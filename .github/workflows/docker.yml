@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# Build the Grimoire container image on top of the official Jennifer image and
+# publish it to GHCR. Pull requests build and smoke-test without publishing, so a
+# broken image is caught before it can be pushed.
+
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # Grimoire is interpreted source, so the image is the same bytes on every
+      # architecture - but the base image is multi-arch, and emulation is what
+      # lets the arm64 variant be assembled and smoke-tested here.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Load a single-arch image locally first: a smoke test has to run before
+      # anything is published, and a multi-arch manifest cannot be loaded into
+      # the local daemon.
+      - name: Build for testing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: grimoire:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the image
+        run: |
+          set -eux
+          docker run --rm grimoire:test --version
+          docker run --rm grimoire:test themes
+
+          # A real book, built end to end, so the test covers more than startup.
+          mkdir -p smoke/docs
+          printf '# Title\n\nA paragraph with `code`.\n\n- one\n  wrapped\n- two\n' \
+            > smoke/docs/index.md
+          printf '[book]\ntitle = "Smoke"\nsrc = "docs"\n[build]\nout = "site"\n[pdf]\nenabled = true\n' \
+            > smoke/grimoire.toml
+
+          # The base image runs as `nonroot`, so writing into a bind mount needs
+          # the caller's own uid - the same flag docs/docker.md tells readers to use.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/smoke:/work" grimoire:test build --pdf
+
+          test -f smoke/site/index.html
+          test -f smoke/site/book.pdf
+          test -f smoke/site/assets/grimoire.css
+          grep -q "wrapped" smoke/site/index.html
+
+      - name: Build and push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

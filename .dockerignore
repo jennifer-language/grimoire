@@ -1,0 +1,6 @@
+.git/
+.github/
+site/
+docs/
+scripts/
+*.pdf

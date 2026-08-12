@@ -1,0 +1,6 @@
+# Build output.
+site/
+
+# Dogfood corpus: the official Jennifer documentation, used during development
+# to have something real to render. Not part of Grimoire, never committed.
+sample-docs/

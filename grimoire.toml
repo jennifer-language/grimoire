@@ -1,0 +1,65 @@
+# Grimoire book configuration for this repository.
+# It builds Grimoire's own documentation in docs/, which is both the manual and
+# the worked example: the tool renders the pages that describe it.
+
+[book]
+title = "Grimoire"
+description = "Build a documentation website, and a printable PDF, from a directory of Markdown files."
+authors = ["mplx <jennifer@mplx.dev>"]
+# What introduces the names in the page footer and on the PDF cover.
+authorsLabel = "Made with ❤ by"
+language = "en"
+src = "docs"
+
+[build]
+out = "site"
+
+[html]
+# Any of the ten built-in themes; run `grimoire themes` for the list.
+theme = "nordic"
+# The colour mode a first-time reader gets: auto, light, or dark.
+mode = "auto"
+tocDepth = 3
+sectionNumbers = true
+footer = 'Rendered with <a href="https://grimoire.jennifer-lang.dev/">Grimoire</a>, by itself.'
+repoUrl = "https://github.com/jennifer-language/grimoire"
+repoLabel = "Source"
+editUrl = "https://github.com/jennifer-language/grimoire/edit/main/docs/{path}"
+favicon = "favicon.ico"
+
+[highlight]
+# Syntax highlighting for code blocks. This is the master switch, and on its own
+# it is the built-in highlighter: Jennifer blocks are coloured while the site is
+# built, with no JavaScript and nothing fetched.
+enabled = true
+
+[highlightjs]
+# Additionally load highlight.js from a CDN, which is what colours the languages
+# the built-in highlighter does not know. This is the only setting that makes a
+# built site depend on a third party, and it does nothing unless [highlight]
+# above is also enabled. Everything else here describes that CDN layer.
+enabled = false
+cdn = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1"
+style = "github"
+styleDark = "github-dark"
+languages = ["bash", "toml", "json", "yaml", "ini"]
+
+[search]
+enabled = true
+bodyChars = 1200
+
+[pdf]
+# On, so `grimoire build` always produces the PDF that index.md links to.
+enabled = true
+output = "grimoire.pdf"
+paper = "a4"
+bookmarkLevel = 3
+# Print "page/total" at the outside edge of every page footer.
+pageNumbers = true
+# The other side of that footer. {version} is the git tag the build sits on, with
+# any leading "v" removed; {commit} is the short commit id, and is filled in only
+# when there is no tag - so this reads "Grimoire 1.0.0 Manual" on a release and
+# "Grimoire Manual 0e173c1" on anything else.
+footerLeft = "Grimoire {version} Manual {commit}"
+# Open the book with a title page. Off starts it at the first chapter.
+titlePage = true

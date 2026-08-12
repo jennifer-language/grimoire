@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+//
+// highlight.js language definition for Jennifer (.j).
+// Written to the common highlight.js API (className + contains + hljs.COMMENT)
+// so it works on both v10 (mdBook bundles 10.1.1) and v11. Works as a CommonJS
+// module (module.exports = factory) and self-registers when a global `hljs` is
+// present (e.g. appended to a highlight.js bundle). See editors/README.md.
+
+(function (factory) {
+  if (typeof hljs !== "undefined" && hljs.registerLanguage) {
+    hljs.registerLanguage("jennifer", factory);
+  }
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = factory;
+  }
+})(function (hljs) {
+  var KEYWORDS = {
+    keyword:
+      "export def const func struct enum use include import as of to init " +
+      "if elseif else while for in repeat until match when break continue return exit " +
+      "try catch throw defer errdefer spawn and or not",
+    built_in: "len",
+    type: "int float string bool bytes list map task",
+    literal: "true false null",
+  };
+
+  var VARIABLE = { className: "variable", begin: /\$[A-Za-z][A-Za-z0-9]*/ };
+
+  // UPPER_CASE constant names (MAX, MAX_RETRIES).
+  var CONSTANT = {
+    className: "symbol",
+    begin: /\b[A-Z][A-Z0-9]*(_[A-Z][A-Z0-9]*)*\b/,
+  };
+
+  var NUMBER = {
+    className: "number",
+    variants: [
+      { begin: /\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\b/ },
+      { begin: /\b0[oO][0-7][0-7_]*\b/ },
+      { begin: /\b0[bB][01][01_]*\b/ },
+      { begin: /\b[0-9][0-9_]*(\.[0-9][0-9_]*([eE][+-]?[0-9]+)?|[eE][+-]?[0-9]+)\b/ },
+      { begin: /\b[0-9][0-9_]*\b/ },
+    ],
+  };
+
+  // Double-quoted is cooked: escape sequences are highlighted and an unescaped
+  // `{expr}` is an interpolation slot (rendered as an embedded `subst`). `\{` /
+  // `\}` are literal-brace escapes (matched before the slot rule so they do not
+  // open a slot). Single-quoted is raw: backslashes are literal and there is no
+  // interpolation, so it carries neither mode.
+  var STRING_COOKED = {
+    className: "string",
+    begin: /"/,
+    end: /"/,
+    contains: [
+      { begin: /\\([nrt\\"'0{}]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/ },
+      {
+        className: "subst",
+        begin: /\{/,
+        end: /\}/,
+        contains: [VARIABLE, NUMBER],
+      },
+    ],
+  };
+  var STRING_RAW = {
+    className: "string",
+    begin: /'/,
+    end: /'/,
+  };
+
+  // Namespace prefix in a qualified call: the `io` in `io.printf(...)`.
+  var NAMESPACE = {
+    className: "built_in",
+    begin: /\b[A-Za-z][A-Za-z0-9]*(?=\.[A-Za-z])/,
+  };
+
+  // A method name immediately before `(`.
+  var FUNCTION = {
+    className: "title",
+    begin: /\b[A-Za-z][A-Za-z0-9]*(?=\s*\()/,
+  };
+
+  // REPL transcript prompts (`>>> ` input, `... ` continuation) at line
+  // start, so a pasted `jennifer repl` session highlights: the prompt shows
+  // as meta and the rest of the line is highlighted as Jennifer. Real source
+  // never begins a line with these, so this is inert in ordinary code.
+  var PROMPT = { className: "meta", begin: /^(>>>|\.\.\.)\s/ };
+
+  return {
+    name: "Jennifer",
+    aliases: ["j"],
+    keywords: KEYWORDS,
+    contains: [
+      PROMPT,
+      hljs.COMMENT("#", "$"),
+      hljs.COMMENT(/\/\*/, /\*\//),
+      STRING_COOKED,
+      STRING_RAW,
+      NUMBER,
+      VARIABLE,
+      NAMESPACE,
+      CONSTANT,
+      FUNCTION,
+    ],
+  };
+});

@@ -1,0 +1,121 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# Build Grimoire's own documentation with Grimoire and publish it to GitHub
+# Pages, PDF included. A pull request builds and checks the output but never
+# publishes.
+#
+# The build runs in the official Jennifer image rather than installing an
+# interpreter on the runner: it is the same command a reader would run from the
+# Docker page of the manual, so this pipeline also keeps that instruction honest.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# GITHUB_TOKEN needs to read the checkout, and the deploy job needs to mint a
+# Pages deployment; id-token is what actions/deploy-pages authenticates with.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one half-way: a partial publish
+# would leave the site serving a mixture of two builds.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # Grimoire's sources require Jennifer 0.25.0, and the `latest` image is still
+  # 0.24.0. Switch this to `latest` the day 0.25.0 is released.
+  JENNIFER_TAG: dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full history and tags, not the default shallow clone: `[pdf] footerLeft`
+      # stamps the page footer from `git describe --tags`, and a depth-1 checkout
+      # fetches no tags at all - so a tagged release would print its commit id
+      # instead of its version, and nothing would fail to say so.
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The version stamp for the PDF footer, worked out here rather than inside
+      # the build. `[pdf] footerLeft` normally asks git for it, but the official
+      # Jennifer image carries no git - so the build would silently print
+      # "Grimoire Manual" with nothing after it. The runner has git and, thanks to
+      # fetch-depth: 0 above, the tags; it hands the answer over instead.
+      #
+      # Exactly one of the two is set, which is the contract the template expects:
+      # a tag when the commit has one, the short commit id otherwise.
+      - name: Work out the version stamp
+        id: stamp
+        run: |
+          set -eu
+          version=$(git describe --tags --exact-match 2>/dev/null || true)
+          version=${version#v}
+          if [ -n "$version" ]; then
+            commit=""
+          else
+            commit=$(git rev-parse --short HEAD)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "stamp: version='$version' commit='$commit'"
+
+      # `grimoire.toml` builds docs/ into site/ with [pdf] enabled, so this is
+      # the whole build: the site and the printable book in one pass, laid out
+      # alongside each other rather than one after the other.
+      - name: Build the site and the PDF
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" \
+            -e GRIMOIRE_VERSION="${{ steps.stamp.outputs.version }}" \
+            -e GRIMOIRE_COMMIT="${{ steps.stamp.outputs.commit }}" \
+            ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG} run ./grimoire build --pdf
+
+      # Assert the pieces a reader actually needs, so a silently empty publish
+      # fails here instead of on the live site. The PDF is checked by name
+      # because docs/index.md links to it: a build that stopped producing it
+      # would leave that link dead. CNAME is checked because this deploys from an
+      # artifact rather than a branch - the published site is only what is in the
+      # tarball, so a missing CNAME silently unbinds the custom domain and drops
+      # the site back to <owner>.github.io/<repo>.
+      - name: Check the output
+        run: |
+          set -eux
+          test -f site/index.html
+          test -f site/grimoire.pdf
+          test -f site/assets/grimoire.css
+          test -f site/assets/search-index.js
+          test -s site/grimoire.pdf
+          grep -q 'href="grimoire.pdf"' site/index.html
+          test "$(cat site/CNAME)" = "grimoire.jennifer-lang.dev"
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
