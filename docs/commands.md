@@ -71,6 +71,7 @@ Build, then serve the result on a local address until interrupted.
 | `-a`, `--addr ADDR` | `127.0.0.1:8080` | address to listen on |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
+| `--no-reload` | off | with `--watch`, do not reload the browser |
 | `--no-build` | off | serve what is already there, without rebuilding |
 
 ```sh
@@ -85,7 +86,7 @@ that caused it:
 ```
 $ grimoire serve --watch
 built 7 pages into site/
-watching docs/ for changes (reload the page to see them)
+watching docs/ for changes (the page reloads itself)
 serving site/ at http://127.0.0.1:8080/ (ctrl-c to stop)
 docs/commands.md modified - rebuilding
 rebuilt 7 pages into site/
@@ -96,10 +97,30 @@ replace across the book - is one rebuild, reported as `and 3 more`. Writing the
 site is not a change: the output directory is left out of the watch, so a book
 that builds into its own source tree does not rebuild itself for ever.
 
-It **does not refresh the browser** - the page shows the change on the next
-reload. Pushing a refresh would mean injecting a script into every page and
-holding a connection open for it, paid for by every reader of the published
-site to save one keystroke here.
+### The browser reloads itself
+
+With `--watch`, every page served carries a small script that polls for the
+build and reloads when it changes, so a save in the editor shows up in the
+window without a keystroke. `--no-reload` turns it off and leaves the watching.
+
+Two properties are worth knowing, because they are the reason it is built this
+way:
+
+- **The script never touches the disk.** It is spliced into the response on its
+  way out, so the files in the output directory are the same bytes a publish
+  would upload. This is why it is not simply written into the page at build
+  time: a preview build that had quietly grown a polling loop would be a bad
+  thing to `rsync`. Nothing outside `serve --watch` ever emits it.
+- **It polls rather than holding a socket open.** The `httpd` engine answers a
+  request once and has no streaming, so there is no WebSocket and no event
+  stream to push down; the script asks a `/.grimoire-reload` endpoint every 700
+  ms, and the endpoint answers with one `stat` of the stylesheet - the file every
+  successful build rewrites. A failed build does not move it, so a page never
+  reloads into a broken one. It also reconnects for free: restart the server
+  under a waiting tab and it simply starts answering again.
+
+The published site is untouched by all of this. It carries no reload script, no
+endpoint, and nothing that polls.
 
 A build that fails does not stop the loop; it reports and waits for the next
 change, which is the moment a watch loop is most useful. Editing `grimoire.toml`

@@ -89,6 +89,7 @@ func serveParser() {
     $p = args.flag($p, "addr", "a", DEFAULT_ADDR, "address to listen on");
     $p = args.boolFlag($p, "no-build", "", "serve what is already in the output directory");
     $p = args.boolFlag($p, "watch", "w", "rebuild whenever a source file changes");
+    $p = args.boolFlag($p, "no-reload", "", "with --watch, do not reload the browser");
     return uiLanguageFlag($p);
 }
 
@@ -277,14 +278,17 @@ func runServe(r as args.Result, appDir as string) {
         warn("nothing to serve: " + $c.outDir + " does not exist");
         return 1;
     }
+    # Reloading the browser is the other half of watching, and is off without it:
+    # there is nothing to reload for when nothing is rebuilding.
+    def live as bool init args.has($r, "watch") and not args.has($r, "no-reload");
     if (args.has($r, "watch")) {
-        io.printf("%s\n", watch.notice($c));
+        io.printf("%s\n", watch.notice($c, $live));
         def configPath as string init args.asString($r, "config");
         spawn {
             return watch.run($c, $configPath);
         };
     }
-    return serve.run($c.outDir, args.asString($r, "addr"));
+    return serve.run($c.outDir, args.asString($r, "addr"), $live);
 }
 
 func runThemes() {

@@ -65,6 +65,9 @@ default.
   arrow keys to move, `Enter` to open. No search library: the index and the
   scorer are both Grimoire's own, and the index loads as a script rather than a
   `fetch` so it works over `file://`.
+- **A preview that reloads itself.** `serve --watch` rebuilds on save and
+  reloads the open page, with the script that does it spliced into the response
+  rather than written to disk - the published files never carry it.
 - **[Eleven interface languages](configuration.md#the-interface-language).** The
   twenty-odd words Grimoire adds around your text - "Search", "On this page",
   "Previous" - follow the book's `language`, with English wherever no

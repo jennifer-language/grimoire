@@ -17,6 +17,7 @@
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
  */
+use convert;
 
 # The runtime. Written as a raw string so the braces of the JavaScript are never
 # read as Jennifer interpolation slots; that also rules out the apostrophe, which
@@ -582,6 +583,32 @@ def const RUNTIME_JS as string init '/* grimoire runtime - no dependencies, work
  */
 export func runtime() {
     return RUNTIME_JS;
+}
+
+/**
+ * The live-reload script, injected into a page by `grimoire serve --watch` and
+ * by nothing else.
+ *
+ * It polls rather than holding a socket open, because that is what the server
+ * underneath it can do: `httpd` answers a request once and has no streaming, so
+ * neither a WebSocket nor an event stream is available to push from. A poll of a
+ * few bytes against a local server is not the part of this worth optimising, and
+ * it reconnects for free - a server restarted under a waiting browser simply
+ * starts answering again, where a socket would need reconnect logic.
+ *
+ * The first answer is only recorded, never acted on, so opening a page never
+ * reloads it. A failed request is ignored: the server is being restarted, or the
+ * build is mid-write.
+ * @param endpoint {string} the path answering with the build token
+ * @param pollMs {int} how often to ask
+ * @return {string} the JavaScript source
+ */
+export func liveReload(endpoint as string, pollMs as int) {
+    return '(function(){var last=null;setInterval(function(){' +
+        'fetch("' + $endpoint + '",{cache:"no-store"}).then(function(r){return r.text();})' +
+        '.then(function(v){if(!v){return;}if(last===null){last=v;return;}' +
+        'if(v!==last){location.reload();}}).catch(function(){});},' +
+        convert.toString($pollMs) + ');})();';
 }
 
 /**

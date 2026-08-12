@@ -11,11 +11,9 @@
  * sits on runs outside the interpreter, so the server in the main task is never
  * held up by it.
  *
- * What it does **not** do is refresh the browser. The output is a static
- * directory served straight off disk, so a rebuild is live as soon as it lands
- * and the page shows it on the next reload. Pushing a refresh would mean
- * injecting a script into every page and holding a connection open for it -
- * paid for by every reader of the published site, to save one keystroke here.
+ * Refreshing the browser is `serve`'s half of the job, not this one: it splices
+ * a script into the pages it serves that polls for the build. Nothing here
+ * knows about that, and nothing on disk carries it - see `src/serve.j`.
  * @module watch
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -177,11 +175,15 @@ export func run(c as config.Config, configPath as string) {
 }
 
 /**
- * The one-line notice `serve` prints when watching, so the reader knows a
- * rebuild is automatic but a refresh is not.
+ * The one-line notice `serve` prints when watching, which says whether the
+ * browser will follow along on its own or has to be told.
  * @param c {config.Config} the book configuration
+ * @param live {bool} whether the pages served carry the reload script
  * @return {string} the notice
  */
-export func notice(c as config.Config) {
+export func notice(c as config.Config, live as bool) {
+    if ($live) {
+        return "watching " + $c.srcDir + "/ for changes (the page reloads itself)";
+    }
     return "watching " + $c.srcDir + "/ for changes (reload the page to see them)";
 }
