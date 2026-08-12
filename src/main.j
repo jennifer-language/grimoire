@@ -34,6 +34,7 @@ import "./summary.j" as summary;
 import "./build.j" as build;
 import "./theme.j" as theme;
 import "./serve.j" as serve;
+import "./watch.j" as watch;
 
 def const VERSION as string init "grimoire 1.0.0";
 def const DEFAULT_CONFIG as string init "grimoire.toml";
@@ -74,6 +75,7 @@ func serveParser() {
     def p as args.Parser init commonFlags(args.parser("serve", "Build, then serve the site"));
     $p = args.flag($p, "addr", "a", DEFAULT_ADDR, "address to listen on");
     $p = args.boolFlag($p, "no-build", "", "serve what is already in the output directory");
+    $p = args.boolFlag($p, "watch", "w", "rebuild whenever a source file changes");
     return $p;
 }
 
@@ -242,6 +244,13 @@ func runServe(r as args.Result, appDir as string) {
         warn("nothing to serve: " + $c.outDir + " does not exist");
         return 1;
     }
+    if (args.has($r, "watch")) {
+        io.printf("%s\n", watch.notice($c));
+        def configPath as string init args.asString($r, "config");
+        spawn {
+            return watch.run($c, $configPath);
+        };
+    }
     return serve.run($c.outDir, args.asString($r, "addr"));
 }
 
@@ -289,6 +298,12 @@ footer = "Rendered with <a href=\"https://grimoire.jennifer-lang.dev/\">Grimoire
 # An SVG is inlined into the mark beside the title, so it follows the colour
 # mode; any other image is referenced. The path is relative to `src`.
 # logo = "logo.svg"
+# Give each page a `keywords` meta tag, worked out from its own title, headings,
+# and code spans.
+keywords = true
+# Words the keyword pass should ignore on top of the built-in English list -
+# whatever is furniture in the subject this book covers.
+# keywordStopwords = ["def", "init", "return"]
 
 [highlight]
 # Syntax highlighting for code blocks. This is the master switch, and on its own

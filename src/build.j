@@ -31,6 +31,7 @@ import "./content.j" as content;
 import "./layout.j" as layout;
 import "./theme.j" as theme;
 import "./assets.j" as assets;
+import "./keywords.j" as keywords;
 import "./search.j" as search;
 import "./pdfbook.j" as pdfbook;
 import "./util.j" as util;
@@ -147,6 +148,19 @@ func missingPages(c as config.Config, entries as list of summary.Entry) {
         }
     }
     return $out;
+}
+
+# How many keywords a page's meta tag carries. Enough to describe a chapter,
+# few enough that the tag stays a summary rather than a word list.
+def const KEYWORD_LIMIT as int init 10;
+
+# pageKeywords derives the `keywords` meta tag for a page, or "" when the book
+# has turned them off.
+func pageKeywords(c as config.Config, rendered as content.Rendered) {
+    if (not $c.keywords) {
+        return "";
+    }
+    return keywords.line($rendered, KEYWORD_LIMIT, $c.keywordStopwords);
 }
 
 # editUrl fills the `{path}` slot of the configured template with the chapter's
@@ -492,6 +506,7 @@ func renderSlice(
         def root as string init util.relPrefix(util.depthOf($entry.out));
         def view as layout.View init layout.View{
             title: plainTitle(titleFor($entry, $rendered)),
+            keywords: pageKeywords($c, $rendered),
             body: $rendered.html,
             toc: content.tocHtml($rendered.headings, $c.tocDepth),
             root: $root,

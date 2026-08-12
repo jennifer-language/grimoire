@@ -39,6 +39,8 @@ repoLabel = "Source"
 editUrl = ""
 favicon = ""
 logo = ""
+keywords = true
+keywordStopwords = []
 
 [highlight]
 enabled = false
@@ -120,6 +122,8 @@ knowing before publishing.
 | `editUrl` | string | `""` | an edit-this-page URL with a `{path}` slot; `""` for none |
 | `favicon` | string | `""` | a favicon path, copied into the site |
 | `logo` | string | `""` | a logo shown beside the title, relative to `src` |
+| `keywords` | bool | `true` | derive a `keywords` meta tag for each page from the page itself |
+| `keywordStopwords` | list of string | `[]` | further words the keyword pass should ignore |
 
 `mode` only decides the **first** visit. Once a reader touches the selector,
 their choice is remembered and this setting no longer applies to them. Whatever
@@ -140,6 +144,71 @@ is fine:
 ```toml
 logo = "../assets/wordmark.svg"
 ```
+
+`keywords` gives each page a `<meta name="keywords">` worked out from its own
+content. The scoring is structural rather than statistical - a term is worth the
+sum of its weighted appearances:
+
+| where it appears | weight |
+| ---------------- | -----: |
+| the page title | 8 |
+| a level-2 heading | 4 |
+| a deeper heading | 3 |
+| a code span | 3 |
+| body text | 1 |
+
+So a word in the title outranks eight mentions in prose, and an identifier the
+page discusses outranks three - which is the right answer for a reference page
+whose subject is named twice and used everywhere. The top ten win.
+
+There is no TF-IDF here, and that is deliberate twice over. Corpus-wide document
+frequencies are not available: chapters render in parallel and are written as
+they finish, so no worker knows about the others' text. And a documentation page
+already declares its subject in places prose statistics cannot see - its title,
+its headings, the identifiers it puts in code spans - so weighting those beats
+counting words, in one pass over one page.
+
+Three details make the difference on technical prose:
+
+- **Qualified names survive whole.** A term may contain `.`, `-`, and `_`, so
+  `strings.join`, `jennifer-tiny`, and `snake_case` stay single terms instead of
+  being shredded into fragments. On the Jennifer library reference this is most
+  of the value: `strings.substring`, `task.waitany`, `task.discard`.
+- **Plurals fold into singulars** when the page uses both, so `module` and
+  `modules` do not take two of the ten slots. Only an exact trailing `s` counts,
+  and only when the singular is a term the page actually used.
+- **Boolean literals are stopped.** Code spans score 3, so a configuration page
+  full of `enabled = false` would otherwise rank `false` above the settings it is
+  describing.
+
+`keywordStopwords` adds to the built-in list, which can only know about English.
+A book knows what is furniture in *its* subject - and those terms are exactly the
+ones that describe every chapter equally, and so describe none. A language manual
+is the clearest case:
+
+```toml
+keywordStopwords = ["def", "init", "return", "int"]
+```
+
+Without it, Jennifer's concurrency chapter offers
+`task, spawn, task.discard, task.wait, return, task.waitall, def, init, int, task.waitany`;
+with it, the three keywords give way to `concurrency, error, catch, try`. Entries
+are lowercased and trimmed, so case in the config does not matter.
+
+Only the first 600 characters of each section's body are read. Body text is the
+weakest signal here - one point against a title's eight - and a section states
+its subject in its opening sentences or not at all, so reading further buys
+ranking that does not change and costs a pass over the whole book. On a
+155-chapter, 2.3 MiB book the whole keyword pass adds about 30% to a build; set
+`keywords = false` if that is not a trade you want.
+
+Ties break alphabetically, so the tag is byte-identical no matter what `--jobs`
+was.
+
+One caveat worth stating: **Google has ignored this tag since 2009.** It is still
+read by some other engines, by site-internal search, and by tooling that
+inventories a documentation set - which is what it is here. If none of those
+apply to your book, `keywords = false` and the tag is not emitted at all.
 
 `footer` is emitted **verbatim**, so it can carry HTML:
 

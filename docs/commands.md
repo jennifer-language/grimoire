@@ -68,11 +68,45 @@ Build, then serve the result on a local address until interrupted.
 | `-o`, `--out DIR` | from config | which directory to serve |
 | `-v`, `--verbose` | off | report each chapter as it is rendered |
 | `-a`, `--addr ADDR` | `127.0.0.1:8080` | address to listen on |
+| `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-build` | off | serve what is already there, without rebuilding |
 
 ```sh
 grimoire serve
+grimoire serve --watch
 grimoire serve --addr 0.0.0.0:9000 --no-build
+```
+
+`--watch` watches the source tree and rebuilds when it changes, naming the file
+that caused it:
+
+```
+$ grimoire serve --watch
+built 7 pages into site/
+watching docs/ for changes (reload the page to see them)
+serving site/ at http://127.0.0.1:8080/ (ctrl-c to stop)
+docs/commands.md modified - rebuilding
+rebuilt 7 pages into site/
+```
+
+A change that lands on several files at once - a `git checkout`, a search and
+replace across the book - is one rebuild, reported as `and 3 more`. Writing the
+site is not a change: the output directory is left out of the watch, so a book
+that builds into its own source tree does not rebuild itself for ever.
+
+It **does not refresh the browser** - the page shows the change on the next
+reload. Pushing a refresh would mean injecting a script into every page and
+holding a connection open for it, paid for by every reader of the published
+site to save one keystroke here.
+
+A build that fails does not stop the loop; it reports and waits for the next
+change, which is the moment a watch loop is most useful. Editing `grimoire.toml`
+is noticed but **not** applied - the loop holds the configuration resolved when
+`serve` started, command-line overrides included, so it says so rather than
+rebuilding with the old theme and looking like it worked:
+
+```
+grimoire.toml modified - restart serve to pick it up
 ```
 
 The server runs a small pool of accept loops, because a browser asks for the

@@ -38,6 +38,10 @@ use convert;
  * @field editUrlTemplate {string} an edit-this-page URL with a `{path}` slot ("" for none)
  * @field favicon {string} a favicon path copied into the site ("" for none)
  * @field logo {string} a logo shown beside the title, relative to the source dir ("" for none)
+ * @field keywords {bool} derive a `keywords` meta tag for each page from its own
+ *   title, headings, and code spans
+ * @field keywordStopwords {list of string} further words this book's keyword pass
+ *   should ignore, on top of the built-in English stop list
  * @field search {bool} whether to build the search index and ship the search UI
  * @field searchBodyChars {int} how much body text each search record keeps
  * @field pdf {bool} whether `grimoire build` also renders the PDF
@@ -86,6 +90,8 @@ export def struct Config {
     editUrlTemplate as string,
     favicon as string,
     logo as string,
+    keywords as bool,
+    keywordStopwords as list of string,
     search as bool,
     searchBodyChars as int,
     pdf as bool,
@@ -149,6 +155,8 @@ export func defaults() {
         editUrlTemplate: "",
         favicon: "",
         logo: "",
+        keywords: true,
+        keywordStopwords: [],
         search: true,
         searchBodyChars: 1200,
         pdf: false,
@@ -250,6 +258,8 @@ export func apply(base as Config, text as string) {
     $c.editUrlTemplate = strAt($doc, "/html/editUrl", $c.editUrlTemplate);
     $c.favicon = strAt($doc, "/html/favicon", $c.favicon);
     $c.logo = strAt($doc, "/html/logo", $c.logo);
+    $c.keywords = boolAt($doc, "/html/keywords", $c.keywords);
+    $c.keywordStopwords = stringsAt($doc, "/html/keywordStopwords", $c.keywordStopwords);
     $c.search = boolAt($doc, "/search/enabled", $c.search);
     $c.searchBodyChars = intAt($doc, "/search/bodyChars", $c.searchBodyChars);
     $c.pdf = boolAt($doc, "/pdf/enabled", $c.pdf);

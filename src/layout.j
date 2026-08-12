@@ -28,6 +28,7 @@ import "./assets.j" as assets;
  * Everything that varies from page to page, gathered so the shell takes one
  * argument instead of a dozen.
  * @field title {string} the page title
+ * @field keywords {string} the page's `keywords` meta tag value ("" for none)
  * @field body {string} the rendered body HTML
  * @field toc {string} the contents list HTML ("" for none)
  * @field root {string} the `../` prefix from this page back to the site root
@@ -39,6 +40,7 @@ import "./assets.j" as assets;
  */
 export def struct View {
     title as string,
+    keywords as string,
     body as string,
     toc as string,
     root as string,
@@ -333,6 +335,9 @@ func head(c as config.Config, v as View) {
     def authors as string init config.authorLine($c);
     if ($authors != "") {
         $out[] = '<meta name="author" content="' + attrEsc($authors) + '">';
+    }
+    if ($v.keywords != "") {
+        $out[] = '<meta name="keywords" content="' + attrEsc($v.keywords) + '">';
     }
     $out[] = '<meta name="generator" content="Grimoire">';
     $out[] = '<meta property="og:title" content="' + attrEsc($title) + '">';

@@ -230,5 +230,5 @@ jennifer lint src/*.j src/themes/*.j scripts/*.j
 ## Possible extensions
 
 Not built, but the shape is there for them: a link checker over the resolved
-outline (the build already knows every output path and anchor), a `--watch`
-rebuild loop for `serve`, and multi-language books.
+outline (the build already knows every output path and anchor), and
+multi-language books.
