@@ -27,12 +27,14 @@ use fs;
 use path;
 use time;
 use convert;
+use strings;
 
 import "args.j" as args;
 import "./config.j" as config;
 import "./summary.j" as summary;
 import "./build.j" as build;
 import "./theme.j" as theme;
+import "./locale.j" as locale;
 import "./serve.j" as serve;
 import "./watch.j" as watch;
 
@@ -53,6 +55,17 @@ func commonFlags(p as args.Parser) {
     return $out;
 }
 
+# The interface language, on the two commands that render a site. Not on `pdf`:
+# the printed book has no chrome to translate.
+func uiLanguageFlag(p as args.Parser) {
+    return args.flag(
+        $p,
+        "ui-language",
+        "L",
+        "",
+        "language for Grimoire's own strings (overrides the config)");
+}
+
 func buildParser() {
     def p as args.Parser init commonFlags(args.parser("build", "Build the site"));
     $p = args.flag($p, "theme", "t", "", "theme name (overrides the config)");
@@ -61,7 +74,7 @@ func buildParser() {
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
     $p = args.boolFlag($p, "quiet", "q", "print nothing on success");
-    return $p;
+    return uiLanguageFlag($p);
 }
 
 func pdfParser() {
@@ -76,7 +89,7 @@ func serveParser() {
     $p = args.flag($p, "addr", "a", DEFAULT_ADDR, "address to listen on");
     $p = args.boolFlag($p, "no-build", "", "serve what is already in the output directory");
     $p = args.boolFlag($p, "watch", "w", "rebuild whenever a source file changes");
-    return $p;
+    return uiLanguageFlag($p);
 }
 
 func initParser() {
@@ -140,9 +153,17 @@ func configure(r as args.Result, appDir as string) {
     if (args.has($r, "jobs")) {
         $c.jobs = args.asInt($r, "jobs");
     }
+    if (args.has($r, "ui-language")) {
+        $c.uiLanguage = args.asString($r, "ui-language");
+    }
     if (args.has($r, "verbose")) {
         $c.verbose = true;
     }
+    # Grimoire's own strings are library state rather than a value threaded
+    # through the renderer, so they are selected here, at the one point where the
+    # configuration is finished and nothing has rendered yet. Every worker that
+    # spawns later shares the choice.
+    locale.install($c.uiLanguage);
     return $c;
 }
 
@@ -156,6 +177,16 @@ func checkTheme(c as config.Config) {
     if (not theme.has($c.theme)) {
         warn("unknown theme " + $c.theme + "; using " + theme.fallback() +
             " (see: grimoire themes)");
+    }
+}
+
+# checkLanguage says so when Grimoire has no strings of its own in the book's
+# language. Not an error: the book still builds, with English furniture around
+# the author's own text, which is the only sensible fallback.
+func checkLanguage(c as config.Config) {
+    if (not locale.has($c.uiLanguage)) {
+        warn("no interface strings for " + $c.uiLanguage + "; using English (have: " +
+            strings.join(locale.names(), ", ") + ")");
     }
 }
 
@@ -185,6 +216,7 @@ func humanBytes(n as int) {
 func runBuild(r as args.Result, appDir as string) {
     def c as config.Config init configure($r, $appDir);
     checkTheme($c);
+    checkLanguage($c);
     def started as time.Time init time.now();
     def report as build.Report init build.run($c);
     def elapsed as int init time.milliseconds(time.sub(time.now(), $started));
@@ -236,6 +268,7 @@ func runServe(r as args.Result, appDir as string) {
     def c as config.Config init configure($r, $appDir);
     if (not args.has($r, "no-build")) {
         checkTheme($c);
+        checkLanguage($c);
         def report as build.Report init build.run($c);
         reportMissing($report);
         io.printf("built %d pages into %s/\n", $report.pages, $c.outDir);

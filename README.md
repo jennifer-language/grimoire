@@ -31,6 +31,9 @@ that works served from a web root, served from a subdirectory, or opened
 straight off the disk over `file://`, search included. Nothing is fetched from
 anywhere unless you opt in.
 
+The words Grimoire adds around your text - "Search", "On this page", the
+colour-mode buttons - follow the book's `language`, in English and ten more.
+
 Ten themes ship, each with a light and a dark palette:
 
 ![grimoire](docs/screenshots/grimoire.png)

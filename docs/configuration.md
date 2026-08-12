@@ -31,6 +31,7 @@ jobs = 0                # 0 = one render task per CPU
 [html]
 theme = "grimoire"
 mode = "auto"           # auto | light | dark
+uiLanguage = "en"       # defaults to book.language
 tocDepth = 3
 sectionNumbers = true
 footer = "Rendered with <a href=\"...\">Grimoire</a>"
@@ -75,7 +76,7 @@ exclude = []
 | `description` | string | `""` | emitted as a `description` meta tag, and as the PDF `Subject` |
 | `authors` | list of string | `[]` | the `author` meta tag, the PDF `Author` field, and the reader-facing credit |
 | `authorsLabel` | string | `"Written by"` | what introduces those names where a reader sees them; `""` prints them alone |
-| `language` | string | `"en"` | the BCP 47 tag on the `html` element |
+| `language` | string | `"en"` | the BCP 47 tag on the `html` element, and the language Grimoire's own words are printed in |
 | `src` | string | `"docs"` | the directory of Markdown to build, relative to the working directory |
 
 `src` is where the outline comes from. If it holds a `SUMMARY.md`, that file is
@@ -114,6 +115,7 @@ knowing before publishing.
 | --- | ---- | ------- | ------- |
 | `theme` | string | `"grimoire"` | one of the [ten themes](themes.md); an unknown name falls back to `grimoire` |
 | `mode` | string | `"auto"` | the colour mode a first-time reader gets: `auto`, `light`, `dark` |
+| `uiLanguage` | string | from `book.language` | the language Grimoire's own words are printed in, when it differs from the book's |
 | `tocDepth` | int | `3` | deepest heading level in the per-page contents; clamped to 1-6 |
 | `sectionNumbers` | bool | `true` | number the chapters in the sidebar |
 | `footer` | string | the Grimoire credit | HTML placed in the page footer; `""` for no footer |
@@ -129,6 +131,38 @@ knowing before publishing.
 their choice is remembered and this setting no longer applies to them. Whatever
 it resolves to is stamped on the document before the first paint, so navigating
 a dark site never flashes white.
+
+### The interface language
+
+Grimoire puts about twenty words of its own on a page - "Search", "On this page",
+"Previous", the colour-mode buttons, the keyboard hints in the search dialog, the
+label on the copy-code button - and they follow `book.language`:
+
+| | | | |
+| - | - | - | - |
+| `de` German | `es` Spanish | `fr` French | `it` Italian |
+| `ja` Japanese | `nl` Dutch | `pl` Polish | `pt` Portuguese |
+| `ru` Russian | `zh` Chinese | `en` English | |
+
+A region is read as its base language, so `pt-BR` gets Portuguese and `de-AT`
+German. A book in a language not on that list still builds - the interface stays
+English, and the build says so once on stderr rather than filling the page with
+untranslated key names.
+
+`uiLanguage` is for when the two should differ: a book written in German whose
+readers expect English furniture, or the reverse.
+
+```toml
+[book]
+language = "de"     # what the chapters are written in, and the html lang attribute
+
+[html]
+uiLanguage = "en"   # but Search and On this page stay English
+```
+
+None of this touches the book's own text, and none of it reaches the PDF - the
+printed book carries the author's words and the two strings configured around
+them, `authorsLabel` and `[pdf] footerLeft`.
 
 `editUrl` substitutes the chapter's source path for `{path}`:
 

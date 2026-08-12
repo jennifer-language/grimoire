@@ -20,6 +20,7 @@ use convert;
 
 import "html.j" as html;
 import "./config.j" as config;
+import "./locale.j" as locale;
 import "./summary.j" as summary;
 import "./content.j" as content;
 import "./assets.j" as assets;
@@ -215,34 +216,43 @@ export func navHtml(items as list of NavItem, current as string, root as string)
     for (def item in $items) {
         $rows[] = navRow($item, $current, $root);
     }
-    return '<nav class="gr-nav" aria-label="Book contents"><ol>' + strings.join($rows, "") +
+    return '<nav class="gr-nav" aria-label="' + attrEsc(locale.tr("bookContents")) + '"><ol>' +
+        strings.join($rows, "") +
         "</ol></nav>";
 }
 
 # --- chrome pieces -------------------------------------------------
 
+# modeButton is one colour-mode radio. The label is both the tooltip and the
+# accessible name, so it is escaped once and used twice.
+func modeButton(mode as string, key as string, icon as string) {
+    def label as string init attrEsc(locale.tr($key));
+    return '<button type="button" role="radio" data-mode="' + $mode + '" ' +
+        'aria-checked="false" title="' + $label + '" aria-label="' + $label + '">' +
+        $icon + "</button>";
+}
+
 func modeSelector() {
-    def out as string init '<div class="gr-modes" role="radiogroup" aria-label="Colour mode">';
-    $out = $out + '<button type="button" role="radio" data-mode="light" aria-checked="false" ' +
-        'title="Light" aria-label="Light">' + ICON_SUN + "</button>";
-    $out = $out + '<button type="button" role="radio" data-mode="auto" aria-checked="false" ' +
-        'title="Match the system" aria-label="Match the system">' + ICON_AUTO + "</button>";
-    $out = $out + '<button type="button" role="radio" data-mode="dark" aria-checked="false" ' +
-        'title="Dark" aria-label="Dark">' + ICON_MOON + "</button>";
-    return $out + "</div>";
+    return '<div class="gr-modes" role="radiogroup" aria-label="' +
+        attrEsc(locale.tr("colourMode")) + '">' +
+        modeButton("light", "light", ICON_SUN) +
+        modeButton("auto", "matchSystem", ICON_AUTO) +
+        modeButton("dark", "dark", ICON_MOON) + "</div>";
 }
 
 func topbar(c as config.Config, v as View, b as Brand) {
     def out as string init '<header class="gr-topbar">';
     $out = $out + '<button class="gr-btn gr-icon-btn" id="gr-menu" type="button" ' +
-        'aria-expanded="false" aria-controls="gr-sidebar" aria-label="Toggle navigation">' +
+        'aria-expanded="false" aria-controls="gr-sidebar" aria-label="' +
+        attrEsc(locale.tr("toggleNav")) + '">' +
         ICON_MENU + "</button>";
     $out = $out + '<a class="gr-brand" href="' + attrEsc($v.root + "index.html") + '">' +
         brandMark($b, $v.root, $c.title) + html.escape($c.title) + "</a>";
     $out = $out + '<span class="gr-spacer"></span>';
     if ($c.search) {
         $out = $out + '<button class="gr-btn gr-searchbtn" id="gr-search-open" type="button" ' +
-            'aria-label="Search">' + ICON_SEARCH + "<span>Search</span>" +
+            'aria-label="' + attrEsc(locale.tr("search")) + '">' + ICON_SEARCH +
+            "<span>" + html.escape(locale.tr("search")) + "</span>" +
             '<kbd class="gr-kbd">/</kbd></button>';
     }
     $out = $out + modeSelector();
@@ -258,15 +268,18 @@ func pager(v as View) {
     if ($v.prevTitle == "" and $v.nextTitle == "") {
         return "";
     }
-    def out as string init '<nav class="gr-pager" aria-label="Chapter navigation">';
+    def out as string init '<nav class="gr-pager" aria-label="' +
+        attrEsc(locale.tr("chapterNav")) + '">';
     if ($v.prevTitle != "") {
         $out = $out + '<a class="gr-prev" href="' + attrEsc($v.prevHref) + '" rel="prev">' +
-            '<span class="gr-dir">Previous</span><span class="gr-title">' +
+            '<span class="gr-dir">' + html.escape(locale.tr("previous")) +
+            '</span><span class="gr-title">' +
             $v.prevTitle + "</span></a>";
     }
     if ($v.nextTitle != "") {
         $out = $out + '<a class="gr-next" href="' + attrEsc($v.nextHref) + '" rel="next">' +
-            '<span class="gr-dir">Next</span><span class="gr-title">' +
+            '<span class="gr-dir">' + html.escape(locale.tr("next")) +
+            '</span><span class="gr-title">' +
             $v.nextTitle + "</span></a>";
     }
     return $out + "</nav>";
@@ -286,7 +299,7 @@ func footer(c as config.Config, v as View) {
     }
     if ($v.editUrl != "") {
         $bits[] = '<a href="' + attrEsc(html.safeUrl($v.editUrl)) +
-            '" rel="noopener noreferrer">Edit this page</a>';
+            '" rel="noopener noreferrer">' + html.escape(locale.tr("editPage")) + "</a>";
     }
     if (len($bits) == 0) {
         return "";
@@ -298,23 +311,33 @@ func tocColumn(v as View) {
     if ($v.toc == "") {
         return '<aside class="gr-toc"></aside>';
     }
-    return '<aside class="gr-toc" aria-label="On this page"><div class="gr-toc-inner">' +
-        "<h2>On this page</h2>" + $v.toc + "</div></aside>";
+    def label as string init locale.tr("onThisPage");
+    return '<aside class="gr-toc" aria-label="' + attrEsc($label) +
+        '"><div class="gr-toc-inner"><h2>' + html.escape($label) + "</h2>" +
+        $v.toc + "</div></aside>";
 }
 
 func searchDialog(c as config.Config) {
     if (not $c.search) {
         return "";
     }
+    # The key caps stay as they are - Enter and Esc are what is printed on the
+    # keyboard, in every language - and only the words around them translate.
+    def searchBook as string init locale.tr("searchBook");
     return '<div class="gr-search" id="gr-search" hidden role="dialog" aria-modal="true" ' +
-        'aria-label="Search"><div class="gr-search-panel"><div class="gr-search-head">' +
+        'aria-label="' + attrEsc(locale.tr("search")) +
+        '"><div class="gr-search-panel"><div class="gr-search-head">' +
         ICON_SEARCH + '<input id="gr-search-input" type="search" autocomplete="off" ' +
-        'spellcheck="false" placeholder="Search the book" aria-label="Search the book">' +
-        '</div><p class="gr-empty" id="gr-empty">Type to search the book.</p>' +
+        'spellcheck="false" placeholder="' + attrEsc($searchBook) + '" aria-label="' +
+        attrEsc($searchBook) + '">' +
+        '</div><p class="gr-empty" id="gr-empty">' + html.escape(locale.tr("typeToSearch")) +
+        "</p>" +
         '<ul class="gr-results" id="gr-results"></ul><div class="gr-search-foot">' +
-        '<span><kbd class="gr-kbd">&uarr;</kbd> <kbd class="gr-kbd">&darr;</kbd> to move</span>' +
-        '<span><kbd class="gr-kbd">Enter</kbd> to open</span>' +
-        '<span><kbd class="gr-kbd">Esc</kbd> to close</span></div></div></div>';
+        '<span><kbd class="gr-kbd">&uarr;</kbd> <kbd class="gr-kbd">&darr;</kbd> ' +
+        html.escape(locale.tr("toMove")) + "</span>" +
+        '<span><kbd class="gr-kbd">Enter</kbd> ' + html.escape(locale.tr("toOpen")) + "</span>" +
+        '<span><kbd class="gr-kbd">Esc</kbd> ' + html.escape(locale.tr("toClose")) +
+        "</span></div></div></div>";
 }
 
 func head(c as config.Config, v as View) {
@@ -353,6 +376,22 @@ func head(c as config.Config, v as View) {
     return strings.join($out, "\n");
 }
 
+# The strings the runtime script writes into the page after it loads: the search
+# dialog's two states, its no-match line, and the copy button's before and after.
+# They travel as data in the settings blob rather than being baked into the
+# script, because the script is one shared asset and the language is per book.
+func runtimeStrings(c as config.Config) {
+    def out as json.Value init json.map();
+    $out = json.set($out, "/copied", locale.tr("copied"));
+    $out = json.set($out, "/copyCode", locale.tr("copyCode"));
+    if ($c.search) {
+        $out = json.set($out, "/loadingIndex", locale.tr("loadingIndex"));
+        $out = json.set($out, "/noResults", locale.tr("noResults"));
+        $out = json.set($out, "/typeToSearch", locale.tr("typeToSearch"));
+    }
+    return $out;
+}
+
 /**
  * Render a complete HTML page.
  * @param c {config.Config} the book configuration
@@ -365,7 +404,8 @@ export func page(c as config.Config, v as View, nav as string, b as Brand) {
     def out as list of string;
     $out[] = head($c, $v);
     $out[] = "<body>";
-    $out[] = '<a class="gr-skip" href="#gr-main">Skip to content</a>';
+    $out[] = '<a class="gr-skip" href="#gr-main">' +
+        html.escape(locale.tr("skipToContent")) + "</a>";
     $out[] = topbar($c, $v, $b);
     $out[] = '<div class="gr-shell">';
     $out[] = '<div class="gr-backdrop" id="gr-backdrop" data-open="false"></div>';
@@ -387,6 +427,7 @@ export func page(c as config.Config, v as View, nav as string, b as Brand) {
     def settings as json.Value init json.map();
     $settings = json.set($settings, "/root", $v.root);
     $settings = json.set($settings, "/search", $c.search);
+    $settings = json.set($settings, "/t", runtimeStrings($c));
     if (config.usesHighlightJs($c)) {
         $settings = json.set($settings, "/hlCdn", $c.highlightCdn);
         $settings = json.set($settings, "/hlStyle", $c.highlightStyle);

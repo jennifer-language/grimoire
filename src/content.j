@@ -27,6 +27,7 @@ import "markdown.j" as markdown;
 import "html.j" as html;
 import "./highlight.j" as highlight;
 import "./util.j" as util;
+import "./locale.j" as locale;
 
 /**
  * One heading of a page, as the contents list needs it.
@@ -216,11 +217,19 @@ func renderTable(n as markdown.Node) {
 
 # The copy button carries its own SVG so the page needs no icon font and no
 # network request; the script attaches the behaviour.
-def const COPY_BUTTON as string init '<button class="gr-copy" type="button" ' +
-    'aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+#
+# A function rather than a `def const`, because its label is translated and a
+# module constant is built before the catalogs are loaded.
+def const COPY_ICON as string init '<svg viewBox="0 0 24 24" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true">' +
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
-    '<path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>';
+    '<path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+
+func copyButton() {
+    return '<button class="gr-copy" type="button" aria-label="' +
+        attrEsc(locale.tr("copyCode")) + '">' + COPY_ICON + "</button>";
+}
 
 func renderCode(n as markdown.Node, highlighting as bool) {
     def lang as string init strings.trim(markdown.attr($n, "lang"));
@@ -243,7 +252,7 @@ func renderCode(n as markdown.Node, highlighting as bool) {
     if (len($classes) > 0) {
         $cls = ' class="' + strings.join($classes, " ") + '"';
     }
-    return '<div class="gr-codeblock">' + $label + COPY_BUTTON + "<pre><code" + $cls + ">" +
+    return '<div class="gr-codeblock">' + $label + copyButton() + "<pre><code" + $cls + ">" +
         $body + "</code></pre></div>";
 }
 

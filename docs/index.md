@@ -65,6 +65,10 @@ default.
   arrow keys to move, `Enter` to open. No search library: the index and the
   scorer are both Grimoire's own, and the index loads as a script rather than a
   `fetch` so it works over `file://`.
+- **[Eleven interface languages](configuration.md#the-interface-language).** The
+  twenty-odd words Grimoire adds around your text - "Search", "On this page",
+  "Previous" - follow the book's `language`, with English wherever no
+  translation exists yet.
 - **[Ten themes](themes.md)**, each with a light and a dark palette.
 - **A mandatory dark mode.** Every theme ships both palettes; the selector in
   the top bar offers light, dark, and follow-the-system, and the choice is

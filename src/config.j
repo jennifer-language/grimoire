@@ -26,6 +26,10 @@ use convert;
  * @field authorsLabel {string} what introduces the author names where a reader
  *   sees them - the page footer and the PDF cover ("" for the names alone)
  * @field language {string} the BCP 47 language tag for the `html` element
+ * @field uiLanguage {string} the language Grimoire's own strings are rendered in
+ *   - "Search", "On this page", the colour-mode buttons. Follows `language`
+ *   unless it is set, for the book written in one language whose reader-facing
+ *   furniture should be in another
  * @field srcDir {string} the directory holding the Markdown sources
  * @field outDir {string} the directory the site is written to
  * @field theme {string} the built-in theme name
@@ -78,6 +82,7 @@ export def struct Config {
     authors as list of string,
     authorsLabel as string,
     language as string,
+    uiLanguage as string,
     srcDir as string,
     outDir as string,
     theme as string,
@@ -143,6 +148,7 @@ export func defaults() {
         authors: [],
         authorsLabel: DEFAULT_AUTHORS_LABEL,
         language: "en",
+        uiLanguage: "en",
         srcDir: "docs",
         outDir: "site",
         theme: "grimoire",
@@ -243,6 +249,9 @@ export func apply(base as Config, text as string) {
     $c.authors = stringsAt($doc, "/book/authors", $c.authors);
     $c.authorsLabel = strAt($doc, "/book/authorsLabel", $c.authorsLabel);
     $c.language = strAt($doc, "/book/language", $c.language);
+    # Read after `language` because that is its default: a German book gets a
+    # German interface without being told twice.
+    $c.uiLanguage = strAt($doc, "/html/uiLanguage", $c.language);
     $c.srcDir = strAt($doc, "/book/src", $c.srcDir);
     $c.outDir = strAt($doc, "/build/out", $c.outDir);
     $c.theme = strAt($doc, "/html/theme", $c.theme);

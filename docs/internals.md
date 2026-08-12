@@ -17,6 +17,9 @@ src/
   palette.j         the theme model and the stylesheet generator
   theme.j           the theme registry
   themes/*.j        the ten shipped themes
+  locale.j          Grimoire's own words, in eleven languages
+  keywords.j        the per-page keyword meta tag
+  watch.j           the rebuild-on-change loop behind serve --watch
   assets.j          the client runtime (mode selector, search, copy buttons)
   assets/           vendored: the Jennifer highlight.js grammar
   search.j          the search index
@@ -26,6 +29,8 @@ src/
 scripts/
   screenshots.sh    regenerate the theme gallery
   theme-css.j       write one theme's stylesheet to a path
+  bench.sh          time a build, and the modules under it
+  bench-md.j        the markdown / pdf modules on their own
 docs/               this documentation, and the book this repository builds
 ```
 

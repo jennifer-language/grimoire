@@ -23,6 +23,7 @@ Render the site.
 | `-o`, `--out DIR` | from config | where to write the site |
 | `-t`, `--theme NAME` | from config | theme to use; `grimoire themes` lists them |
 | `-m`, `--mode MODE` | from config | first-visit colour mode: `auto`, `light`, `dark` |
+| `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `--pdf` | off | also render the book to PDF |
 | `--no-search` | off | skip the search index and the search UI |
 | `-j`, `--jobs N` | `0` | chapters to render in parallel; `0` is one per CPU |
@@ -68,6 +69,7 @@ Build, then serve the result on a local address until interrupted.
 | `-o`, `--out DIR` | from config | which directory to serve |
 | `-v`, `--verbose` | off | report each chapter as it is rendered |
 | `-a`, `--addr ADDR` | `127.0.0.1:8080` | address to listen on |
+| `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-build` | off | serve what is already there, without rebuilding |
 

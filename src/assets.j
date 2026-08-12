@@ -27,6 +27,16 @@ def const RUNTIME_JS as string init '/* grimoire runtime - no dependencies, work
 
     var root = document.documentElement;
     var cfg = window.grimoire || {};
+
+    /* The words Grimoire adds to a page, translated at build time and carried in
+       the settings blob. The fallback is the English original, so a page whose
+       settings failed to parse still reads as a page rather than as a set of key
+       names. No apostrophes in here: this whole script is a raw string, which
+       ends at the first one. */
+    function t(key, fallback) {
+        return (cfg.t && cfg.t[key]) || fallback;
+    }
+
     var MODE_KEY = "grimoire-mode";
 
     /* ---------- colour mode ---------- */
@@ -127,10 +137,10 @@ def const RUNTIME_JS as string init '/* grimoire runtime - no dependencies, work
                 }
                 var done = function () {
                     button.setAttribute("data-copied", "true");
-                    button.setAttribute("aria-label", "Copied");
+                    button.setAttribute("aria-label", t("copied", "Copied"));
                     setTimeout(function () {
                         button.removeAttribute("data-copied");
-                        button.setAttribute("aria-label", "Copy code");
+                        button.setAttribute("aria-label", t("copyCode", "Copy code"));
                     }, 1400);
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -328,11 +338,12 @@ def const RUNTIME_JS as string init '/* grimoire runtime - no dependencies, work
         if (empty) {
             if (!tokens.length) {
                 empty.textContent = searchState.ready
-                    ? "Type to search the book."
-                    : "Loading the index...";
+                    ? t("typeToSearch", "Type to search the book.")
+                    : t("loadingIndex", "Loading the index...");
                 empty.hidden = false;
             } else if (!searchState.results.length) {
-                empty.textContent = "No results for " + query;
+                empty.textContent = t("noResults", "No results for %query%")
+                    .replace("%query%", query);
                 empty.hidden = false;
             } else {
                 empty.hidden = true;
