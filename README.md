@@ -1,4 +1,4 @@
-# Grimoire
+# Jennifer's Grimoire
 
 Build a documentation website - and a printable PDF - from a directory of
 Markdown files. What mdBook, MkDocs, and similar tools do - written in

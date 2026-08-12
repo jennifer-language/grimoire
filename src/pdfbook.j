@@ -410,8 +410,17 @@ func excluded(c as config.Config, src as string) {
 }
 
 /**
- * Assemble the whole book as one Markdown document, ready for the PDF layout: a
- * cover, then each part heading, then each chapter.
+ * Assemble the whole book for the PDF layout - a cover, then each part heading,
+ * then each chapter - as a list of pieces rather than as one string.
+ *
+ * Joining these with a newline is the combined Markdown source, and reading them
+ * that way is the right way to understand what follows. They are handed out
+ * separately because `render` parses them separately: `markdown.parse` costs
+ * time quadratic in the length of what it is given, so one call on a 31,000-line
+ * book costs more than twice what the same text costs as 155 chapters. Each
+ * piece is self-contained - every one of them opens with a blank line, so
+ * nothing can run on across the boundary - and their block trees concatenate to
+ * the tree the single parse would have produced.
  *
  * `[pdf] exclude` drops chapters here rather than earlier, so the site keeps
  * them. A part whose chapters are all excluded is dropped with them - its
@@ -434,12 +443,12 @@ func excluded(c as config.Config, src as string) {
  * leave the part title alone on a sheet of its own.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
- * @return {string} the combined Markdown source
+ * @return {list of string} the cover and the chapters, in order
  */
-export func combine(c as config.Config, entries as list of summary.Entry) {
-    def parts as list of string;
+export func chunks(c as config.Config, entries as list of summary.Entry) {
+    def out as list of string;
     if ($c.pdfTitlePage) {
-        $parts[] = cover($c);
+        $out[] = sanitize(cover($c));
     }
     def underPart as bool init false;
     def opensPart as bool init false;
@@ -464,10 +473,14 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
             }
             continue;
         }
+        # One chapter's lines, joined into one piece at the end of the iteration.
+        # A part heading belongs to the chapter that follows it rather than to a
+        # piece of its own, so that a piece always begins a page.
+        def lines as list of string;
         if ($pendingPart != "") {
-            $parts[] = "";
-            $parts[] = "# " + $pendingPart;
-            $parts[] = "";
+            $lines[] = "";
+            $lines[] = "# " + $pendingPart;
+            $lines[] = "";
             $pendingPart = "";
         }
         def shift as int init 0;
@@ -479,22 +492,23 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
         }
         def source as string init fs.readString($file);
         def body as string init prepare($source, $shift);
-        $parts[] = "";
+        $lines[] = "";
         # A demoted chapter has to ask for its page; an undemoted one gets it from
         # its own level-one heading, and the first chapter of a part gets it from
         # the part heading above.
         if ($underPart and not $opensPart) {
-            $parts[] = PAGE_BREAK;
-            $parts[] = "";
+            $lines[] = PAGE_BREAK;
+            $lines[] = "";
         }
         $opensPart = false;
         if (not hasTitle($source)) {
-            $parts[] = strings.repeat("#", 1 + $shift) + " " + $e.title;
-            $parts[] = "";
+            $lines[] = strings.repeat("#", 1 + $shift) + " " + $e.title;
+            $lines[] = "";
         }
-        $parts[] = $body;
+        $lines[] = $body;
+        $out[] = sanitize(strings.join($lines, "\n"));
     }
-    return sanitize(strings.join($parts, "\n"));
+    return $out;
 }
 
 # The Grimoire credit, carried in the PDF metadata rather than on the title page.
@@ -678,12 +692,27 @@ func footer(c as config.Config, doc as pdf.Document) {
 
 /**
  * Render the book to PDF bytes.
+ *
+ * The document handed to the layout is built by parsing each piece of the book
+ * and hanging the resulting blocks off one root, rather than by parsing the
+ * whole book at once. The two are the same tree - see `chunks` - but not the
+ * same cost: parsing is quadratic in document length, and on a book of any size
+ * the single call is where most of the PDF build goes.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
  * @return {bytes} the PDF document
  * @throws {Error} kind "markdown" or "pdf" when a document cannot be laid out
  */
 export func render(c as config.Config, entries as list of summary.Entry) {
-    def tree as markdown.Node init markdown.parse(combine($c, $entries));
+    def blocks as list of markdown.Node;
+    for (def chunk in chunks($c, $entries)) {
+        for (def block in markdown.children(markdown.parse($chunk))) {
+            $blocks[] = $block;
+        }
+    }
+    # An empty document to hang them off, rather than a hand-built Node: the
+    # struct is the module's, and this cannot fall behind a field it gains.
+    def tree as markdown.Node init markdown.parse("");
+    $tree.children = $blocks;
     return pdf.render(footer($c, markdown.renderPdfDoc($tree, options($c))));
 }

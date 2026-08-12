@@ -390,8 +390,8 @@ func leastLoaded(loads as list of int) {
 #
 # Chapter sizes here span two orders of magnitude - 135 KiB against a 7 KiB
 # median - so how the work is split decides the wall clock. Dealing them out in
-# outline order leaves one worker holding 336 KiB while another holds far less;
-# this rule gets the largest share down to 211 KiB on eight workers, which is
+# outline order leaves one worker holding 337 KiB while another holds far less;
+# this rule gets the largest share down to 213 KiB on eight workers, which is
 # exactly the total divided by eight. At sixteen it reaches 135 KiB, the size of
 # the single largest chapter and therefore the floor - a chapter cannot be split.
 #

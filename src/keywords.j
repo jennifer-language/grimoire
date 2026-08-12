@@ -306,17 +306,20 @@ func stopSet(extra as list of string) {
     return $out;
 }
 
-# useful reports whether a term is worth scoring: long enough, not a bare number,
-# and not a stop word.
+# scoreable reports whether a term has the shape of one worth scoring: long
+# enough, and not a bare number.
 #
-# The order is by cost. The length test is free; the set lookup is a hash; the
-# regex runs only for a term that starts with a digit, which is the only kind
-# that can be all digits and separators.
-func useful(term as string, stops as map of string to int) {
+# It deliberately does **not** take the stop set, which the caller tests instead.
+# Maps are values in Jennifer, so a map handed to a function is deep-copied into
+# it - and this is called once per token, which made a 145-entry copy per word of
+# the book and a sixth of the site build. The lookup is a hash either way; it is
+# the crossing of the call boundary that costs.
+#
+# The order inside is by cost. The length test is free; the regex runs only for a
+# term that starts with a digit, which is the only kind that can be all digits
+# and separators.
+func scoreable(term as string) {
     if (len($term) < MIN_LENGTH) {
-        return false;
-    }
-    if (maps.has($stops, $term)) {
         return false;
     }
     def first as string init strings.substring($term, 0, 1);
@@ -415,15 +418,17 @@ export func extract(r as content.Rendered, limit as int, extra as list of string
     for (def m in regex.findAll(CODE_SPAN, $r.html)) {
         $runs[] = Run{text: unescape($m.groups[0]), weight: W_CODE};
     }
-    # One map, filled in place. Maps are values in Jennifer, so a helper that
-    # took the scores and handed them back would copy every entry on the way in
-    # and on the way out - once per heading and once per section. On a book of
-    # any size that copying, not the tokenizing, is the whole cost.
+    # Two maps that stay here. Maps are values in Jennifer, so a helper that took
+    # the scores and handed them back would copy every entry on the way in and on
+    # the way out - once per heading and once per section - and a helper that
+    # merely *read* the stop set would copy it once per token. Both are filled
+    # and tested where they live; on a book of any size that copying, not the
+    # tokenizing, is the whole cost.
     def stops as map of string to int init stopSet($extra);
     def scores as map of string to int;
     for (def run in $runs) {
         for (def term in terms($run.text)) {
-            if (not useful($term, $stops)) {
+            if (not scoreable($term) or maps.has($stops, $term)) {
                 continue;
             }
             if (maps.has($scores, $term)) {

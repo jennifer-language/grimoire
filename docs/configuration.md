@@ -198,9 +198,11 @@ are lowercased and trimmed, so case in the config does not matter.
 Only the first 600 characters of each section's body are read. Body text is the
 weakest signal here - one point against a title's eight - and a section states
 its subject in its opening sentences or not at all, so reading further buys
-ranking that does not change and costs a pass over the whole book. On a
-155-chapter, 2.3 MiB book the whole keyword pass adds about 30% to a build; set
-`keywords = false` if that is not a trade you want.
+ranking that does not change and costs a pass over the whole book. With that cap
+the whole pass is close to free - on a 155-chapter book, turning it off changes
+the build by less than the difference between two runs of the same build. It
+rides along with a render that has already parsed the chapter. `keywords = false`
+turns it off, but there is little to save.
 
 Ties break alphabetically, so the tag is byte-identical no matter what `--jobs`
 was.
