@@ -415,12 +415,24 @@ func excluded(c as config.Config, src as string) {
  *
  * Joining these with a newline is the combined Markdown source, and reading them
  * that way is the right way to understand what follows. They are handed out
- * separately because `render` parses them separately: `markdown.parse` costs
- * time quadratic in the length of what it is given, so one call on a 31,000-line
- * book costs more than twice what the same text costs as 155 chapters. Each
- * piece is self-contained - every one of them opens with a blank line, so
- * nothing can run on across the boundary - and their block trees concatenate to
- * the tree the single parse would have produced.
+ * separately because `render` parses them separately, which costs less than one
+ * call over the join: `markdown.parse` hands the whole line list to a collector
+ * once per fenced block, quote, and list, so a document that is one book rather
+ * than one chapter pays for that again on every block. On a manual - fences
+ * everywhere - that is still quadratic. Each piece is self-contained (every one
+ * opens with a blank line, so nothing runs on across a boundary) and their block
+ * trees concatenate to the tree the single parse would have produced.
+ *
+ * The margin narrows as the module improves and this should be re-measured
+ * rather than assumed: it was 2.25x when the per-line copy was still there, and
+ * is 1.14x on this book now that only the per-block one is. When it reaches 1,
+ * delete this and parse the join - one call is the honest way to write it.
+ *
+ * Two upstream changes are expected to take it there, so re-measure at each: the
+ * collectors taking their two lines rather than the list, as `looksLikeTable`
+ * already does; and the read-only parameter borrow scheduled for Jennifer 0.30,
+ * which removes the copy for every helper that only reads its argument and
+ * retires this whole class of workaround.
  *
  * `[pdf] exclude` drops chapters here rather than earlier, so the site keeps
  * them. A part whose chapters are all excluded is dropped with them - its
@@ -695,9 +707,9 @@ func footer(c as config.Config, doc as pdf.Document) {
  *
  * The document handed to the layout is built by parsing each piece of the book
  * and hanging the resulting blocks off one root, rather than by parsing the
- * whole book at once. The two are the same tree - see `chunks` - but not the
- * same cost: parsing is quadratic in document length, and on a book of any size
- * the single call is where most of the PDF build goes.
+ * whole book at once. The two are the same tree - see `chunks`, which also has
+ * the measurement - but not the same cost, and the parse is a third of this
+ * build.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
  * @return {bytes} the PDF document
