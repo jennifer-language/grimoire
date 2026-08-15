@@ -84,7 +84,7 @@ jobs:
             > smoke/grimoire.toml
 
           # The base image runs as `nonroot`, so writing into a bind mount needs
-          # the caller's own uid - the same flag docs/docker.md tells readers to use.
+          # the caller's own uid - the same flag docs/installation.md tells readers to use.
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD/smoke:/work" grimoire:test build --pdf
 

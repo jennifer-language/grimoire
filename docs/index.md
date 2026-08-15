@@ -30,13 +30,10 @@ plus, on request, the whole book as one paginated PDF.
 ```
 
 `grimoire` is a Jennifer script with a shebang; the program itself is
-`src/main.j`. It runs from any working directory and through any symlink, so
-either put the checkout on your `PATH` or link the launcher into a directory
-already on it, and the leading `./` goes away:
-
-```sh
-ln -s "$PWD/grimoire" ~/.local/bin/grimoire
-```
+`src/main.j`. It runs from any working directory and through any symlink, so the
+leading `./` goes away once the launcher is on your `PATH` - see
+[Installation](installation.md), which also covers running the whole thing from
+a container instead.
 
 A built site is a directory of files that works served from a web root, served
 from a subdirectory, or **opened straight off the disk over `file://`** - search
@@ -99,25 +96,18 @@ default.
 
 | | |
 | - | - |
+| [Installation](installation.md) | from a checkout, or from a container with Docker or Podman |
 | [Commands](commands.md) | every subcommand and flag |
 | [Configuration](configuration.md) | `grimoire.toml`, key by key |
 | [Themes](themes.md) | the ten themes, with screenshots, and how to write one |
-| [Docker](docker.md) | running from the official image, and the Grimoire image |
 | [Internals](internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](performance.md) | where the time goes, and why it scales the way it does |
 
 ## Requirements
 
-Jennifer 0.25.0 or newer.
-
-`build`, `pdf`, `init`, and `themes` run on both the default binary and
-`jennifer-tiny`; `serve` needs the default binary, since `jennifer-tiny` stubs
-`httpd`. To pick the embeddable interpreter, invoke it directly rather than
-through the shebang:
-
-```sh
-jennifer-tiny run ./grimoire build
-```
+Jennifer 0.25.0 or newer - or nothing at all beyond a container runtime.
+[Installation](installation.md) has both paths, including which of the two
+interpreter binaries runs which commands.
 
 ## License
 

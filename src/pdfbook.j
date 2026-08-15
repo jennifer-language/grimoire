@@ -411,28 +411,25 @@ func excluded(c as config.Config, src as string) {
 
 /**
  * Assemble the whole book for the PDF layout - a cover, then each part heading,
- * then each chapter - as a list of pieces rather than as one string.
+ * then each chapter - as one Markdown document.
  *
- * Joining these with a newline is the combined Markdown source, and reading them
- * that way is the right way to understand what follows. They are handed out
- * separately because `render` parses them separately, which costs less than one
- * call over the join: `markdown.parse` hands the whole line list to a collector
- * once per fenced block, quote, and list, so a document that is one book rather
- * than one chapter pays for that again on every block. On a manual - fences
- * everywhere - that is still quadratic. Each piece is self-contained (every one
- * opens with a blank line, so nothing runs on across a boundary) and their block
- * trees concatenate to the tree the single parse would have produced.
+ * It was a list of pieces until recently, and the history is worth a paragraph
+ * because the shape of the code was entirely a workaround. `markdown.parse`
+ * handed the whole line list to a collector once per fenced block, quote, and
+ * list, so a document that was a book rather than a chapter paid for that copy
+ * on every block - quadratic on a manual, where fences are everywhere. Parsing
+ * each chapter separately and concatenating the block trees produced the same
+ * tree for less: 2.25x less before `looksLikeTable` was fixed, 1.14x less on
+ * `0.24.0-dev+13`.
  *
- * The margin narrows as the module improves and this should be re-measured
- * rather than assumed: it was 2.25x when the per-line copy was still there, and
- * is 1.14x on this book now that only the per-block one is. When it reaches 1,
- * delete this and parse the join - one call is the honest way to write it.
+ * The read-only parameter borrow in `0.24.0-dev+15` removed that copy, and the
+ * Jennifer team confirmed this collector is covered by it. So the pieces are
+ * joined here and `render` makes one `markdown.parse` call, which is what the
+ * code wanted to say all along.
  *
- * Two upstream changes are expected to take it there, so re-measure at each: the
- * collectors taking their two lines rather than the list, as `looksLikeTable`
- * already does; and the read-only parameter borrow scheduled for Jennifer 0.30,
- * which removes the copy for every helper that only reads its argument and
- * retires this whole class of workaround.
+ * Each chapter still opens with a blank line. That was what stopped one piece
+ * running on into the next while they were parsed apart, and it is what keeps
+ * the joins clean now that they are not.
  *
  * `[pdf] exclude` drops chapters here rather than earlier, so the site keeps
  * them. A part whose chapters are all excluded is dropped with them - its
@@ -455,9 +452,9 @@ func excluded(c as config.Config, src as string) {
  * leave the part title alone on a sheet of its own.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
- * @return {list of string} the cover and the chapters, in order
+ * @return {string} the cover and the chapters, in order, as one document
  */
-export func chunks(c as config.Config, entries as list of summary.Entry) {
+export func combine(c as config.Config, entries as list of summary.Entry) {
     def out as list of string;
     if ($c.pdfTitlePage) {
         $out[] = sanitize(cover($c));
@@ -520,7 +517,9 @@ export func chunks(c as config.Config, entries as list of summary.Entry) {
         $lines[] = $body;
         $out[] = sanitize(strings.join($lines, "\n"));
     }
-    return $out;
+    # Each chapter is sanitized on its own rather than the join being sanitized
+    # once, so that this stays exactly the text the spliced version parsed.
+    return strings.join($out, "\n");
 }
 
 # The Grimoire credit, carried in the PDF metadata rather than on the title page.
@@ -705,26 +704,15 @@ func footer(c as config.Config, doc as pdf.Document) {
 /**
  * Render the book to PDF bytes.
  *
- * The document handed to the layout is built by parsing each piece of the book
- * and hanging the resulting blocks off one root, rather than by parsing the
- * whole book at once. The two are the same tree - see `chunks`, which also has
- * the measurement - but not the same cost, and the parse is a third of this
- * build.
+ * One `markdown.parse` over the whole assembled book - see `combine` for why
+ * that used to be one call per chapter. The parse is about a third of this
+ * build, and the layout another third.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
  * @return {bytes} the PDF document
  * @throws {Error} kind "markdown" or "pdf" when a document cannot be laid out
  */
 export func render(c as config.Config, entries as list of summary.Entry) {
-    def blocks as list of markdown.Node;
-    for (def chunk in chunks($c, $entries)) {
-        for (def block in markdown.children(markdown.parse($chunk))) {
-            $blocks[] = $block;
-        }
-    }
-    # An empty document to hang them off, rather than a hand-built Node: the
-    # struct is the module's, and this cannot fall behind a field it gains.
-    def tree as markdown.Node init markdown.parse("");
-    $tree.children = $blocks;
+    def tree as markdown.Node init markdown.parse(combine($c, $entries));
     return pdf.render(footer($c, markdown.renderPdfDoc($tree, options($c))));
 }

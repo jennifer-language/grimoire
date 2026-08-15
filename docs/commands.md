@@ -23,6 +23,8 @@ Render the site.
 | `-o`, `--out DIR` | from config | where to write the site |
 | `-t`, `--theme NAME` | from config | theme to use; `grimoire themes` lists them |
 | `-m`, `--mode MODE` | from config | first-visit colour mode: `auto`, `light`, `dark` |
+| `--nav WHERE` | from config | the book-contents column: `left`, `right`, `off` |
+| `--toc WHERE` | from config | the on-this-page column: `left`, `right`, `off` |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `--pdf` | off | also render the book to PDF |
 | `--no-search` | off | skip the search index and the search UI |
@@ -34,7 +36,13 @@ Render the site.
 grimoire build
 grimoire build --theme nordic --out /tmp/preview
 grimoire build --pdf --jobs 4
+grimoire build --nav right --toc off
 ```
+
+`--nav` and `--toc` place the two navigation columns, or leave them out. Both
+are covered in [Configuration](configuration.md#the-two-navigation-columns),
+which is where the setting belongs once a book has decided; the flags are for
+trying an arrangement before writing it down.
 
 The exit status is `1` when the outline names a chapter with no file behind it -
 the rest of the book still builds, and the missing entries are reported on
@@ -69,6 +77,8 @@ Build, then serve the result on a local address until interrupted.
 | `-o`, `--out DIR` | from config | which directory to serve |
 | `-v`, `--verbose` | off | report each chapter as it is rendered |
 | `-a`, `--addr ADDR` | `127.0.0.1:8080` | address to listen on |
+| `--nav WHERE` | from config | the book-contents column: `left`, `right`, `off` |
+| `--toc WHERE` | from config | the on-this-page column: `left`, `right`, `off` |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-reload` | off | with `--watch`, do not reload the browser |
@@ -77,8 +87,15 @@ Build, then serve the result on a local address until interrupted.
 ```sh
 grimoire serve
 grimoire serve --watch
+grimoire serve --watch --nav right --toc left
 grimoire serve --addr 0.0.0.0:9000 --no-build
 ```
+
+The two column flags are here as well as on `build` because trying an
+arrangement is what `--watch` is for. The override lives as long as the process
+does: the watch loop rebuilds with the configuration `serve` started with, so
+every rebuild keeps it. It does nothing under `--no-build`, which serves what is
+already on disk.
 
 `--watch` watches the source tree and rebuilds when it changes, naming the file
 that caused it:

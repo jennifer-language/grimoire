@@ -484,6 +484,16 @@ func flattenRecords(groups as list of list of search.Record) {
     return $out;
 }
 
+# tocFor builds the per-page contents list, or nothing when the book does not
+# show one. The headings are collected either way - the search index and the PDF
+# bookmarks are built from the same pass - so this skips only the list itself.
+func tocFor(c as config.Config, rendered as content.Rendered) {
+    if (not config.showsToc($c)) {
+        return "";
+    }
+    return content.tocHtml($rendered.headings, $c.tocDepth);
+}
+
 # renderSlice renders the chapters one worker was given. Which chapters those
 # are is decided up front by `assignWork`, so a worker just walks its own list.
 func renderSlice(
@@ -508,7 +518,7 @@ func renderSlice(
             title: plainTitle(titleFor($entry, $rendered)),
             keywords: pageKeywords($c, $rendered),
             body: $rendered.html,
-            toc: content.tocHtml($rendered.headings, $c.tocDepth),
+            toc: tocFor($c, $rendered),
             root: $root,
             prevTitle: "",
             prevHref: "",
@@ -524,7 +534,10 @@ func renderSlice(
             $view.nextTitle = $labels[$i + 1];
             $view.nextHref = $root + $pages[$i + 1].out;
         }
-        def nav as string init layout.navHtml($items, $entry.out, $root);
+        def nav as string init "";
+        if (config.showsNav($c)) {
+            $nav = layout.navHtml($items, $entry.out, $root);
+        }
         $written = $written +
             writeFile(path.join($c.outDir, $entry.out), layout.page($c, $view, $nav, $brand));
         if ($c.search) {
@@ -562,8 +575,12 @@ export func run(c as config.Config) {
     fs.mkdirAll($c.outDir);
     # The sidebar and the pager labels are Markdown. Render them once here rather
     # than once per chapter: on a book this size that is the difference between
-    # a few hundred Markdown parses and a few tens of thousands.
-    def items as list of layout.NavItem init layout.navItems($entries, $c.sectionNumbers);
+    # a few hundred Markdown parses and a few tens of thousands. A book with no
+    # sidebar skips the outline pass entirely; the pager labels are still needed.
+    def items as list of layout.NavItem;
+    if (config.showsNav($c)) {
+        $items = layout.navItems($entries, $c.sectionNumbers);
+    }
     def labels as list of string;
     for (def e in $pages) {
         $labels[] = content.inline($e.title);

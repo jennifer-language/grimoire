@@ -4,10 +4,10 @@
 
 # Using Grimoire
 
+- [Installation](installation.md)
 - [Commands](commands.md)
 - [Configuration](configuration.md)
 - [Themes](themes.md)
-- [Docker](docker.md)
 
 # Reference
 

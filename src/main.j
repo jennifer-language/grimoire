@@ -66,10 +66,20 @@ func uiLanguageFlag(p as args.Parser) {
         "language for Grimoire's own strings (overrides the config)");
 }
 
+# Where the two navigation columns go, on the same two commands. Trying an
+# arrangement is exactly what `serve --watch` is for, so it takes them as well.
+func columnFlags(p as args.Parser) {
+    def out as args.Parser init $p;
+    $out = args.flag($out, "nav", "", "", "book contents column: left, right, or off");
+    $out = args.flag($out, "toc", "", "", "on-this-page column: left, right, or off");
+    return $out;
+}
+
 func buildParser() {
     def p as args.Parser init commonFlags(args.parser("build", "Build the site"));
     $p = args.flag($p, "theme", "t", "", "theme name (overrides the config)");
     $p = args.flag($p, "mode", "m", "", "default colour mode: auto, light, or dark");
+    $p = columnFlags($p);
     $p = args.boolFlag($p, "pdf", "", "also render the book to PDF");
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
@@ -90,6 +100,7 @@ func serveParser() {
     $p = args.boolFlag($p, "no-build", "", "serve what is already in the output directory");
     $p = args.boolFlag($p, "watch", "w", "rebuild whenever a source file changes");
     $p = args.boolFlag($p, "no-reload", "", "with --watch, do not reload the browser");
+    $p = columnFlags($p);
     return uiLanguageFlag($p);
 }
 
@@ -118,6 +129,26 @@ func parser() {
 
 # --- configuration --------------------------------------------------
 
+# warn reports a problem that does not stop the build: a chapter in the outline
+# with no file behind it, a theme name that does not resolve, a flag value
+# outside the set it allows.
+func warn(message as string) {
+    io.eprintf("grimoire: %s\n", $message);
+}
+
+# position reads one of the two column-placement flags. A `grimoire.toml` key of
+# the wrong shape quietly keeps the default, which is the right stance for a file
+# that may be half written - but a flag was typed just now, by someone watching,
+# so a value outside the set says so before falling back.
+func position(r as args.Result, name as string, deflt as string) {
+    def value as string init args.asString($r, $name);
+    if (config.validPosition($value)) {
+        return $value;
+    }
+    warn("--" + $name + ": no such position " + $value + " (left, right, or off); using " + $deflt);
+    return $deflt;
+}
+
 # configure loads the config file named on the command line and layers the
 # command-line overrides on top, so a flag always wins over a file.
 func configure(r as args.Result, appDir as string) {
@@ -138,6 +169,12 @@ func configure(r as args.Result, appDir as string) {
     }
     if (args.has($r, "mode")) {
         $c.defaultMode = args.asString($r, "mode");
+    }
+    if (args.has($r, "nav")) {
+        $c.navPosition = position($r, "nav", $c.navPosition);
+    }
+    if (args.has($r, "toc")) {
+        $c.tocPosition = position($r, "toc", $c.tocPosition);
     }
     if (args.has($r, "output")) {
         $c.pdfOutput = args.asString($r, "output");
@@ -166,12 +203,6 @@ func configure(r as args.Result, appDir as string) {
     # spawns later shares the choice.
     locale.install($c.uiLanguage);
     return $c;
-}
-
-# warn reports a problem that does not stop the build: a chapter in the outline
-# with no file behind it, or a theme name that does not resolve.
-func warn(message as string) {
-    io.eprintf("grimoire: %s\n", $message);
 }
 
 func checkTheme(c as config.Config) {
@@ -325,6 +356,11 @@ out = "site"
 theme = "grimoire"
 # The colour mode a first-time reader gets: auto, light, or dark.
 mode = "auto"
+# Where the two navigation columns go. navPosition is the book outline,
+# tocPosition the headings of the page being read. Each takes left, right, or
+# off; off leaves that column out of the pages entirely.
+navPosition = "left"
+tocPosition = "right"
 tocDepth = 3
 sectionNumbers = true
 # The footer is emitted verbatim, so it may carry HTML.
@@ -419,7 +455,7 @@ def const STARTER_FIRST as string init '# First steps
 
 Walk the reader through their first success.
 
-> Tip: headings become anchors, entries in the contents column on the right,
+> Tip: headings become anchors, entries in the on-this-page column,
 > and records in the search index - so write them as the questions a reader
 > would ask.
 ';

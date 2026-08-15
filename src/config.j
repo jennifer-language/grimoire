@@ -35,6 +35,10 @@ use convert;
  * @field theme {string} the built-in theme name
  * @field defaultMode {string} the initial colour mode: "auto", "light", or "dark"
  * @field tocDepth {int} the deepest heading level shown in the per-page contents
+ * @field navPosition {string} which side the book-contents sidebar sits on:
+ *   "left", "right", or "off" to build the pages without it at all
+ * @field tocPosition {string} which side the per-page contents column sits on:
+ *   "left", "right", or "off" to build the pages without it at all
  * @field sectionNumbers {bool} whether the sidebar numbers its chapters
  * @field footer {string} HTML placed in the page footer, emitted verbatim ("" for none)
  * @field repoUrl {string} a source-repository URL linked from the top bar ("" for none)
@@ -88,6 +92,8 @@ export def struct Config {
     theme as string,
     defaultMode as string,
     tocDepth as int,
+    navPosition as string,
+    tocPosition as string,
     sectionNumbers as bool,
     footer as string,
     repoUrl as string,
@@ -136,6 +142,13 @@ def const DEFAULT_AUTHORS_LABEL as string init "Written by";
 # that breaks a language grammar.
 def const HLJS_CDN as string init "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1";
 
+# Where either navigation column may sit. "off" is a third position rather than a
+# separate boolean because the two settings are one decision per column - a book
+# that wants both on the left and a book that wants neither are the same knob
+# turned differently, and a `nav = "off"` plus a `navPosition = "left"` that
+# contradict each other is a state worth not being able to express.
+def const POSITIONS as list of string init ["left", "right", "off"];
+
 /**
  * The default configuration: build `docs/` into `site/` with the `grimoire`
  * theme, a three-level page contents, search on, and the PDF off.
@@ -154,6 +167,8 @@ export func defaults() {
         theme: "grimoire",
         defaultMode: "auto",
         tocDepth: 3,
+        navPosition: "left",
+        tocPosition: "right",
         sectionNumbers: true,
         footer: DEFAULT_FOOTER,
         repoUrl: "",
@@ -260,6 +275,14 @@ export func apply(base as Config, text as string) {
         ["auto", "light", "dark"],
         $c.defaultMode);
     $c.tocDepth = intAt($doc, "/html/tocDepth", $c.tocDepth);
+    $c.navPosition = oneOf(
+        strAt($doc, "/html/navPosition", $c.navPosition),
+        POSITIONS,
+        $c.navPosition);
+    $c.tocPosition = oneOf(
+        strAt($doc, "/html/tocPosition", $c.tocPosition),
+        POSITIONS,
+        $c.tocPosition);
     $c.sectionNumbers = boolAt($doc, "/html/sectionNumbers", $c.sectionNumbers);
     $c.footer = strAt($doc, "/html/footer", $c.footer);
     $c.repoUrl = strAt($doc, "/html/repoUrl", $c.repoUrl);
@@ -309,6 +332,38 @@ export func load(path as string) {
         return defaults();
     }
     return apply(defaults(), fs.readString($path));
+}
+
+/**
+ * Whether a string names a column position. The CLI needs the test on its own,
+ * to say so when a flag was mistyped rather than silently falling back the way
+ * a configuration file does.
+ * @param value {string} the candidate
+ * @return {bool} true for "left", "right", or "off"
+ */
+export func validPosition(value as string) {
+    return lists.contains(POSITIONS, $value);
+}
+
+/**
+ * Whether pages carry the book-contents sidebar. Off means the markup is never
+ * emitted rather than hidden, so the outline is not rendered per page either.
+ * @param c {Config} the configuration
+ * @return {bool} true when the sidebar is shown
+ */
+export func showsNav(c as Config) {
+    return $c.navPosition != "off";
+}
+
+/**
+ * Whether pages carry the per-page contents column. Off means the headings are
+ * still collected - the search index and the PDF bookmarks want them - but no
+ * list is built from them and no column is emitted.
+ * @param c {Config} the configuration
+ * @return {bool} true when the contents column is shown
+ */
+export func showsToc(c as Config) {
+    return $c.tocPosition != "off";
 }
 
 /**

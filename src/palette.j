@@ -382,6 +382,10 @@ a:hover { color: var(--gr-accent-hover); }
     border-bottom: 1px solid var(--gr-border);
 }
 
+/* Everything else in the bar is order 0, so this is "last". A drawer that opens
+   from the right edge is reached by a button on the right. */
+.gr-topbar[data-nav="right"] #gr-menu { order: 9; }
+
 .gr-brand {
     display: flex;
     align-items: center;
@@ -498,18 +502,32 @@ a:hover { color: var(--gr-accent-hover); }
 
 /* ---------- shell ---------- */
 
+/* A flex row rather than a grid of named columns, because either navigation
+   column can be turned off: a grid has to be told how many columns it has and
+   how wide each one is, so every combination of the two settings would need its
+   own template. Flex takes the columns that are there, and `order` below is what
+   puts them on the side the book asked for. */
 .gr-shell {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: start;
+    display: flex;
+    align-items: flex-start;
     max-width: var(--gr-shell-w);
     margin: 0 auto;
 }
+
+/* The visual order of the row, left to right. The sidebar is outermost when
+   both columns share a side: it belongs to the book, the contents list only to
+   the page, and the wider scope reads better further out. */
+.gr-shell[data-nav="left"] .gr-sidebar { order: 1; }
+.gr-shell[data-toc="left"] .gr-toc { order: 2; }
+.gr-main { order: 3; }
+.gr-shell[data-toc="right"] .gr-toc { order: 4; }
+.gr-shell[data-nav="right"] .gr-sidebar { order: 5; }
 
 .gr-sidebar {
     position: fixed;
     inset: var(--gr-topbar-h) auto 0 0;
     z-index: 35;
+    flex: none;
     width: var(--gr-sidebar-w);
     max-width: 86vw;
     padding: 18px 8px 40px 16px;
@@ -521,6 +539,18 @@ a:hover { color: var(--gr-accent-hover); }
     transition: transform 180ms ease;
 }
 .gr-sidebar[data-open="true"] { transform: none; box-shadow: 0 12px 40px var(--gr-shadow); }
+
+/* A right-hand sidebar is the same drawer hinged on the other edge, and the
+   border moves with it so it always faces the text. */
+.gr-shell[data-nav="right"] .gr-sidebar {
+    inset: var(--gr-topbar-h) 0 0 auto;
+    padding: 18px 16px 40px 8px;
+    border-right: 0;
+    border-left: 1px solid var(--gr-border);
+    transform: translateX(102%);
+}
+.gr-shell[data-nav="right"] .gr-sidebar[data-open="true"] { transform: none; }
+.gr-shell[data-nav="right"] .gr-nav > ol { padding-right: 0; padding-left: 6px; }
 
 .gr-backdrop {
     position: fixed;
@@ -586,7 +616,9 @@ a:hover { color: var(--gr-accent-hover); }
 
 /* ---------- main column ---------- */
 
-.gr-main { min-width: 0; padding: 8px 20px 64px; }
+/* min-width: 0 lets the text column shrink below the width of its widest
+   unbreakable child - a long code line - instead of pushing the row wider. */
+.gr-main { flex: 1 1 auto; min-width: 0; padding: 8px 20px 64px; }
 
 .gr-content {
     max-width: var(--gr-content-w);
@@ -836,13 +868,13 @@ a:hover { color: var(--gr-accent-hover); }
 
 /* ---------- on-this-page ---------- */
 
-.gr-toc { display: none; }
+.gr-toc { display: none; flex: none; width: var(--gr-toc-w); }
 
-/* The column has to span the whole grid row, not just its own content: a sticky
-   child can only travel inside the box of its parent, so a column that ends where
-   the list ends takes the list off-screen with it a few hundred pixels down the
-   page. See align-self on .gr-toc below, which overrides the align-items: start
-   that the shell sets for the main column. */
+/* The column has to span the whole row, not just its own content: a sticky child
+   can only travel inside the box of its parent, so a column that ends where the
+   list ends takes the list off-screen with it a few hundred pixels down the
+   page. See align-self on .gr-toc below, which overrides the align-items that
+   the shell sets for the main column. */
 .gr-toc-inner {
     position: sticky;
     top: calc(var(--gr-topbar-h) + 18px);
@@ -881,6 +913,11 @@ a:hover { color: var(--gr-accent-hover); }
 .gr-toc li[data-level="3"] a { padding-left: 22px; }
 .gr-toc li[data-level="4"] a { padding-left: 34px; }
 .gr-toc li[data-level="5"] a, .gr-toc li[data-level="6"] a { padding-left: 46px; }
+
+/* The gutter belongs between the list and the text, so it changes sides with the
+   column. The rule on the links does not: their left border is the position
+   marker rather than a frame, and it stays where the indentation starts. */
+.gr-shell[data-toc="left"] .gr-toc-inner { padding: 22px 0 30px 16px; }
 
 /* ---------- search ---------- */
 
@@ -985,22 +1022,31 @@ a:hover { color: var(--gr-accent-hover); }
 
 /* ---------- responsive ---------- */
 
+/* Wide enough for the sidebar to stop being a drawer and become a column. The
+   right-hand variant needs saying again rather than inheriting: its off-canvas
+   rules are the more specific ones, so they would otherwise survive the
+   breakpoint and leave the column parked outside the viewport. */
 @media (min-width: 1080px) {
-    .gr-shell { grid-template-columns: var(--gr-sidebar-w) minmax(0, 1fr); }
     .gr-sidebar {
         position: sticky;
         top: var(--gr-topbar-h);
         height: calc(100vh - var(--gr-topbar-h));
         transform: none;
     }
+    .gr-shell[data-nav="right"] .gr-sidebar {
+        inset: var(--gr-topbar-h) auto auto auto;
+        transform: none;
+    }
     .gr-sidebar[data-open="true"] { box-shadow: none; }
     .gr-backdrop { display: none; }
     #gr-menu { display: none; }
     .gr-main { padding-left: 34px; padding-right: 34px; }
+    /* Without a sidebar there is 302px of room going spare, so the contents
+       column does not have to wait for the wider breakpoint below. */
+    .gr-shell[data-nav="off"] .gr-toc { display: block; align-self: stretch; }
 }
 
 @media (min-width: 1400px) {
-    .gr-shell { grid-template-columns: var(--gr-sidebar-w) minmax(0, 1fr) var(--gr-toc-w); }
     .gr-toc { display: block; align-self: stretch; }
 }
 

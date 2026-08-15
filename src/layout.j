@@ -241,11 +241,18 @@ func modeSelector() {
 }
 
 func topbar(c as config.Config, v as View, b as Brand) {
-    def out as string init '<header class="gr-topbar">';
-    $out = $out + '<button class="gr-btn gr-icon-btn" id="gr-menu" type="button" ' +
-        'aria-expanded="false" aria-controls="gr-sidebar" aria-label="' +
-        attrEsc(locale.tr("toggleNav")) + '">' +
-        ICON_MENU + "</button>";
+    # The top bar sits outside the shell but carries the same attribute, so the
+    # menu button can move to the end of the row when the drawer it opens comes
+    # in from the other edge.
+    def out as string init '<header class="gr-topbar" data-nav="' + $c.navPosition + '">';
+    # The menu button opens the sidebar drawer on a narrow screen, so it goes
+    # with the sidebar: a book built without one has nothing for it to toggle.
+    if (config.showsNav($c)) {
+        $out = $out + '<button class="gr-btn gr-icon-btn" id="gr-menu" type="button" ' +
+            'aria-expanded="false" aria-controls="gr-sidebar" aria-label="' +
+            attrEsc(locale.tr("toggleNav")) + '">' +
+            ICON_MENU + "</button>";
+    }
     $out = $out + '<a class="gr-brand" href="' + attrEsc($v.root + "index.html") + '">' +
         brandMark($b, $v.root, $c.title) + html.escape($c.title) + "</a>";
     $out = $out + '<span class="gr-spacer"></span>';
@@ -307,7 +314,13 @@ func footer(c as config.Config, v as View) {
     return '<footer class="gr-footer">' + strings.join($bits, "") + "</footer>";
 }
 
-func tocColumn(v as View) {
+func tocColumn(c as config.Config, v as View) {
+    if (not config.showsToc($c)) {
+        return "";
+    }
+    # An empty column rather than none at all: the width is reserved on every
+    # page, so a chapter with too few headings to list does not shift the text
+    # column sideways as the reader pages through the book.
     if ($v.toc == "") {
         return '<aside class="gr-toc"></aside>';
     }
@@ -396,7 +409,8 @@ func runtimeStrings(c as config.Config) {
  * Render a complete HTML page.
  * @param c {config.Config} the book configuration
  * @param v {View} the per-page values
- * @param nav {string} the sidebar navigation HTML for this page
+ * @param nav {string} the sidebar navigation HTML for this page, ignored when
+ *   `html.navPosition` is "off"
  * @param b {Brand} the mark drawn beside the title
  * @return {string} the complete HTML document
  */
@@ -407,9 +421,16 @@ export func page(c as config.Config, v as View, nav as string, b as Brand) {
     $out[] = '<a class="gr-skip" href="#gr-main">' +
         html.escape(locale.tr("skipToContent")) + "</a>";
     $out[] = topbar($c, $v, $b);
-    $out[] = '<div class="gr-shell">';
-    $out[] = '<div class="gr-backdrop" id="gr-backdrop" data-open="false"></div>';
-    $out[] = '<div class="gr-sidebar" id="gr-sidebar" data-open="false">' + $nav + "</div>";
+    # Which side each of the two navigation columns sits on, as data attributes
+    # the stylesheet orders the shell by. Put on the shell rather than on the
+    # columns themselves because the ordering is a property of the row: whether
+    # the contents column is inside or outside the sidebar depends on both.
+    $out[] = '<div class="gr-shell" data-nav="' + $c.navPosition +
+        '" data-toc="' + $c.tocPosition + '">';
+    if (config.showsNav($c)) {
+        $out[] = '<div class="gr-backdrop" id="gr-backdrop" data-open="false"></div>';
+        $out[] = '<div class="gr-sidebar" id="gr-sidebar" data-open="false">' + $nav + "</div>";
+    }
     $out[] = '<main class="gr-main" id="gr-main" tabindex="-1">';
     $out[] = '<article class="gr-content">';
     $out[] = $v.body;
@@ -417,7 +438,7 @@ export func page(c as config.Config, v as View, nav as string, b as Brand) {
     $out[] = pager($v);
     $out[] = footer($c, $v);
     $out[] = "</main>";
-    $out[] = tocColumn($v);
+    $out[] = tocColumn($c, $v);
     $out[] = "</div>";
     $out[] = searchDialog($c);
     # The runtime reads its configuration from this global: where the site root is

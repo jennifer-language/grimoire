@@ -156,6 +156,18 @@ func classifyWord(word as string, next as string) {
 #
 # Each returns the index just past the token it consumed, so the main loop only
 # has to dispatch on the first character.
+#
+# These five take the character list, which on an interpreter without the
+# read-only parameter borrow is one copy of the whole block per call. That is
+# affordable where it is left: between them they run about 5,700 times on this
+# manual. The three things that ran per character or per identifier - the prompt
+# test, the identifier scan, and the slicing - are written out inside `render`
+# instead, where `cs` is a local and no binding copies it.
+#
+# The borrow arrived in 0.24.0-dev+15 and makes the copy free, so this is a
+# floor rather than a target: what is inlined below is inlined to remove a call
+# per character, which costs something on every interpreter. Do not undo it on
+# the grounds that the copy is gone.
 
 func scanLineComment(cs as list of string, at as int) {
     def i as int init $at;
@@ -240,46 +252,6 @@ func scanNumber(cs as list of string, at as int) {
     return $i;
 }
 
-func scanWord(cs as list of string, at as int) {
-    def i as int init $at;
-    while ($i < len($cs) and isIdentChar($cs[$i])) {
-        $i = $i + 1;
-    }
-    return $i;
-}
-
-func slice(cs as list of string, lo as int, hi as int) {
-    return strings.join($cs[$lo..$hi], "");
-}
-
-# nextSignificant returns the next character that is not a space or tab, which is
-# what decides whether an identifier is a call or a namespace prefix.
-func nextSignificant(cs as list of string, at as int) {
-    def i as int init $at;
-    while ($i < len($cs) and ($cs[$i] == " " or $cs[$i] == "\t")) {
-        $i = $i + 1;
-    }
-    if ($i < len($cs)) {
-        return $cs[$i];
-    }
-    return "";
-}
-
-# atLineStart reports whether `at` is the first column of a line, for the REPL
-# prompt rule - real source never begins a line with `>>> `, so the rule is inert
-# in ordinary code and only fires on a pasted session transcript.
-func atLineStart(cs as list of string, at as int) {
-    return $at == 0 or $cs[$at - 1] == "\n";
-}
-
-func isPrompt(cs as list of string, at as int) {
-    if (not atLineStart($cs, $at) or $at + 3 >= len($cs)) {
-        return false;
-    }
-    def three as string init slice($cs, $at, $at + 3);
-    return ($three == ">>>" or $three == "...") and $cs[$at + 3] == " ";
-}
-
 /**
  * Highlight Jennifer source, returning HTML with highlight.js class names. The
  * text is escaped as it is emitted, so the result is ready to drop inside a
@@ -297,7 +269,18 @@ export func render(code as string) {
         def ch as string init $cs[$i];
         def cls as string init "";
         def stop as int init $i;
-        if (isPrompt($cs, $i)) {
+        # The REPL prompt rule, written out here rather than as a helper: it is
+        # the only test that runs on every character, so a helper taking `cs`
+        # would copy the whole block once per character. Real source never opens
+        # a line with `>>> `, so this is inert outside a pasted transcript - the
+        # first-character test is what keeps it that way.
+        def prompt as bool init false;
+        if (($ch == ">" or $ch == ".") and $i + 3 < $n and
+            ($i == 0 or $cs[$i - 1] == "\n")) {
+            def three as string init $ch + $cs[$i + 1] + $cs[$i + 2];
+            $prompt = ($three == ">>>" or $three == "...") and $cs[$i + 3] == " ";
+        }
+        if ($prompt) {
             $cls = "meta";
             $stop = $i + 4;
         } elseif ($ch == "#") {
@@ -314,13 +297,39 @@ export func render(code as string) {
             $stop = scanRawString($cs, $i);
         } elseif ($ch == "$" and $i + 1 < $n and isAlpha($cs[$i + 1])) {
             $cls = "variable";
-            $stop = scanWord($cs, $i + 1);
+            $stop = $i + 1;
+            while ($stop < $n and isIdentChar($cs[$stop])) {
+                $stop = $stop + 1;
+            }
         } elseif (isDigit($ch)) {
             $cls = "number";
             $stop = scanNumber($cs, $i);
         } elseif (isAlpha($ch) or $ch == "_") {
-            $stop = scanWord($cs, $i);
-            $cls = classifyWord(slice($cs, $i, $stop), nextSignificant($cs, $stop));
+            # The identifier scan is written out rather than called for the same
+            # reason as the prompt test above: it is the most frequent token in
+            # any Jennifer source, and a helper taking `cs` copied the whole
+            # block on each of the 23,000 of them in this manual.
+            $stop = $i;
+            while ($stop < $n and isIdentChar($cs[$stop])) {
+                $stop = $stop + 1;
+            }
+            # The character after the token, spaces and tabs skipped, decides
+            # whether the identifier is a call or a namespace prefix.
+            def after as int init $stop;
+            while ($after < $n and ($cs[$after] == " " or $cs[$after] == "\t")) {
+                $after = $after + 1;
+            }
+            def next as string init "";
+            if ($after < $n) {
+                $next = $cs[$after];
+            }
+            $cls = classifyWord(strings.join($cs[$i..$stop], ""), $next);
+        }
+        # A scanner can run past the end - a cooked string whose last character
+        # is a backslash consumes the escape and the character after it, which
+        # may not exist. Clamping here keeps the slices below in range.
+        if ($stop > $n) {
+            $stop = $n;
         }
         if ($cls == "" or $stop <= $i) {
             # Ordinary text: accumulate and emit it in one run, so the output is
@@ -329,14 +338,14 @@ export func render(code as string) {
             continue;
         }
         if ($plain < $i) {
-            $out[] = html.escape(slice($cs, $plain, $i));
+            $out[] = html.escape(strings.join($cs[$plain..$i], ""));
         }
-        $out[] = span($cls, slice($cs, $i, $stop));
+        $out[] = span($cls, strings.join($cs[$i..$stop], ""));
         $i = $stop;
         $plain = $i;
     }
     if ($plain < $n) {
-        $out[] = html.escape(slice($cs, $plain, $n));
+        $out[] = html.escape(strings.join($cs[$plain..$n], ""));
     }
     return strings.join($out, "");
 }

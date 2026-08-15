@@ -32,6 +32,8 @@ jobs = 0                # 0 = one render task per CPU
 theme = "grimoire"
 mode = "auto"           # auto | light | dark
 uiLanguage = "en"       # defaults to book.language
+navPosition = "left"    # left | right | off
+tocPosition = "right"   # left | right | off
 tocDepth = 3
 sectionNumbers = true
 footer = "Rendered with <a href=\"...\">Grimoire</a>"
@@ -116,6 +118,8 @@ knowing before publishing.
 | `theme` | string | `"grimoire"` | one of the [ten themes](themes.md); an unknown name falls back to `grimoire` |
 | `mode` | string | `"auto"` | the colour mode a first-time reader gets: `auto`, `light`, `dark` |
 | `uiLanguage` | string | from `book.language` | the language Grimoire's own words are printed in, when it differs from the book's |
+| `navPosition` | string | `"left"` | which side the book-contents sidebar sits on: `left`, `right`, `off` |
+| `tocPosition` | string | `"right"` | which side the on-this-page column sits on: `left`, `right`, `off` |
 | `tocDepth` | int | `3` | deepest heading level in the per-page contents; clamped to 1-6 |
 | `sectionNumbers` | bool | `true` | number the chapters in the sidebar |
 | `footer` | string | the Grimoire credit | HTML placed in the page footer; `""` for no footer |
@@ -131,6 +135,54 @@ knowing before publishing.
 their choice is remembered and this setting no longer applies to them. Whatever
 it resolves to is stamped on the document before the first paint, so navigating
 a dark site never flashes white.
+
+### The two navigation columns
+
+A page carries two of them, and each is placed independently:
+
+- **`navPosition`** is the **book contents** - the whole outline, the same on
+  every page, with the current chapter marked.
+- **`tocPosition`** is **on this page** - the headings of the chapter being
+  read, which is what `tocDepth` above sets the depth of.
+
+Either takes `left`, `right`, or `off`, so all nine arrangements are available:
+
+```toml
+[html]
+navPosition = "left"     # the default: outline left, headings right
+tocPosition = "right"
+
+navPosition = "right"    # mirrored, for a right-to-left reading order
+tocPosition = "left"
+
+navPosition = "left"     # both together, down one side
+tocPosition = "left"
+
+navPosition = "off"      # a single column of text and nothing else
+tocPosition = "off"
+```
+
+When both share a side the book contents sits **outside** the page contents,
+nearer the edge: it is the wider scope of the two, and it is the one that does
+not change as the reader moves through the book.
+
+`off` leaves the column out of the HTML rather than hiding it with a stylesheet,
+so the pages are smaller and the work behind them is skipped - `navPosition =
+"off"` renders no outline at all, on any page. Nothing else is lost: turning the
+page contents off does not affect the search index or the PDF bookmarks, which
+are built from the same headings by a different path.
+
+Below 1080px wide there is no room for a second column, so the book contents
+becomes a drawer behind the menu button in the top bar - hinged on whichever
+edge `navPosition` names. The page contents appears at 1400px, or at 1080px when
+there is no sidebar taking up the width.
+
+`--nav` and `--toc` on [`grimoire build`](commands.md#grimoire-build) override
+both, which is the quick way to see an arrangement before committing to it:
+
+```sh
+grimoire build --nav right --toc left --out /tmp/mirrored
+```
 
 ### The interface language
 

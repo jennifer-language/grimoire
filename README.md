@@ -45,10 +45,10 @@ Everything lives in [`docs/`](docs/index.md), which Grimoire builds with itself:
 | | |
 | - | - |
 | [Introduction](docs/index.md) | what it does, in one page |
+| [Installation](docs/installation.md) | from a checkout, or from a container with Docker or Podman |
 | [Commands](docs/commands.md) | every subcommand and flag |
 | [Configuration](docs/configuration.md) | `grimoire.toml`, key by key |
 | [Themes](docs/themes.md) | the ten themes, with screenshots, and how to write one |
-| [Docker](docs/docker.md) | running from the official image, and the Grimoire image |
 | [Internals](docs/internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](docs/performance.md) | where the time goes, and why it scales the way it does |
 
@@ -61,6 +61,9 @@ Everything lives in [`docs/`](docs/index.md), which Grimoire builds with itself:
 Jennifer 0.25.0 or newer. `build`, `pdf`, `init`, and `themes` run on both the
 default binary and `jennifer-tiny`; `serve` needs the default binary, since
 `jennifer-tiny` stubs `httpd`.
+
+Or none of it: the [installation page](docs/installation.md) has the Docker and
+Podman lines, which need nothing on the machine but the container runtime.
 
 ## Trying it
 
