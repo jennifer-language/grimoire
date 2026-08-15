@@ -188,10 +188,16 @@ func renderList(n as markdown.Node) {
 func renderRow(row as markdown.Node, cellTag as string) {
     def out as list of string init ["<tr>"];
     for (def cell in markdown.children($row)) {
+        # Only the two alignments the stylesheet has a rule for are emitted.
+        # Testing for what is *wanted* rather than excluding what is not is what
+        # keeps this quiet when the `markdown` module changes its mind about how
+        # an unaligned cell is spelled: it reported "" once and reports "none"
+        # now, and the exclusion list had put `data-align="none"` on every cell
+        # of every table in the book.
         def align as string init markdown.attr($cell, "align");
         def attrs as string init "";
-        if ($align != "" and $align != "left") {
-            $attrs = ' data-align="' + attrEsc($align) + '"';
+        if ($align == "right" or $align == "center") {
+            $attrs = ' data-align="' + $align + '"';
         }
         $out[] = "<" + $cellTag + $attrs + ">" + renderInline(markdown.children($cell)) +
             "</" + $cellTag + ">";

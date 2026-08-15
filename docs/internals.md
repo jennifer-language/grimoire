@@ -26,7 +26,9 @@ src/
   pdfbook.j         the printable build
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
+  *_test.j          one white-box test overlay per module, run by jennifer test
 scripts/
+  test.sh           run every unit test
   screenshots.sh    regenerate the theme gallery
   theme-css.j       write one theme's stylesheet to a path
   bench.sh          time a build, and the modules under it
@@ -231,6 +233,46 @@ Sources are formatted with `jennifer fmt` and clean under `jennifer lint`:
 jennifer fmt --write src/*.j src/themes/*.j scripts/*.j
 jennifer lint src/*.j src/themes/*.j scripts/*.j
 ```
+
+## Tests
+
+Every module has a `src/NAME_test.j` beside it, and `scripts/test.sh` runs the
+lot:
+
+```sh
+scripts/test.sh              # everything
+scripts/test.sh config util  # just these modules
+```
+
+A `_test.j` is a **white-box overlay**, which is Jennifer's own arrangement
+rather than anything Grimoire invented: `jennifer test src/config_test.j` loads
+`src/config.j` and splices the overlay into it, so a test sees the module's
+private functions unqualified and shares its imports. That is why none of these
+files import the module they test - and why importing it anyway is an error, the
+alias already being bound.
+
+The consequence worth knowing is that the private helpers are where most of the
+testing happens. `assignWork`, `stripScripts`, `foldPlurals`, `pageFile` and
+`printLine` are none of them exported, and all of them are places where a wrong
+answer produces a plausible-looking book rather than an error.
+
+What the tests are for, beyond the obvious:
+
+- **The determinism promise.** `assignWork` and `placeRecords` both have cases
+  that fail if a tie-break disappears - a failure a single-threaded build would
+  never show.
+- **The catalogs.** Eleven parallel maps of twenty-two keys rot quietly; a key
+  added to English and forgotten in Polish shows up as a raw key name on a Polish
+  reader's page and nowhere else. `locale_test.j` compares all eleven on every
+  run, and enforces the punctuation rule that the ASCII grep cannot, since it
+  excludes that file by name.
+- **The runtime.** `assets.j` holds JavaScript in a raw Jennifer string, which
+  ends at the first apostrophe with no escape available. One in a comment would
+  truncate the runtime and the build would carry on quite happily.
+
+The end-to-end behaviour - a real book built, byte-identical output at any
+`--jobs`, the PDF, the links - is not here. That is what a build is for, and
+the `PKGBUILD`'s `check()` runs one.
 
 ## Possible extensions
 

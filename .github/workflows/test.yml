@@ -1,0 +1,174 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The gate every change goes through: formatting, lint, the repository's own
+# punctuation rule, the unit tests, and then a real book built end to end.
+#
+# Everything runs inside the official Jennifer image rather than installing an
+# interpreter on the runner, the same way `pages.yml` does. That is one fewer
+# thing to keep in step, and it means the pipeline is exercising the interpreter
+# a reader would actually get.
+#
+# Two jobs rather than one, because they fail for different reasons and the split
+# says which: `unit` is Grimoire's own code being wrong, `book` is Grimoire's
+# output being wrong.
+
+name: test
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Grimoire's sources require Jennifer 0.25.0, and the `latest` image is still
+  # 0.24.0. Switch this to `latest` the day 0.25.0 is released - the same line
+  # lives in `Dockerfile` and `pages.yml`.
+  JENNIFER_TAG: dev
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # Pull once and name it once; every step below is the same invocation.
+      - name: Pull the interpreter image
+        run: docker pull "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}"
+
+      # `--check` names the unformatted files and exits non-zero without
+      # rewriting one, which is what a pipeline wants: a formatting fix belongs
+      # in the commit that needed it, not in a bot's.
+      - name: Check formatting
+        run: |
+          docker run --rm -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            fmt --check grimoire src/*.j src/themes/*.j scripts/*.j
+
+      - name: Lint
+        run: |
+          docker run --rm -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            lint grimoire src/*.j src/themes/*.j scripts/*.j
+
+      # The repository writes ASCII punctuation everywhere, for two reasons: a
+      # typographic character is invisible in a diff, and the printable build
+      # encodes WinAnsi so every one of them is a transliteration away from the
+      # page. `src/pdfbook.j` holds the transliteration table and `src/locale.j`
+      # holds eleven languages, so both are exempt from the grep - `locale.j` is
+      # checked by `src/locale_test.j` instead, which bans the punctuation while
+      # allowing the letters.
+      #
+      # Two lines are expected: the example in `docs/internals.md` and the
+      # `authorsLabel` in `grimoire.toml`, both of which are the character as
+      # content rather than as punctuation.
+      # The count is checked as well as the files, so that a *second* such
+      # character sneaking into one of the two sanctioned files is caught too.
+      - name: Check for non-ASCII punctuation
+        run: |
+          set -eu
+          found=$(grep -rnP '[^\x00-\x7F]' \
+            --include='*.j' --include='*.md' --include='*.toml' \
+            --include='*.sh' --include='*.yml' . \
+            | grep -Ev 'src/(pdfbook|locale)\.j' || true)
+          unexpected=$(printf '%s\n' "$found" \
+            | grep -Ev '^\./(docs/internals\.md|grimoire\.toml):' | grep -c . || true)
+          total=$(printf '%s\n' "$found" | grep -c . || true)
+          if [ "$unexpected" -ne 0 ] || [ "$total" -ne 2 ]; then
+            echo "expected exactly the two sanctioned lines, got $total:"
+            echo "$found"
+            exit 1
+          fi
+          echo "$found"
+
+      # `scripts/test.sh` splits JENNIFER on whitespace precisely so it can be a
+      # whole command, which is what lets the loop run on the runner while every
+      # test runs in the image.
+      - name: Unit tests
+        run: |
+          JENNIFER="docker run --rm -v $PWD:/work ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            scripts/test.sh
+
+  book:
+    needs: unit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Pull the interpreter image
+        run: docker pull "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}"
+
+      # Twice, at two job counts, into two directories. Byte-identical output at
+      # any `--jobs` is a promise Grimoire makes and an easy one to break by
+      # accident: anything that accumulates across chapters has to be reassembled
+      # in outline order rather than in the order the workers finish.
+      #
+      # The PDF is included because it is the piece most likely to go wrong here -
+      # it runs alongside the chapter render rather than after it.
+      - name: Build the manual twice
+        run: |
+          set -eux
+          run() {
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+              "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+              run ./grimoire build --pdf "$@"
+          }
+          run --out /work/out-j1 --jobs 1 --quiet
+          run --out /work/out-j7 --jobs 7 --quiet
+
+      - name: Check the output is byte-identical
+        run: diff -r out-j1 out-j7
+
+      - name: Check the pieces a reader needs
+        run: |
+          set -eux
+          test -s out-j1/index.html
+          test -s out-j1/grimoire.pdf
+          test -s out-j1/assets/grimoire.css
+          test -s out-j1/assets/grimoire.js
+          test -s out-j1/assets/search-index.js
+
+      # A build reports a missing *chapter* but not a broken cross-reference, so
+      # the one thing a Grimoire build cannot tell you about itself is checked
+      # here. Every local href, and every fragment it points at.
+      - name: Check every link and fragment
+        run: |
+          set -eu
+          cd out-j1
+          dead=$(for f in *.html; do
+            grep -oh 'href="[^"]*"' "$f" | sed 's|href="||;s|"$||' | grep -v '^http' |
+            while read -r l; do
+              t="${l%%#*}"; frag="${l#*#}"; tf="${t:-$f}"
+              [ -z "$t" ] || [ -f "$t" ] || echo "DEAD FILE: $f -> $l"
+              case "$l" in *#*) grep -q "id=\"$frag\"" "$tf" || echo "DEAD FRAG: $f -> $l";; esac
+            done
+          done | sort -u)
+          if [ -n "$dead" ]; then
+            echo "$dead"
+            exit 1
+          fi
+          echo "no dead links"
+
+      # The nine arrangements of the two navigation columns, since eight of them
+      # are never exercised by the build above.
+      - name: Build every column arrangement
+        run: |
+          set -eux
+          for nav in left right off; do
+            for toc in left right off; do
+              docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+                "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+                run ./grimoire build --nav "$nav" --toc "$toc" \
+                  --out "/work/out-$nav-$toc" --quiet
+              grep -q "data-nav=\"$nav\" data-toc=\"$toc\"" "out-$nav-$toc/index.html"
+            done
+          done

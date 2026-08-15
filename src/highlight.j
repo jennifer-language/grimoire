@@ -334,7 +334,17 @@ export func render(code as string) {
         if ($cls == "" or $stop <= $i) {
             # Ordinary text: accumulate and emit it in one run, so the output is
             # not a span per character.
-            $i = $i + 1;
+            #
+            # An identifier that classified as nothing has still been *consumed*,
+            # so step over the whole token rather than one character. Restarting
+            # inside it re-scans the tail as a token of its own, and a keyword
+            # that happens to be a suffix then gets highlighted in the middle of
+            # a word: `plain` came out as `pla` followed by a keyword `in`.
+            if ($stop > $i) {
+                $i = $stop;
+            } else {
+                $i = $i + 1;
+            }
             continue;
         }
         if ($plain < $i) {

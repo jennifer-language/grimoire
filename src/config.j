@@ -254,7 +254,9 @@ func oneOf(value as string, allowed as list of string, deflt as string) {
  * @param base {Config} the configuration to layer onto
  * @param text {string} the TOML source
  * @return {Config} the merged configuration
- * @throws {Error} kind "toml" when the document does not parse
+ * @throws {Error} when the document does not parse. The `toml` module raises a
+ *   plain runtime error rather than a kinded one; its message carries the
+ *   `toml:` prefix and the line number
  */
 export func apply(base as Config, text as string) {
     def doc as toml.Value init toml.decode($text);
@@ -325,7 +327,7 @@ export func apply(base as Config, text as string) {
  * Read a configuration file, falling back to the defaults when it is absent.
  * @param path {string} the path to a `grimoire.toml`
  * @return {Config} the resolved configuration
- * @throws {Error} kind "toml" when the file exists but does not parse
+ * @throws {Error} when the file exists but does not parse, as `apply` does
  */
 export func load(path as string) {
     if (not fs.isFile($path)) {

@@ -72,6 +72,17 @@ jobs:
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "stamp: version='$version' commit='$commit'"
 
+      # The unit tests again, even though `test.yml` has already run them on this
+      # same commit. The duplication is deliberate and costs a few seconds: this
+      # job publishes the live site, and one workflow cannot gate on another
+      # without `workflow_run`, which would deploy from a stale commit. Better to
+      # re-run a fast check than to publish a site built from code that failed
+      # one.
+      - name: Unit tests
+        run: |
+          JENNIFER="docker run --rm -v $PWD:/work ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            scripts/test.sh
+
       # `grimoire.toml` builds docs/ into site/ with [pdf] enabled, so this is
       # the whole build: the site and the printable book in one pass, laid out
       # alongside each other rather than one after the other.
