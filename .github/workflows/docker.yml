@@ -46,7 +46,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Derive tags
+      # The labels are worth stating rather than inheriting. `metadata-action`
+      # fills `org.opencontainers.image.description` from the repository's GitHub
+      # "About" text and overwrites whatever the `Dockerfile` said; when that text
+      # is empty the label is empty, and the package page falls back to rendering
+      # the whole repository README - which is a page about a checkout, on a page
+      # about an image.
+      #
+      # One line, because this input is newline-delimited `key=value` pairs and a
+      # value cannot contain a newline. The longer package text lives in
+      # `packaging/OVERVIEW.md`, which the release workflow uses as-is.
+      - name: Derive tags and labels
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -57,6 +67,11 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=Grimoire
+            org.opencontainers.image.description=Build a documentation website, and a printable PDF, from a directory of Markdown files. Mount a book at /work; everything after the image name is a Grimoire command. Full manual: https://grimoire.jennifer-lang.dev/
+            org.opencontainers.image.documentation=https://grimoire.jennifer-lang.dev/
+            org.opencontainers.image.licenses=LGPL-3.0-only
 
       # Load a single-arch image locally first: a smoke test has to run before
       # anything is published, and a multi-arch manifest cannot be loaded into

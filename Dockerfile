@@ -24,8 +24,13 @@
 ARG JENNIFER_TAG=dev
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
+# The registry shows `description` on the package page, so it says how to run the
+# thing rather than only what it is. CI overwrites these from
+# `.github/workflows/docker.yml`; they are repeated here so a `docker build .` by
+# hand produces the same image, and the two are meant to stay in step.
 LABEL org.opencontainers.image.title="Grimoire" \
-      org.opencontainers.image.description="Build a documentation site and a PDF from a directory of Markdown files" \
+      org.opencontainers.image.description="Build a documentation website, and a printable PDF, from a directory of Markdown files. Mount a book at /work; everything after the image name is a Grimoire command. Full manual: https://grimoire.jennifer-lang.dev/" \
+      org.opencontainers.image.documentation="https://grimoire.jennifer-lang.dev/" \
       org.opencontainers.image.source="https://github.com/jennifer-language/grimoire" \
       org.opencontainers.image.licenses="LGPL-3.0-only"
 

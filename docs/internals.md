@@ -27,6 +27,9 @@ src/
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
   *_test.j          one white-box test overlay per module, run by jennifer test
+packaging/
+  OVERVIEW.md       the short text the package page and releases carry
+  arch/             a PKGBUILD, and notes on building it
 scripts/
   test.sh           run every unit test
   screenshots.sh    regenerate the theme gallery
@@ -219,6 +222,31 @@ pieces a reader needs - the landing page, the stylesheet, the search index, a
 non-empty PDF, and the link between the last two - so an empty publish fails in
 CI rather than on the live site. A pull request builds and checks without
 publishing.
+
+### The short version, for pages that are not this one
+
+A container registry and a release page are read by someone deciding whether to
+install a version, not by someone learning what the project is. Both get
+`packaging/OVERVIEW.md` instead of the repository README: what it does in a
+paragraph, the command that runs it, and links out.
+
+It reaches them two different ways, because the two places accept different
+things.
+
+`.github/workflows/release.yml` uses the file as-is for a `v*` tag, adding the
+pull line for that version and the commit log since the previous tag.
+
+The package page cannot take a file. It shows
+`org.opencontainers.image.description`, and **falls back to rendering the whole
+repository README when that label is empty** - which is what it did, because
+`docker/metadata-action` fills the label from the repository's GitHub "About"
+text and overwrites whatever the `Dockerfile` said. So `docker.yml` now states
+the label itself. One line: that input is newline-delimited `key=value` pairs,
+so a value cannot contain a newline, and one sentence with a link is the right
+length for the box it lands in anyway.
+
+The same labels are repeated in the `Dockerfile`, so that a `docker build .` by
+hand produces the same image. They are meant to stay in step.
 
 `docs/CNAME` is what binds the custom domain, and it needs no special handling:
 it is a non-Markdown file under `src`, so the ordinary asset copy puts it at

@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# Publish a GitHub Release for a `v*` tag.
+#
+# The body is `packaging/OVERVIEW.md` - the same brief text the container package
+# page carries - with the lines that only make sense for one tag generated on top
+# of it. A release page is read by someone deciding whether to install this
+# version, not by someone learning what the project is, so it says how to get it
+# and points at the manual for the rest. The repository README stays where it is
+# useful, which is the repository.
+#
+# Nothing is built here. The site publishes from `pages.yml` and the image from
+# `docker.yml`, both of which already run on a tag; this job waits for neither,
+# because a release that failed to appear is easier to notice than one that
+# appeared with the wrong notes.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: the existing tag to release
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full history and tags: the changelog below asks git what happened since
+      # the previous tag, and a shallow clone knows about neither.
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Compose the release notes
+        id: notes
+        run: |
+          set -eu
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          previous=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+
+          {
+            cat packaging/OVERVIEW.md
+            echo
+            echo "## This release"
+            echo
+            echo '```sh'
+            echo "docker pull ghcr.io/jennifer-language/grimoire:$version"
+            echo '```'
+            echo
+            echo "Or a checkout at this tag, which needs only a Jennifer interpreter:"
+            echo
+            echo '```sh'
+            echo "git clone --branch $tag https://github.com/jennifer-language/grimoire"
+            echo "cd grimoire && ./grimoire build"
+            echo '```'
+            if [ -n "$previous" ]; then
+              echo
+              echo "## Changes since $previous"
+              echo
+              git log --no-merges --pretty='- %s' "$previous..$tag"
+              echo
+              echo "[Full diff](https://github.com/jennifer-language/grimoire/compare/$previous...$tag)"
+            fi
+          } > notes.md
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "--- notes.md ---"
+          cat notes.md
+
+      # `--verify-tag` so a mistyped dispatch input fails here rather than
+      # creating a release pointing at a tag that does not exist.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.notes.outputs.tag }}" \
+            --title "Grimoire ${{ steps.notes.outputs.tag }}" \
+            --notes-file notes.md \
+            --verify-tag

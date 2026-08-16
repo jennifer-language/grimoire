@@ -88,6 +88,26 @@ jobs:
           fi
           echo "$found"
 
+      # The package page shows `org.opencontainers.image.description`, and falls
+      # back to the whole repository README when it is empty. `docker.yml` states
+      # it so that cannot happen, and the `Dockerfile` repeats it so a build by
+      # hand produces the same image - two copies of one sentence, which is
+      # exactly the arrangement that drifts. Nothing else would notice.
+      - name: Check the image description has not drifted
+        run: |
+          set -eu
+          dockerfile=$(sed -n 's/.*org\.opencontainers\.image\.description="\(.*\)".*/\1/p' Dockerfile)
+          workflow=$(sed -n 's/^ *org\.opencontainers\.image\.description=//p' \
+            .github/workflows/docker.yml)
+          test -n "$dockerfile"
+          if [ "$dockerfile" != "$workflow" ]; then
+            echo "the image description differs between Dockerfile and docker.yml:"
+            echo "  Dockerfile: $dockerfile"
+            echo "  docker.yml: $workflow"
+            exit 1
+          fi
+          test -s packaging/OVERVIEW.md
+
       # `scripts/test.sh` splits JENNIFER on whitespace precisely so it can be a
       # whole command, which is what lets the loop run on the runner while every
       # test runs in the image.
