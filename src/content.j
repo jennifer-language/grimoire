@@ -15,7 +15,21 @@
  * Everything that reaches the output goes through `html.escape` (text) or the
  * local attribute escaper (attribute values), and every link goes through
  * `html.safeUrl`, so a hostile document cannot inject markup or a
- * `javascript:` href.
+ * `javascript:` href - in any casing, entity-encoded, or as a `data:` URL.
+ * Inline HTML is covered by the same rule without any effort: the parser hands
+ * `a <b>bold</b> c` back as one text node, so it is escaped like any other text.
+ *
+ * A hand-written HTML **block** is the single exception, and the only thing
+ * `rawHtml` controls. On, which is the default and what every comparable
+ * generator does, it goes to the page as written - that is the point of writing
+ * it, and a book's own source is trusted the same way the configured footer is.
+ * Off, it is escaped and shown, for a book assembled from Markdown its author did
+ * not write.
+ *
+ * `markdown.toHtml` is not used for any of this. It gained the same choice as
+ * `toHtmlWith(md, HtmlOptions{allowRawHtml: ...})` and defaults to escaping now,
+ * but nothing here has ever called it: a documentation site needs more than the
+ * plain translation, and the walk above is where that difference lives.
  * @module content
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -148,8 +162,10 @@ func renderSpan(n as markdown.Node) {
         else {
             # A block that turned up in inline position - a nested list, or the
             # paragraph the module now wraps a multi-line list item in - renders
-            # through the block path.
-            return renderBlock($n, false);
+            # through the block path. Neither highlighting nor raw HTML can
+            # arrive by this route, so both are off: a fenced block is not inline,
+            # and inline HTML is text by the time the parser is done with it.
+            return renderBlock($n, false, false);
         }
     }
 }
@@ -262,10 +278,10 @@ func renderCode(n as markdown.Node, highlighting as bool) {
         $body + "</code></pre></div>";
 }
 
-func renderQuote(n as markdown.Node, highlighting as bool) {
+func renderQuote(n as markdown.Node, highlighting as bool, rawHtml as bool) {
     def out as list of string init ["<blockquote>"];
     for (def child in markdown.children($n)) {
-        $out[] = renderBlock($child, $highlighting);
+        $out[] = renderBlock($child, $highlighting, $rawHtml);
     }
     $out[] = "</blockquote>";
     return strings.join($out, "");
@@ -273,7 +289,7 @@ func renderQuote(n as markdown.Node, highlighting as bool) {
 
 # renderBlock covers every block kind except a top-level heading, which the page
 # walk handles itself so it can attach the anchor id it assigned.
-func renderBlock(n as markdown.Node, highlighting as bool) {
+func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
     match (markdown.typeOf($n)) {
         when "paragraph" { return "<p>" + renderInline(markdown.children($n)) + "</p>"; }
         when "heading" {
@@ -283,13 +299,26 @@ func renderBlock(n as markdown.Node, highlighting as bool) {
         when "code" { return renderCode($n, $highlighting); }
         when "list" { return renderList($n); }
         when "table" { return renderTable($n); }
-        when "quote" { return renderQuote($n, $highlighting); }
+        when "quote" { return renderQuote($n, $highlighting, $rawHtml); }
         when "thematic_break" { return "<hr>"; }
+        # The one place anything reaches the page unescaped, and the only reason
+        # `rawHtml` is threaded this far down.
+        #
         # A hand-written block goes to the page verbatim - that is the point of
-        # writing it. It comes from the book's own source, which is trusted the
-        # same way the configured footer is; everything that comes from anywhere
-        # else on this page is escaped.
-        when "html_block" { return markdown.text($n); }
+        # writing it - and a book's own source is trusted the same way the
+        # configured footer is. `[html] rawHtml = false` is for the book that is
+        # not its own author: a generated reference, contributed chapters, a
+        # vendored README. Then the markup is shown rather than run.
+        #
+        # Only a *block* can be raw. Inline HTML never reaches here: the parser
+        # hands `a <b>bold</b> c` back as one text node, which the inline path
+        # escapes like any other text.
+        when "html_block" {
+            if ($rawHtml) {
+                return markdown.text($n);
+            }
+            return "<p>" + html.escape(markdown.text($n)) + "</p>";
+        }
         # A page-break directive is print-only and has nothing to draw here.
         when "page_break" { return ""; }
         else {
@@ -320,10 +349,12 @@ func renderHeading(n as markdown.Node, id as string) {
  * GitHub does, so a repeated heading still gets a stable, distinct link.
  * @param md {string} the Markdown source
  * @param highlighting {bool} whether to highlight Jennifer code blocks in place
+ * @param rawHtml {bool} whether a hand-written HTML block goes to the page
+ *   verbatim; false escapes it, so the markup is shown rather than run
  * @return {Rendered} the rendered page
  * @throws {Error} kind "markdown" when the document is too deep or too large
  */
-export func render(md as string, highlighting as bool) {
+export func render(md as string, highlighting as bool, rawHtml as bool) {
     def doc as markdown.Node init markdown.parse($md);
     def out as list of string;
     def headings as list of Heading;
@@ -335,7 +366,7 @@ export func render(md as string, highlighting as bool) {
     def buffer as list of string;
     for (def node in markdown.children($doc)) {
         if (markdown.typeOf($node) != "heading") {
-            $out[] = renderBlock($node, $highlighting);
+            $out[] = renderBlock($node, $highlighting, $rawHtml);
             # Raw markup and a rule are both structure rather than prose, so
             # neither goes into the search index - nobody searches for a `<div>`.
             def kind as string init markdown.typeOf($node);

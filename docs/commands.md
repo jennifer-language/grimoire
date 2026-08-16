@@ -28,6 +28,8 @@ Render the site.
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `--clean` | from config | empty the output directory before building |
 | `--no-clean` | from config | keep what is already in the output directory |
+| `--raw-html` | from config | emit hand-written HTML blocks as written |
+| `--no-raw-html` | from config | escape hand-written HTML blocks |
 | `--pdf` | off | also render the book to PDF |
 | `--no-search` | off | skip the search index and the search UI |
 | `-j`, `--jobs N` | `0` | chapters to render in parallel; `0` is one per CPU |
@@ -54,6 +56,11 @@ decided. `--no-clean` is how a single run opts out of that setting.
 are covered in [Configuration](configuration.md#the-two-navigation-columns),
 which is where the setting belongs once a book has decided; the flags are for
 trying an arrangement before writing it down.
+
+`--no-raw-html` escapes a hand-written HTML block in the Markdown instead of
+emitting it as written - for a book assembled from Markdown you did not write.
+Everything else on a page is escaped either way; see
+[Configuration](configuration.md#hand-written-html).
 
 The exit status is `1` when the outline names a chapter with no file behind it -
 the rest of the book still builds, and the missing entries are reported on
@@ -92,6 +99,8 @@ Build, then serve the result on a local address until interrupted.
 | `--toc WHERE` | from config | the on-this-page column: `left`, `right`, `off` |
 | `--clean` | from config | empty the output directory before the first build |
 | `--no-clean` | from config | keep what is already in the output directory |
+| `--raw-html` | from config | emit hand-written HTML blocks as written |
+| `--no-raw-html` | from config | escape hand-written HTML blocks |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-reload` | off | with `--watch`, do not reload the browser |

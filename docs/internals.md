@@ -81,7 +81,15 @@ calling out:
 - An **`html_block`** is emitted **verbatim**, because writing one is a
   deliberate act by the book's author. It is the single exception: everything on
   the page that comes from anywhere else is escaped, and every link goes through
-  `html.safeUrl`.
+  `html.safeUrl` - so a `javascript:` target dies whatever its casing, however it
+  is entity-encoded, and a `data:` URL with it. `[html] rawHtml = false` closes
+  that exception too, for a book assembled from Markdown its author did not
+  write; the block is then escaped and shown rather than run.
+
+  Inline HTML needs no setting and never did. The parser hands `a <b>bold</b> c`
+  back as a single text node, so the inline path escapes it like any other text -
+  which is why `rawHtml` is threaded through three functions rather than through
+  the whole renderer.
 - A **`page_break`** renders as nothing. It is a directive for the printable
   build, and has nothing to draw on a web page.
 

@@ -600,7 +600,7 @@ func testResolveBrandRejectsAnSvgWithNoRootElement() {
 # The headings are collected either way - the search index and the PDF bookmarks
 # are built from the same pass - so turning the column off skips only the list.
 func testTocForFollowsTheSetting() {
-    def r as content.Rendered init content.render("## A\n\n## B\n", false);
+    def r as content.Rendered init content.render("## A\n\n## B\n", false, true);
     def c as config.Config init config.defaults();
     testing.assertNotEqual(tocFor($c, $r), "");
     $c.tocPosition = "off";

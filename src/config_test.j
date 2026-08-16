@@ -50,6 +50,25 @@ func testTheOutputDirectoryIsNotPrunedByDefault() {
     testing.assertFalse(defaults().clean);
 }
 
+# On by default, which is what every comparable generator does and what a book
+# that writes its own markup needs. The other default would silently change what
+# every existing book renders.
+func testRawHtmlIsAllowedByDefault() {
+    testing.assertTrue(defaults().rawHtml);
+}
+
+func testRawHtmlIsReadFromTheHtmlTable() {
+    testing.assertFalse(apply(defaults(), '[html]
+rawHtml = false
+').rawHtml);
+    testing.assertTrue(apply(defaults(), '[html]
+rawHtml = true
+').rawHtml);
+    testing.assertTrue(apply(defaults(), '[html]
+rawHtml = "no"
+').rawHtml);
+}
+
 func testCleanIsReadFromTheBuildTable() {
     testing.assertTrue(apply(defaults(), '[build]
 clean = true

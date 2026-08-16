@@ -62,6 +62,8 @@ func testBuildTakesEveryFlagItDocuments() {
         "--toc",
         "--clean",
         "--no-clean",
+        "--raw-html",
+        "--no-raw-html",
         "--pdf",
         "--no-search",
         "--jobs",
@@ -83,7 +85,9 @@ func testServeTakesItsOwnFlags() {
         "--nav",
         "--toc",
         "--clean",
-        "--no-clean"
+        "--no-clean",
+        "--raw-html",
+        "--no-raw-html"
     ]) {
         testing.assertContains($usage, $flag);
     }
@@ -233,6 +237,46 @@ func testTheCleanFlagsReachServe() {
 # else there, so emptying it would be a side effect of an unrelated command.
 func testThePdfCommandTakesNoCleanFlag() {
     testing.assertFalse(strings.contains(args.usage(pdfParser()), "--clean"));
+}
+
+# The same pair shape as `--clean`, and the same precedence: when both are given
+# the reading that escapes wins, because escaping shows the markup and the other
+# way runs it.
+func testNoRawHtmlWinsOverRawHtml() {
+    def both as config.Config init resolve(buildArgs([
+        "--config",
+        "no-such-file.toml",
+        "--raw-html",
+        "--no-raw-html"
+    ]));
+    testing.assertFalse($both.rawHtml);
+}
+
+func testTheRawHtmlFlagsReachTheirField() {
+    def off as list of string init ["--config", "no-such-file.toml", "--no-raw-html"];
+    testing.assertTrue(resolve(buildArgs(["--config", "no-such-file.toml"])).rawHtml);
+    testing.assertFalse(resolve(buildArgs($off)).rawHtml);
+    def serveArgv as list of string init [
+        "grimoire",
+        "serve",
+        "--config",
+        "no-such-file.toml",
+        "--no-raw-html"
+    ];
+    testing.assertFalse(resolve($serveArgv).rawHtml);
+}
+
+# A book that turns it off in `grimoire.toml` still needs a way to say "not this
+# time" that is not editing the file.
+func testRawHtmlOverridesTheConfiguration() {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-rawhtml-");
+    def file as string init path.join($dir, "grimoire.toml");
+    fs.writeString($file, '[html]
+rawHtml = false
+');
+    testing.assertFalse(resolve(buildArgs(["--config", $file])).rawHtml);
+    testing.assertTrue(resolve(buildArgs(["--config", $file, "--raw-html"])).rawHtml);
+    fs.removeAll($dir);
 }
 
 func testEntryCountReadsAsEnglish() {

@@ -33,6 +33,7 @@ jobs = 0                # 0 = one render task per CPU
 theme = "grimoire"
 mode = "auto"           # auto | light | dark
 uiLanguage = "en"       # defaults to book.language
+rawHtml = true          # false escapes hand-written HTML blocks
 navPosition = "left"    # left | right | off
 tocPosition = "right"   # left | right | off
 tocDepth = 3
@@ -171,6 +172,7 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 | `theme` | string | `"grimoire"` | one of the [ten themes](themes.md); an unknown name falls back to `grimoire` |
 | `mode` | string | `"auto"` | the colour mode a first-time reader gets: `auto`, `light`, `dark` |
 | `uiLanguage` | string | from `book.language` | the language Grimoire's own words are printed in, when it differs from the book's |
+| `rawHtml` | bool | `true` | emit a hand-written HTML block from the Markdown as written; `false` escapes it |
 | `navPosition` | string | `"left"` | which side the book-contents sidebar sits on: `left`, `right`, `off` |
 | `tocPosition` | string | `"right"` | which side the on-this-page column sits on: `left`, `right`, `off` |
 | `tocDepth` | int | `3` | deepest heading level in the per-page contents; clamped to 1-6 |
@@ -188,6 +190,48 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 their choice is remembered and this setting no longer applies to them. Whatever
 it resolves to is stamped on the document before the first paint, so navigating
 a dark site never flashes white.
+
+### Hand-written HTML
+
+A Markdown file may hold a block of HTML, and by default it reaches the page as
+written:
+
+```markdown
+<div class="callout">
+Something the Markdown subset cannot say.
+</div>
+```
+
+That is what every comparable generator does, and it is the point of writing
+such a block: the author is reaching past Markdown on purpose, in a file they
+control, the same way `[html] footer` reaches past it in `grimoire.toml`.
+
+It is also the **only** thing on a page that is not escaped. Prose, headings,
+code spans, code blocks and attribute values all go through the escaper, and
+every link target goes through a URL gate that removes a `javascript:` scheme in
+any casing, entity-encoded, and a `data:` URL with it. Inline HTML is not an
+exception either - `a <b>bold</b> c` inside a paragraph is escaped and shown,
+because the Markdown parser hands it back as text rather than as markup.
+
+So the setting is about one case, and it is a real one:
+
+```toml
+[html]
+rawHtml = false
+```
+
+Turn it off for a book you are building out of Markdown **you did not write** - a
+generated API reference, contributed chapters, a vendored README, anything
+assembled by a tool from somewhere else. Those blocks are then escaped and shown
+as markup rather than run as markup. Nothing else about the page changes.
+
+Leave it on for an ordinary book. Turning it off would show the source of a
+callout a chapter wrote on purpose, which is not an improvement.
+
+`--raw-html` and `--no-raw-html` on [`build`](commands.md#grimoire-build) and
+[`serve`](commands.md#grimoire-serve) override it for one run. As with
+`--clean`, giving both is a mistake, and the safer reading wins: `--no-raw-html`
+escapes, and escaping shows the markup where the other way runs it.
 
 ### The two navigation columns
 

@@ -38,6 +38,10 @@ use convert;
  *   that were never Grimoire's to begin with
  * @field theme {string} the built-in theme name
  * @field defaultMode {string} the initial colour mode: "auto", "light", or "dark"
+ * @field rawHtml {bool} emit a hand-written HTML block from the Markdown source
+ *   verbatim. On by default, which is what every comparable generator does and
+ *   what a book that writes its own markup needs; off escapes those blocks, for
+ *   a book assembled from Markdown its author did not write
  * @field tocDepth {int} the deepest heading level shown in the per-page contents
  * @field navPosition {string} which side the book-contents sidebar sits on:
  *   "left", "right", or "off" to build the pages without it at all
@@ -96,6 +100,7 @@ export def struct Config {
     clean as bool,
     theme as string,
     defaultMode as string,
+    rawHtml as bool,
     tocDepth as int,
     navPosition as string,
     tocPosition as string,
@@ -172,6 +177,7 @@ export func defaults() {
         clean: false,
         theme: "grimoire",
         defaultMode: "auto",
+        rawHtml: true,
         tocDepth: 3,
         navPosition: "left",
         tocPosition: "right",
@@ -283,6 +289,7 @@ export func apply(base as Config, text as string) {
         strAt($doc, "/html/mode", $c.defaultMode),
         ["auto", "light", "dark"],
         $c.defaultMode);
+    $c.rawHtml = boolAt($doc, "/html/rawHtml", $c.rawHtml);
     $c.tocDepth = intAt($doc, "/html/tocDepth", $c.tocDepth);
     $c.navPosition = oneOf(
         strAt($doc, "/html/navPosition", $c.navPosition),

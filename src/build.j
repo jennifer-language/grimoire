@@ -602,7 +602,10 @@ func renderSlice(
         def entry as summary.Entry init $pages[$i];
         def source as string init path.join($c.srcDir, $entry.src);
         note($c, "  render  " + $entry.src + "  ->  " + $entry.out);
-        def rendered as content.Rendered init content.render(fs.readString($source), $c.highlight);
+        def rendered as content.Rendered init content.render(
+            fs.readString($source),
+            $c.highlight,
+            $c.rawHtml);
         def root as string init util.relPrefix(util.depthOf($entry.out));
         def view as layout.View init layout.View{
             title: plainTitle(titleFor($entry, $rendered)),

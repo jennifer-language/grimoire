@@ -88,12 +88,24 @@ func cleanFlags(p as args.Parser) {
     return $out;
 }
 
+# Whether a hand-written HTML block in the Markdown reaches the page as written.
+# On by default; both directions for the same reason `--clean` has both, and
+# because the interesting case - a book assembled from Markdown its author did
+# not write - is usually one run rather than a setting.
+func rawHtmlFlags(p as args.Parser) {
+    def out as args.Parser init $p;
+    $out = args.boolFlag($out, "raw-html", "", "emit hand-written HTML blocks as written");
+    $out = args.boolFlag($out, "no-raw-html", "", "escape hand-written HTML blocks");
+    return $out;
+}
+
 func buildParser() {
     def p as args.Parser init commonFlags(args.parser("build", "Build the site"));
     $p = args.flag($p, "theme", "t", "", "theme name (overrides the config)");
     $p = args.flag($p, "mode", "m", "", "default colour mode: auto, light, or dark");
     $p = columnFlags($p);
     $p = cleanFlags($p);
+    $p = rawHtmlFlags($p);
     $p = args.boolFlag($p, "pdf", "", "also render the book to PDF");
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
@@ -118,6 +130,7 @@ func serveParser() {
     # Only the build `serve` does on the way in prunes; a watch rebuild never
     # does, or the directory being served would empty itself on every save.
     $p = cleanFlags($p);
+    $p = rawHtmlFlags($p);
     return uiLanguageFlag($p);
 }
 
@@ -210,6 +223,15 @@ func configure(r as args.Result, appDir as string) {
     }
     if (args.has($r, "no-clean")) {
         $c.clean = false;
+    }
+    # Same rule as the pair above: the two together are a mistake, and the
+    # reading that escapes is the one to take when it is not clear which was
+    # meant. Escaping shows the markup; the other way runs it.
+    if (args.has($r, "raw-html")) {
+        $c.rawHtml = true;
+    }
+    if (args.has($r, "no-raw-html")) {
+        $c.rawHtml = false;
     }
     if (args.has($r, "no-search")) {
         $c.search = false;
@@ -406,6 +428,11 @@ mode = "auto"
 # off; off leaves that column out of the pages entirely.
 navPosition = "left"
 tocPosition = "right"
+# A hand-written HTML block in the Markdown reaches the page as written. Turn it
+# off for a book assembled from Markdown you did not write - a generated
+# reference, contributed chapters - and those blocks are escaped and shown
+# instead. Everything else on a page is escaped either way.
+rawHtml = true
 tocDepth = 3
 sectionNumbers = true
 # The footer is emitted verbatim, so it may carry HTML.
