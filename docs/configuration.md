@@ -39,6 +39,7 @@ tocPosition = "right"   # left | right | off
 tocDepth = 3
 sectionNumbers = true
 footer = "Rendered with <a href=\"...\">Grimoire</a>"
+titleUrl = ""           # where the title links; "" is the book itself
 repoUrl = ""
 repoLabel = "Source"
 editUrl = ""
@@ -178,6 +179,7 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 | `tocDepth` | int | `3` | deepest heading level in the per-page contents; clamped to 1-6 |
 | `sectionNumbers` | bool | `true` | number the chapters in the sidebar |
 | `footer` | string | the Grimoire credit | HTML placed in the page footer; `""` for no footer |
+| `titleUrl` | string | `""` | where the title in the top bar links; `""` is the book's own landing page |
 | `repoUrl` | string | `""` | a source-repository link in the top bar; `""` for none |
 | `repoLabel` | string | `"Source"` | the label on that link |
 | `editUrl` | string | `""` | an edit-this-page URL with a `{path}` slot; `""` for none |
@@ -190,6 +192,43 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 their choice is remembered and this setting no longer applies to them. Whatever
 it resolves to is stamped on the document before the first paint, so navigating
 a dark site never flashes white.
+
+### Where the title links
+
+The book's title sits in the top-left corner, and by default it links to the
+book's own landing page - the same place the first chapter of the contents goes.
+For a book that is one part of a larger site, that is a dead end: the obvious
+way back is the obvious thing to click, and it goes nowhere new.
+
+```toml
+[html]
+titleUrl = "https://example.com/"
+```
+
+Now the title is the way out, and the contents is the way in. The two stop
+duplicating each other.
+
+**Give it an absolute or a root-relative URL** (`https://example.com/`, or `/`).
+Unlike every other link Grimoire writes, this one is **not** rewritten per page:
+it names somewhere outside the book, so the book has no path to resolve it
+against. A page-relative value like `../` would mean a different place on every
+page, which is never what anyone means.
+
+An external target is marked `rel="noopener noreferrer"`, the same as the
+repository link. The value goes through the same URL gate as every other href, so
+a `javascript:` scheme does not survive it.
+
+`--title-url` on [`build`](commands.md#grimoire-build) and
+[`serve`](commands.md#grimoire-serve) overrides it for one run, which is the
+quick way to see it before writing it down. `--title-url ""` goes the other way
+and points the title back at the book.
+
+The title's **text** is always `book.title`, and it is always text - escaped
+here, in the `<title>` element, in the `og:title` tag, in the `alt` of a logo,
+on the PDF cover, and in the PDF's own `Title` field. That is why this is a
+separate setting rather than markup allowed inside the title: a title carrying
+`<a href="...">` would put a tag into all six of those, and five of them cannot
+use it. If you want a different mark beside the title, that is `logo`.
 
 ### Hand-written HTML
 

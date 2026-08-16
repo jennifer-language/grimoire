@@ -177,6 +177,72 @@ func testTopbarCarriesTheTitleAndModeSelector() {
     testing.assertContains($bar, 'data-mode="auto"');
 }
 
+# --- where the title links -------------------------------------------
+
+# The default target is the book's own landing page, and it is resolved per page
+# so a built site works from a web root, from a subdirectory, and off a disk.
+func testTheTitleLinksToTheLandingPageByDefault() {
+    english();
+    def v as View init view();
+    testing.assertContains(topbar(config.defaults(), $v, noBrand()), 'href="index.html"');
+    $v.root = "../";
+    testing.assertContains(topbar(config.defaults(), $v, noBrand()), 'href="../index.html"');
+}
+
+# A configured target is a way *out* of the book - back to the site it belongs
+# to - so it names somewhere the book cannot know a path to. It goes out as
+# written, identically on every page; rewriting it per page would only break it.
+func testAConfiguredTitleUrlIsUsedAsWritten() {
+    english();
+    def c as config.Config init config.defaults();
+    $c.titleUrl = "https://example.com/";
+    def v as View init view();
+    testing.assertContains(topbar($c, $v, noBrand()), 'href="https://example.com/"');
+    $v.root = "../";
+    testing.assertContains(topbar($c, $v, noBrand()), 'href="https://example.com/"');
+    testing.assertFalse(strings.contains(topbar($c, $v, noBrand()), "../https"));
+}
+
+func testARootRelativeTitleUrlIsAlsoLeftAlone() {
+    english();
+    def c as config.Config init config.defaults();
+    $c.titleUrl = "/";
+    def v as View init view();
+    $v.root = "../../";
+    testing.assertContains(topbar($c, $v, noBrand()), 'href="/"');
+}
+
+# The same courtesy the repository link gets, and for the same reason.
+func testAnExternalTitleUrlIsMarkedNoopener() {
+    english();
+    def c as config.Config init config.defaults();
+    $c.titleUrl = "https://example.com/";
+    testing.assertContains(topbar($c, view(), noBrand()), 'rel="noopener noreferrer"');
+    $c.titleUrl = "/elsewhere";
+    testing.assertFalse(strings.contains(topbar($c, view(), noBrand()), "noopener"));
+}
+
+# Configuration is the author's, but it lands in an href like anything else.
+func testAHostileTitleUrlIsGated() {
+    english();
+    def c as config.Config init config.defaults();
+    $c.titleUrl = "javascript:alert(1)";
+    testing.assertFalse(strings.contains(
+        strings.lower(topbar($c, view(), noBrand())),
+        "javascript:"));
+}
+
+# The title is text wherever it appears, which is what makes a dedicated URL the
+# right answer rather than allowing markup in the title itself.
+func testTheTitleIsEscapedInTheBrand() {
+    english();
+    def c as config.Config init config.defaults();
+    $c.title = "Ada & <Grace>";
+    def bar as string init topbar($c, view(), noBrand());
+    testing.assertContains($bar, "Ada &amp; &lt;Grace&gt;");
+    testing.assertFalse(strings.contains($bar, "<Grace>"));
+}
+
 func testTheSearchButtonFollowsTheSearchSetting() {
     english();
     def c as config.Config init config.defaults();

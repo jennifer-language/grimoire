@@ -497,11 +497,28 @@ func testPageKeywordsFollowsTheSetting() {
 # A meta refresh plus a plain link, so it works with scripting off and never
 # leaves a reader on a blank page.
 func testRedirectWorksWithoutScripting() {
-    def html as string init redirect(config.defaults(), "guide/index.html");
-    testing.assertContains($html, 'http-equiv="refresh"');
-    testing.assertContains($html, 'href="guide/index.html"');
-    testing.assertContains($html, 'rel="canonical"');
-    testing.assertContains($html, "<a href=");
+    def page as string init redirect(config.defaults(), "guide/index.html");
+    testing.assertContains($page, 'http-equiv="refresh"');
+    testing.assertContains($page, 'href="guide/index.html"');
+    testing.assertContains($page, 'rel="canonical"');
+    testing.assertContains($page, "<a href=");
+}
+
+# The title is text on this page as on every other. It went in raw until a test
+# asked, and an `&` in a book title made an invalid document on the one page
+# nobody looks at.
+func testRedirectEscapesTheTitle() {
+    def c as config.Config init config.defaults();
+    $c.title = "Ada & <Grace>";
+    def page as string init redirect($c, "guide/index.html");
+    testing.assertContains($page, "<title>Ada &amp; &lt;Grace&gt;</title>");
+    testing.assertFalse(strings.contains($page, "<Grace>"));
+}
+
+func testRedirectEscapesTheLanguageTag() {
+    def c as config.Config init config.defaults();
+    $c.language = 'en" onload="x';
+    testing.assertFalse(strings.contains(redirect($c, "x.html"), 'onload="x"'));
 }
 
 # --- stripScripts ----------------------------------------------------

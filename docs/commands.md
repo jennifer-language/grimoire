@@ -30,6 +30,7 @@ Render the site.
 | `--no-clean` | from config | keep what is already in the output directory |
 | `--raw-html` | from config | emit hand-written HTML blocks as written |
 | `--no-raw-html` | from config | escape hand-written HTML blocks |
+| `--title-url URL` | from config | where the title in the top bar links; `""` is the book itself |
 | `--pdf` | off | also render the book to PDF |
 | `--no-search` | off | skip the search index and the search UI |
 | `-j`, `--jobs N` | `0` | chapters to render in parallel; `0` is one per CPU |
@@ -61,6 +62,12 @@ trying an arrangement before writing it down.
 emitting it as written - for a book assembled from Markdown you did not write.
 Everything else on a page is escaped either way; see
 [Configuration](configuration.md#hand-written-html).
+
+`--title-url` points the title in the top bar somewhere other than the book's own
+landing page - back to the site the book belongs to. An empty value is a value:
+`--title-url ""` puts it back to the book when `grimoire.toml` says otherwise.
+See [Configuration](configuration.md#where-the-title-links) for the shape of URL
+that belongs there.
 
 The exit status is `1` when the outline names a chapter with no file behind it -
 the rest of the book still builds, and the missing entries are reported on
@@ -101,6 +108,7 @@ Build, then serve the result on a local address until interrupted.
 | `--no-clean` | from config | keep what is already in the output directory |
 | `--raw-html` | from config | emit hand-written HTML blocks as written |
 | `--no-raw-html` | from config | escape hand-written HTML blocks |
+| `--title-url URL` | from config | where the title in the top bar links; `""` is the book itself |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-reload` | off | with `--watch`, do not reload the browser |

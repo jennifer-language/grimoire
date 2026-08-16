@@ -25,6 +25,7 @@ use lists;
 use maps;
 use convert;
 
+import "html.j" as html;
 import "./config.j" as config;
 import "./summary.j" as summary;
 import "./content.j" as content;
@@ -307,13 +308,27 @@ func copyAssets(c as config.Config) {
 # redirect is the stand-in landing page for a book whose outline has no chapter
 # at the site root: a meta refresh plus a plain link, so it works with scripting
 # off and never leaves a reader on a blank page.
+# An attribute value, which needs the quote on top of what `html.escape` does for
+# text - `escape` leaves it alone on purpose, since it is legal in element text.
+# `content.j` and `layout.j` each keep the same two-line helper for the same
+# reason.
+func attrEsc(s as string) {
+    return strings.replace(html.escape($s), '"', "&quot;");
+}
+
+# The title is text here as it is everywhere else. It was going in raw, which is
+# the one place in the program that treated it as markup - an `&` in a book title
+# produced an invalid document, and the page nobody looks at is the worst place
+# for the exception to live.
 func redirect(c as config.Config, target as string) {
-    return "<!DOCTYPE html>\n<html lang=\"" + $c.language + "\">\n<head>\n" +
+    def title as string init html.escape($c.title);
+    def href as string init attrEsc($target);
+    return "<!DOCTYPE html>\n<html lang=\"" + attrEsc($c.language) + "\">\n<head>\n" +
         '<meta charset="utf-8">' + "\n" +
-        '<meta http-equiv="refresh" content="0; url=' + $target + '">' + "\n" +
-        '<link rel="canonical" href="' + $target + '">' + "\n" +
-        "<title>" + $c.title + "</title>\n</head>\n<body>\n" +
-        '<p>Continue to <a href="' + $target + '">' + $c.title + "</a>.</p>\n" +
+        '<meta http-equiv="refresh" content="0; url=' + $href + '">' + "\n" +
+        '<link rel="canonical" href="' + $href + '">' + "\n" +
+        "<title>" + $title + "</title>\n</head>\n<body>\n" +
+        '<p>Continue to <a href="' + $href + '">' + $title + "</a>.</p>\n" +
         "</body>\n</html>\n";
 }
 

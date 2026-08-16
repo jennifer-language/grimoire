@@ -57,6 +57,23 @@ func testRawHtmlIsAllowedByDefault() {
     testing.assertTrue(defaults().rawHtml);
 }
 
+# "" means the book's own landing page, which is what it linked to before there
+# was a setting.
+func testTheTitleLinksToTheBookByDefault() {
+    testing.assertEqual(defaults().titleUrl, "");
+}
+
+func testTitleUrlIsReadFromTheHtmlTable() {
+    testing.assertEqual(
+        apply(defaults(), '[html]
+titleUrl = "https://example.com/"
+').titleUrl,
+        "https://example.com/");
+    testing.assertEqual(apply(defaults(), '[html]
+titleUrl = 42
+').titleUrl, "");
+}
+
 func testRawHtmlIsReadFromTheHtmlTable() {
     testing.assertFalse(apply(defaults(), '[html]
 rawHtml = false

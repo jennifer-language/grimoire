@@ -49,6 +49,10 @@ use convert;
  *   "left", "right", or "off" to build the pages without it at all
  * @field sectionNumbers {bool} whether the sidebar numbers its chapters
  * @field footer {string} HTML placed in the page footer, emitted verbatim ("" for none)
+ * @field titleUrl {string} where the title in the top bar links ("" for the
+ *   book's own landing page, which is the default). Set it to send a reader back
+ *   to the site the book is part of. Used as written rather than resolved per
+ *   page, so an absolute or root-relative URL is what belongs here
  * @field repoUrl {string} a source-repository URL linked from the top bar ("" for none)
  * @field repoLabel {string} the label for the repository link
  * @field editUrlTemplate {string} an edit-this-page URL with a `{path}` slot ("" for none)
@@ -106,6 +110,7 @@ export def struct Config {
     tocPosition as string,
     sectionNumbers as bool,
     footer as string,
+    titleUrl as string,
     repoUrl as string,
     repoLabel as string,
     editUrlTemplate as string,
@@ -183,6 +188,7 @@ export func defaults() {
         tocPosition: "right",
         sectionNumbers: true,
         footer: DEFAULT_FOOTER,
+        titleUrl: "",
         repoUrl: "",
         repoLabel: "Source",
         editUrlTemplate: "",
@@ -301,6 +307,7 @@ export func apply(base as Config, text as string) {
         $c.tocPosition);
     $c.sectionNumbers = boolAt($doc, "/html/sectionNumbers", $c.sectionNumbers);
     $c.footer = strAt($doc, "/html/footer", $c.footer);
+    $c.titleUrl = strAt($doc, "/html/titleUrl", $c.titleUrl);
     $c.repoUrl = strAt($doc, "/html/repoUrl", $c.repoUrl);
     $c.repoLabel = strAt($doc, "/html/repoLabel", $c.repoLabel);
     $c.editUrlTemplate = strAt($doc, "/html/editUrl", $c.editUrlTemplate);

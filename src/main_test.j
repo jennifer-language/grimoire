@@ -64,6 +64,7 @@ func testBuildTakesEveryFlagItDocuments() {
         "--no-clean",
         "--raw-html",
         "--no-raw-html",
+        "--title-url",
         "--pdf",
         "--no-search",
         "--jobs",
@@ -87,7 +88,8 @@ func testServeTakesItsOwnFlags() {
         "--clean",
         "--no-clean",
         "--raw-html",
-        "--no-raw-html"
+        "--no-raw-html",
+        "--title-url"
     ]) {
         testing.assertContains($usage, $flag);
     }
@@ -264,6 +266,47 @@ func testTheRawHtmlFlagsReachTheirField() {
         "--no-raw-html"
     ];
     testing.assertFalse(resolve($serveArgv).rawHtml);
+}
+
+# --- where the title links -------------------------------------------
+
+func testTheTitleUrlFlagReachesItsField() {
+    def argv as list of string init [
+        "--config",
+        "no-such-file.toml",
+        "--title-url",
+        "https://example.com/"
+    ];
+    testing.assertEqual(resolve(buildArgs($argv)).titleUrl, "https://example.com/");
+    testing.assertEqual(resolve(buildArgs(["--config", "no-such-file.toml"])).titleUrl, "");
+}
+
+func testTheTitleUrlFlagReachesServe() {
+    def argv as list of string init [
+        "grimoire",
+        "serve",
+        "--config",
+        "no-such-file.toml",
+        "--title-url",
+        "/"
+    ];
+    testing.assertEqual(resolve($argv).titleUrl, "/");
+}
+
+# An empty value is a value, not an absent flag: it is how a run puts the link
+# back to the book's own landing page when the file says otherwise. The `args`
+# module has to distinguish the two for that to work, so this pins it.
+func testAnEmptyTitleUrlFlagResetsTheConfiguredOne() {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-titleurl-");
+    def file as string init path.join($dir, "grimoire.toml");
+    fs.writeString($file, '[html]
+titleUrl = "https://from-file.example/"
+');
+    testing.assertEqual(
+        resolve(buildArgs(["--config", $file])).titleUrl,
+        "https://from-file.example/");
+    testing.assertEqual(resolve(buildArgs(["--config", $file, "--title-url", ""])).titleUrl, "");
+    fs.removeAll($dir);
 }
 
 # A book that turns it off in `grimoire.toml` still needs a way to say "not this

@@ -88,6 +88,15 @@ func cleanFlags(p as args.Parser) {
     return $out;
 }
 
+# Where the title in the top bar links, on the two commands that render a site.
+# Book identity rather than a per-run choice, like `repoUrl` and `logo` beside it
+# - but it is also the setting whose effect you most want to see before writing
+# it down, which is what a flag is for. `--title-url ""` puts it back to the
+# book's own landing page.
+func titleUrlFlag(p as args.Parser) {
+    return args.flag($p, "title-url", "", "", "where the title in the top bar links");
+}
+
 # Whether a hand-written HTML block in the Markdown reaches the page as written.
 # On by default; both directions for the same reason `--clean` has both, and
 # because the interesting case - a book assembled from Markdown its author did
@@ -106,6 +115,7 @@ func buildParser() {
     $p = columnFlags($p);
     $p = cleanFlags($p);
     $p = rawHtmlFlags($p);
+    $p = titleUrlFlag($p);
     $p = args.boolFlag($p, "pdf", "", "also render the book to PDF");
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
@@ -131,6 +141,7 @@ func serveParser() {
     # does, or the directory being served would empty itself on every save.
     $p = cleanFlags($p);
     $p = rawHtmlFlags($p);
+    $p = titleUrlFlag($p);
     return uiLanguageFlag($p);
 }
 
@@ -227,6 +238,11 @@ func configure(r as args.Result, appDir as string) {
     # Same rule as the pair above: the two together are a mistake, and the
     # reading that escapes is the one to take when it is not clear which was
     # meant. Escaping shows the markup; the other way runs it.
+    # Taken verbatim, empty included: `--title-url ""` is how a run puts the link
+    # back to the book's own landing page when the file says otherwise.
+    if (args.has($r, "title-url")) {
+        $c.titleUrl = args.asString($r, "title-url");
+    }
     if (args.has($r, "raw-html")) {
         $c.rawHtml = true;
     }
@@ -437,6 +453,10 @@ tocDepth = 3
 sectionNumbers = true
 # The footer is emitted verbatim, so it may carry HTML.
 footer = "Rendered with <a href=\"https://grimoire.jennifer-lang.dev/\">Grimoire</a>"
+# Where the title in the top bar links. Unset, it goes to this book. Point it at
+# the site this book belongs to and the title becomes the way back out. Absolute
+# or root-relative: it is not rewritten per page.
+# titleUrl = "https://example.com/"
 # repoUrl = "https://example.com/my/book"
 # repoLabel = "Source"
 # editUrl = "https://example.com/my/book/edit/main/docs/{path}"

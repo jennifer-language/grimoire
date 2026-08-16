@@ -160,12 +160,17 @@ jobs:
       # A build reports a missing *chapter* but not a broken cross-reference, so
       # the one thing a Grimoire build cannot tell you about itself is checked
       # here. Every local href, and every fragment it points at.
+      #
+      # `<code>` spans come out first. A page that documents an `href` - this
+      # manual does, in the configuration chapter - puts the literal string in
+      # the output, where it looks exactly like a link to a file called `...`.
       - name: Check every link and fragment
         run: |
           set -eu
           cd out-j1
           dead=$(for f in *.html; do
-            grep -oh 'href="[^"]*"' "$f" | sed 's|href="||;s|"$||' | grep -v '^http' |
+            sed 's|<code>[^<]*</code>||g' "$f" |
+            grep -oh 'href="[^"]*"' | sed 's|href="||;s|"$||' | grep -v '^http' |
             while read -r l; do
               t="${l%%#*}"; frag="${l#*#}"; tf="${t:-$f}"
               [ -z "$t" ] || [ -f "$t" ] || echo "DEAD FILE: $f -> $l"

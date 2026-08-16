@@ -24,6 +24,7 @@ import "./locale.j" as locale;
 import "./summary.j" as summary;
 import "./content.j" as content;
 import "./assets.j" as assets;
+import "./util.j" as util;
 
 /**
  * Everything that varies from page to page, gathered so the shell takes one
@@ -240,6 +241,29 @@ func modeSelector() {
         modeButton("dark", "dark", ICON_MOON) + "</div>";
 }
 
+# brandLink opens the anchor around the mark and the title in the top-left
+# corner: the book's own landing page by default, or wherever `html.titleUrl`
+# points.
+#
+# The default href is resolved per page, because a built site has to work from a
+# web root, from a subdirectory, and off the filesystem. A configured one is
+# not: it is a way out of the book, so it names somewhere the book cannot know
+# the path to, and rewriting it per page would only break it. That is the reason
+# the documentation asks for an absolute or root-relative URL.
+#
+# An external target gets `rel="noopener noreferrer"`, the same as the repository
+# link further along the bar.
+func brandLink(c as config.Config, v as View) {
+    if ($c.titleUrl == "") {
+        return '<a class="gr-brand" href="' + attrEsc($v.root + "index.html") + '">';
+    }
+    def rel as string init "";
+    if (util.isExternal($c.titleUrl)) {
+        $rel = ' rel="noopener noreferrer"';
+    }
+    return '<a class="gr-brand" href="' + attrEsc(html.safeUrl($c.titleUrl)) + '"' + $rel + ">";
+}
+
 func topbar(c as config.Config, v as View, b as Brand) {
     # The top bar sits outside the shell but carries the same attribute, so the
     # menu button can move to the end of the row when the drawer it opens comes
@@ -253,7 +277,7 @@ func topbar(c as config.Config, v as View, b as Brand) {
             attrEsc(locale.tr("toggleNav")) + '">' +
             ICON_MENU + "</button>";
     }
-    $out = $out + '<a class="gr-brand" href="' + attrEsc($v.root + "index.html") + '">' +
+    $out = $out + brandLink($c, $v) +
         brandMark($b, $v.root, $c.title) + html.escape($c.title) + "</a>";
     $out = $out + '<span class="gr-spacer"></span>';
     if ($c.search) {
