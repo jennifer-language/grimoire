@@ -75,11 +75,25 @@ func columnFlags(p as args.Parser) {
     return $out;
 }
 
+# Emptying the output directory first, on the two commands that write one.
+#
+# Both directions, unlike the one-way boolean flags around them: this setting has
+# a reasonable answer either way, so a book that turns it on in `grimoire.toml`
+# still needs a way to say "not this time" - and that way had better not be
+# editing the file.
+func cleanFlags(p as args.Parser) {
+    def out as args.Parser init $p;
+    $out = args.boolFlag($out, "clean", "", "empty the output directory first");
+    $out = args.boolFlag($out, "no-clean", "", "keep what is already in the output directory");
+    return $out;
+}
+
 func buildParser() {
     def p as args.Parser init commonFlags(args.parser("build", "Build the site"));
     $p = args.flag($p, "theme", "t", "", "theme name (overrides the config)");
     $p = args.flag($p, "mode", "m", "", "default colour mode: auto, light, or dark");
     $p = columnFlags($p);
+    $p = cleanFlags($p);
     $p = args.boolFlag($p, "pdf", "", "also render the book to PDF");
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
@@ -101,6 +115,9 @@ func serveParser() {
     $p = args.boolFlag($p, "watch", "w", "rebuild whenever a source file changes");
     $p = args.boolFlag($p, "no-reload", "", "with --watch, do not reload the browser");
     $p = columnFlags($p);
+    # Only the build `serve` does on the way in prunes; a watch rebuild never
+    # does, or the directory being served would empty itself on every save.
+    $p = cleanFlags($p);
     return uiLanguageFlag($p);
 }
 
@@ -185,6 +202,15 @@ func configure(r as args.Result, appDir as string) {
     if (args.has($r, "pdf")) {
         $c.pdf = true;
     }
+    # `--no-clean` wins over `--clean`, which is the safe way round: the two
+    # together are a mistake, and the reading that deletes nothing is the one to
+    # take when it is not clear which was meant.
+    if (args.has($r, "clean")) {
+        $c.clean = true;
+    }
+    if (args.has($r, "no-clean")) {
+        $c.clean = false;
+    }
     if (args.has($r, "no-search")) {
         $c.search = false;
     }
@@ -231,6 +257,15 @@ func reportMissing(report as build.Report) {
     }
 }
 
+# The same courtesy `build.j` extends to its progress lines, for the one count
+# this module formats itself: a summary that says "1 entries" reads as a bug.
+func entryCount(n as int) {
+    if ($n == 1) {
+        return "1 entry";
+    }
+    return convert.toString($n) + " entries";
+}
+
 func humanBytes(n as int) {
     if ($n < 1024) {
         return convert.toString($n) + " B";
@@ -263,6 +298,12 @@ func runBuild(r as args.Result, appDir as string) {
         humanBytes($report.written),
         $report.assets,
         $elapsed);
+    # Said out loud whenever anything was deleted, and not only under --verbose:
+    # this is the one thing a build does that cannot be undone by running it
+    # again, so it belongs in the summary a reader actually sees.
+    if ($report.pruned > 0) {
+        io.printf("  pruned: %s from %s/ before building\n", entryCount($report.pruned), $c.outDir);
+    }
     if ($c.search) {
         io.printf("  search index: %d sections\n", $report.records);
     }
@@ -350,6 +391,10 @@ src = "docs"
 
 [build]
 out = "site"
+# Empty the output directory before building, so a chapter deleted from the book
+# stops being published. Off by default, because an output directory can also
+# hold files this tool never wrote. Top-level dotfiles are kept either way.
+clean = false
 
 [html]
 # Any of the ten built-in themes; run `grimoire themes` for the list.

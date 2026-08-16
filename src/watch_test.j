@@ -21,6 +21,8 @@
  */
 use testing;
 use strings;
+use os;
+use path;
 
 func event(p as string, isDir as bool) {
     return fs.Event{path: $p, kind: "modified", isDir: $isDir};
@@ -79,6 +81,42 @@ func testThePathIsCleanedBeforeItIsCompared() {
 # every file event is a real change.
 func testNothingIsOursWhenThePrefixIsEmpty() {
     testing.assertFalse(ignorable(event("site/index.html", false), ""));
+}
+
+# --- rebuild does not prune ------------------------------------------
+
+# `serve` prunes once on the way in when the book asked for it. A rebuild must
+# not: it would empty the directory the server is answering from, on every save,
+# so a reader who reloaded at the wrong moment would get a 404 instead of a page.
+# The chapter a prune would remove is one a rebuild overwrites anyway.
+#
+# Checked by leaving a file a build would never write and seeing it survive.
+func testARebuildNeverPrunesTheOutputDirectory() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-watch-");
+    def src as string init path.join($root, "docs");
+    def out as string init path.join($root, "site");
+    fs.mkdirAll($src);
+    fs.mkdirAll($out);
+    fs.writeString(path.join($src, "index.md"), "# Home\n\nA paragraph.\n");
+    fs.writeString(path.join($out, "not-from-this-build.html"), "left behind");
+    def c as config.Config init config.defaults();
+    $c.srcDir = $src;
+    $c.outDir = $out;
+    $c.clean = true;
+    rebuild($c);
+    testing.assertTrue(fs.isFile(path.join($out, "index.html")));
+    testing.assertTrue(fs.isFile(path.join($out, "not-from-this-build.html")));
+    fs.removeAll($root);
+}
+
+# A rebuild turns a failure into a message rather than an exit: the moment a
+# build breaks is the moment the loop is most needed.
+func testARebuildSurvivesABrokenBook() {
+    def c as config.Config init config.defaults();
+    $c.srcDir = path.join(os.tempDir(), "grimoire-no-such-source");
+    $c.outDir = path.join(os.tempDir(), "grimoire-no-such-output");
+    rebuild($c);
+    testing.assertFalse(fs.isDir($c.outDir));
 }
 
 # --- also ------------------------------------------------------------

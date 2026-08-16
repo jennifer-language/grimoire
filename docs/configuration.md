@@ -26,6 +26,7 @@ src = "docs"
 
 [build]
 out = "site"
+clean = false           # true empties the output directory first
 jobs = 0                # 0 = one render task per CPU
 
 [html]
@@ -101,15 +102,67 @@ authorsLabel = ""                     # -> Ada Lovelace, Grace Hopper
 | Key | Type | Default | Meaning |
 | --- | ---- | ------- | ------- |
 | `out` | string | `"site"` | where the site is written |
+| `clean` | bool | `false` | empty the output directory before building |
 | `jobs` | int | `0` | chapters rendered in parallel; `0` means one task per CPU |
-
-The output directory is created if it is missing. Files already there are left
-alone unless the build writes over them, so an unrelated file in `site/`
-survives - but so does a chapter you deleted from the book, which is worth
-knowing before publishing.
 
 `jobs` above the chapter count simply idles the extra workers. See
 [Performance](performance.md) for what raising it actually buys.
+
+### Emptying the output directory
+
+The output directory is created if it is missing, and by default nothing in it is
+removed: a file already there survives unless the build writes over it. That has
+two consequences, and which one matters depends on the book.
+
+An unrelated file in `site/` survives, which is what you want when the output
+directory holds something that was never Grimoire's - a `.well-known/`, a
+hand-written `robots.txt`, a directory another tool publishes into. But a chapter
+you deleted from the book survives too, still reachable at its old URL and still
+in whatever the last build's search index said, which is not what anyone wants
+before publishing.
+
+`clean = true` picks the other behaviour:
+
+```toml
+[build]
+clean = true
+```
+
+It is off by default because both readings are reasonable and only one of them
+deletes files. A book opts in; nothing opts in on its behalf.
+
+**What a prune keeps.** The directory itself, because it may be a mount, a
+symlink, or the root a `serve` is already answering from. And every entry whose
+name begins with a dot - a `.git` for an output directory that is a publishing
+worktree, a `.nojekyll`, a `.gitignore`. None of those is Grimoire's output,
+all of them are painful to lose, and nothing in a build puts them back. Anything
+Grimoire does put there comes from the source tree and is copied in again by the
+same build.
+
+**What a prune refuses.** Emptying a directory is the one thing a build does that
+running it again will not undo, so three configurations are rejected outright
+rather than obeyed:
+
+| | |
+| - | - |
+| a filesystem root | `out = "/"` |
+| the working directory | `--out .`, usually meant as `--out ./site` |
+| anything holding the sources | `out = "."` with `src = "docs"`, or `out` and `src` the same |
+
+Each of those is a plausible slip rather than a hypothesis, and each would delete
+the book. The build stops with a message naming the directory, and nothing is
+removed or written.
+
+**On the command line**, [`build`](commands.md#grimoire-build) and
+[`serve`](commands.md#grimoire-serve) both take `--clean` and `--no-clean`. The
+pair exists because this is the one setting where a book may reasonably say one
+thing and a single run the other; `--no-clean` wins if both are given, since the
+reading that deletes nothing is the right one to take when it is not clear which
+was meant.
+
+`serve --watch` prunes only the build it does on the way in. A rebuild never
+does: it would empty the directory the server is answering from on every save,
+and a reader who reloaded at the wrong moment would get a 404 rather than a page.
 
 ## `[html]`
 

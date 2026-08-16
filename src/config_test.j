@@ -43,6 +43,25 @@ func testDefaultsHaveSearchOnAndTheRestOff() {
     testing.assertFalse($c.highlightJs);
 }
 
+# Off by default, and this is the one default worth being deliberate about: the
+# other reading is just as reasonable, and getting it wrong deletes files. A book
+# opts in; nothing opts in on its behalf.
+func testTheOutputDirectoryIsNotPrunedByDefault() {
+    testing.assertFalse(defaults().clean);
+}
+
+func testCleanIsReadFromTheBuildTable() {
+    testing.assertTrue(apply(defaults(), '[build]
+clean = true
+').clean);
+    testing.assertFalse(apply(defaults(), '[build]
+clean = false
+').clean);
+    testing.assertFalse(apply(defaults(), '[build]
+clean = "yes"
+').clean);
+}
+
 func testDefaultsPlaceTheColumnsWhereTheyHaveAlwaysBeen() {
     def c as Config init defaults();
     testing.assertEqual($c.navPosition, "left");

@@ -57,6 +57,8 @@ def const MAX_SCRIPT_STRIPS as int init 64;
  * @field missing {list of string} outline entries whose source file is absent
  * @field warnings {list of string} non-fatal problems worth telling the user about
  * @field pdfBytes {int} the PDF size, or 0 when no PDF was built
+ * @field pruned {int} entries removed from the output directory before the
+ *   build, 0 when `[build] clean` is off
  */
 export def struct Report {
     pages as int,
@@ -65,7 +67,8 @@ export def struct Report {
     written as int,
     missing as list of string,
     warnings as list of string,
-    pdfBytes as int
+    pdfBytes as int,
+    pruned as int
 };
 
 # note prints one progress line when the run asked for them. Printing from inside
@@ -76,6 +79,93 @@ func note(c as config.Config, message as string) {
     if ($c.verbose) {
         io.printf("%s\n", $message);
     }
+}
+
+# --- pruning the output directory ------------------------------------
+#
+# `[build] clean` is the only thing in Grimoire that deletes anything, so the
+# rules around it are written out rather than left to `fs.removeAll` and hope.
+
+# absolutePath resolves a configured path against the working directory, so that
+# the containment tests below compare two paths of the same kind. `path.clean`
+# rather than `fs.realpath`: the output directory may not exist yet, and a
+# refusal has to happen before anything is created.
+func absolutePath(p as string) {
+    if (path.isAbs($p)) {
+        return path.clean($p);
+    }
+    return path.clean(path.join(os.cwd(), $p));
+}
+
+# contains reports whether `outer` is `inner` or an ancestor of it. The trailing
+# separator on both sides is what keeps `/book/site` from looking like an
+# ancestor of `/book/site-notes`.
+func contains(outer as string, inner as string) {
+    if ($outer == $inner) {
+        return true;
+    }
+    return strings.startsWith($inner + "/", $outer + "/");
+}
+
+# refuseToPrune returns the reason the output directory must not be emptied, or
+# "" when it is safe to do so.
+#
+# Every one of these is a configuration that would delete something the user
+# cannot get back, and each is a plausible typo rather than a hypothetical: `out`
+# left at its default while `src` is the project root, an `--out .` meant as
+# `--out ./site`, an absolute path that lost its last component. Refusing costs a
+# re-run; the alternative does not have a re-run.
+func refuseToPrune(c as config.Config) {
+    def out as string init absolutePath($c.outDir);
+    def src as string init absolutePath($c.srcDir);
+    if (path.dir($out) == $out) {
+        return "refusing to empty a filesystem root: " + $out;
+    }
+    if ($out == absolutePath(".")) {
+        return "refusing to empty the working directory: " + $out;
+    }
+    if (contains($out, $src)) {
+        return "refusing to empty " + $out + ": the sources in " + $src + " are inside it";
+    }
+    return "";
+}
+
+# prune empties the output directory when the book asked for it, and reports how
+# many entries went. Nothing at all when it did not ask, which is the default.
+#
+# The directory itself stays: it may be a mount, a symlink, or the root a `serve`
+# is already answering from, and replacing it would break all three.
+#
+# Top-level dotfiles are kept. A `.git` (an output directory that is a publishing
+# worktree), a `.nojekyll`, a `.gitignore` - none of those are Grimoire's output,
+# and all of them are painful to lose and easy to forget. Anything Grimoire
+# itself puts there comes from the source tree and is copied back in the same
+# build.
+#
+# A configuration that names the wrong directory stops the build rather than
+# being skipped quietly: not doing what was asked is worse than saying why.
+func prune(c as config.Config) {
+    if (not $c.clean) {
+        return 0;
+    }
+    def refusal as string init refuseToPrune($c);
+    if ($refusal != "") {
+        throw Error{kind: "grimoire", message: $refusal, file: $c.outDir, line: 0, col: 0};
+    }
+    if (not fs.isDir($c.outDir)) {
+        return 0;
+    }
+    # `fs.list` hands back bare names, not the `fs.Stat` values `fs.walk` yields.
+    def removed as int init 0;
+    for (def name in fs.list($c.outDir)) {
+        if (strings.startsWith($name, ".")) {
+            continue;
+        }
+        note($c, "  pruned  " + $name);
+        fs.removeAll(path.join($c.outDir, $name));
+        $removed = $removed + 1;
+    }
+    return $removed;
 }
 
 # writeFile creates the parent directory and writes the file, returning the byte
@@ -572,6 +662,9 @@ export func run(c as config.Config) {
     def pages as list of summary.Entry init resolvePages($c, $entries);
     def records as list of search.Record;
     def written as int init 0;
+    # Before anything is created, so a refusal leaves the directory exactly as it
+    # was found.
+    def pruned as int init prune($c);
     fs.mkdirAll($c.outDir);
     # The sidebar and the pager labels are Markdown. Render them once here rather
     # than once per chapter: on a book this size that is the difference between
@@ -666,7 +759,8 @@ export func run(c as config.Config) {
         written: $written,
         missing: missingPages($c, $entries),
         warnings: $warnings,
-        pdfBytes: $pdfBytes
+        pdfBytes: $pdfBytes,
+        pruned: $pruned
     };
 }
 

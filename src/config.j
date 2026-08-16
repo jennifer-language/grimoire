@@ -32,6 +32,10 @@ use convert;
  *   furniture should be in another
  * @field srcDir {string} the directory holding the Markdown sources
  * @field outDir {string} the directory the site is written to
+ * @field clean {bool} empty the output directory before building, so a chapter
+ *   deleted from the book stops being published. Off by default, because the
+ *   other reading is just as reasonable - an output directory can hold files
+ *   that were never Grimoire's to begin with
  * @field theme {string} the built-in theme name
  * @field defaultMode {string} the initial colour mode: "auto", "light", or "dark"
  * @field tocDepth {int} the deepest heading level shown in the per-page contents
@@ -89,6 +93,7 @@ export def struct Config {
     uiLanguage as string,
     srcDir as string,
     outDir as string,
+    clean as bool,
     theme as string,
     defaultMode as string,
     tocDepth as int,
@@ -164,6 +169,7 @@ export func defaults() {
         uiLanguage: "en",
         srcDir: "docs",
         outDir: "site",
+        clean: false,
         theme: "grimoire",
         defaultMode: "auto",
         tocDepth: 3,
@@ -271,6 +277,7 @@ export func apply(base as Config, text as string) {
     $c.uiLanguage = strAt($doc, "/html/uiLanguage", $c.language);
     $c.srcDir = strAt($doc, "/book/src", $c.srcDir);
     $c.outDir = strAt($doc, "/build/out", $c.outDir);
+    $c.clean = boolAt($doc, "/build/clean", $c.clean);
     $c.theme = strAt($doc, "/html/theme", $c.theme);
     $c.defaultMode = oneOf(
         strAt($doc, "/html/mode", $c.defaultMode),

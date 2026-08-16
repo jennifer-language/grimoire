@@ -100,7 +100,15 @@ func settle(w as fs.Watcher, ours as string) {
 # loop is most needed.
 func rebuild(c as config.Config) {
     try {
-        def report as build.Report init build.run($c);
+        # A rebuild never prunes, whatever the book configured. `serve` already
+        # pruned once on the way in, and doing it again on every save would empty
+        # the directory the server is answering from - a reader who reloaded at
+        # the wrong moment would get a 404 rather than a page - for the sake of
+        # deleting a chapter that a rebuild is about to overwrite anyway. The
+        # parameter is a value, so this is local to the loop.
+        def once as config.Config init $c;
+        $once.clean = false;
+        def report as build.Report init build.run($once);
         io.printf("rebuilt %d pages into %s/\n", $report.pages, $c.outDir);
         for (def missing in $report.missing) {
             io.printf("  missing: %s\n", $missing);

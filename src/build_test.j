@@ -65,6 +65,149 @@ func configFor(root as string) {
     return $c;
 }
 
+# --- absolutePath and contains ---------------------------------------
+
+func testAbsolutePathLeavesAnAbsolutePathAlone() {
+    testing.assertEqual(absolutePath("/a/b"), "/a/b");
+    testing.assertEqual(absolutePath("/a/./b/../c"), "/a/c");
+}
+
+func testAbsolutePathResolvesAgainstTheWorkingDirectory() {
+    testing.assertEqual(absolutePath("site"), path.join(os.cwd(), "site"));
+    testing.assertEqual(absolutePath("."), os.cwd());
+}
+
+# The trailing separator on both sides is what keeps `/book/site` from looking
+# like an ancestor of `/book/site-notes` - which would refuse a perfectly good
+# configuration, or worse, accept a bad one.
+func testContainsIsAboutPathSegmentsNotPrefixes() {
+    testing.assertTrue(contains("/book", "/book/docs"));
+    testing.assertTrue(contains("/book", "/book"));
+    testing.assertFalse(contains("/book/site", "/book/site-notes"));
+    testing.assertFalse(contains("/book/docs", "/book"));
+    testing.assertFalse(contains("/other", "/book/docs"));
+}
+
+# --- refuseToPrune ---------------------------------------------------
+#
+# Tested through the policy function rather than by running `prune`, on purpose.
+# Every case below describes a configuration that would delete something
+# irreplaceable, so the test that proves it is refused must not be the test that
+# finds out it is not.
+
+func pruneConfig(src as string, out as string) {
+    def c as config.Config init config.defaults();
+    $c.clean = true;
+    $c.srcDir = $src;
+    $c.outDir = $out;
+    return $c;
+}
+
+func testPruningAnOrdinaryOutputDirectoryIsAllowed() {
+    testing.assertEqual(refuseToPrune(pruneConfig("/book/docs", "/book/site")), "");
+    testing.assertEqual(refuseToPrune(pruneConfig("/book/docs", "/tmp/elsewhere")), "");
+}
+
+func testRefusesAFilesystemRoot() {
+    testing.assertNotEqual(refuseToPrune(pruneConfig("/book/docs", "/")), "");
+    testing.assertContains(refuseToPrune(pruneConfig("/book/docs", "/")), "filesystem root");
+}
+
+# `--out .` meant as `--out ./site` is the typo this catches.
+func testRefusesTheWorkingDirectory() {
+    def refusal as string init refuseToPrune(pruneConfig("/somewhere/else", "."));
+    testing.assertContains($refusal, "working directory");
+}
+
+# `out` left at its default while `src` is the project root, and the sources go
+# with the build output.
+func testRefusesToDeleteTheSourcesItIsAboutToRead() {
+    testing.assertContains(
+        refuseToPrune(pruneConfig("/book/docs", "/book")),
+        "the sources in /book/docs are inside it");
+    testing.assertContains(refuseToPrune(pruneConfig("/book/docs", "/book/docs")), "are inside it");
+}
+
+# A book whose output directory sits inside its source tree is a layout
+# `watch.j` already accounts for, and it is fine to prune: what is being emptied
+# is Grimoire's own output, not the chapters beside it.
+func testAllowsAnOutputDirectoryInsideTheSources() {
+    testing.assertEqual(refuseToPrune(pruneConfig("/book/docs", "/book/docs/site")), "");
+}
+
+# --- prune -----------------------------------------------------------
+
+# A built-looking output directory, plus the things a prune has to leave behind.
+func populated() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-prune-");
+    fs.mkdirAll(path.join($root, "assets"));
+    fs.mkdirAll(path.join($root, ".git"));
+    fs.writeString(path.join($root, "index.html"), "page");
+    fs.writeString(path.join($root, "stale.html"), "a chapter that was deleted");
+    fs.writeString(path.join($root, "assets/grimoire.css"), "css");
+    fs.writeString(path.join($root, ".nojekyll"), "");
+    fs.writeString(path.join($root, ".git/HEAD"), "ref: refs/heads/main");
+    return $root;
+}
+
+func testPruneDoesNothingWhenCleanIsOff() {
+    def root as string init populated();
+    def c as config.Config init pruneConfig("docs", $root);
+    $c.clean = false;
+    testing.assertEqual(prune($c), 0);
+    testing.assertTrue(fs.isFile(path.join($root, "stale.html")));
+    fs.removeAll($root);
+}
+
+func testPruneEmptiesTheDirectory() {
+    def root as string init populated();
+    testing.assertEqual(prune(pruneConfig("docs", $root)), 3);
+    testing.assertFalse(fs.exists(path.join($root, "stale.html")));
+    testing.assertFalse(fs.exists(path.join($root, "index.html")));
+    testing.assertFalse(fs.exists(path.join($root, "assets")));
+    fs.removeAll($root);
+}
+
+# A `.git` here is an output directory that is a publishing worktree, and a
+# `.nojekyll` is a deployment flag. Neither is Grimoire's output, both are
+# painful to lose, and nothing in a build puts them back.
+func testPruneKeepsTopLevelDotfiles() {
+    def root as string init populated();
+    prune(pruneConfig("docs", $root));
+    testing.assertTrue(fs.isFile(path.join($root, ".nojekyll")));
+    testing.assertTrue(fs.isFile(path.join($root, ".git/HEAD")));
+    fs.removeAll($root);
+}
+
+# The directory itself stays: it may be a mount, a symlink, or the root a
+# `serve` is already answering from.
+func testPruneLeavesTheDirectoryItself() {
+    def root as string init populated();
+    prune(pruneConfig("docs", $root));
+    testing.assertTrue(fs.isDir($root));
+    fs.removeAll($root);
+}
+
+func testPruneOfAnAbsentDirectoryIsNotAnError() {
+    def c as config.Config init pruneConfig(
+        "docs",
+        path.join(os.tempDir(), "grimoire-no-such-out"));
+    testing.assertEqual(prune($c), 0);
+}
+
+# The refusal has to reach the caller, not be swallowed into a build that then
+# writes into a directory it declined to empty. Arranged inside a temporary tree,
+# so that a regression here deletes a fixture rather than a repository.
+func pruneAnAncestorOfTheSources() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-refuse-");
+    fs.mkdirAll(path.join($root, "docs"));
+    return prune(pruneConfig(path.join($root, "docs"), $root));
+}
+
+func testARefusedPruneThrows() {
+    testing.assertThrows("pruneAnAncestorOfTheSources", "grimoire");
+}
+
 # --- plural and searchNote -------------------------------------------
 
 # So a progress line does not say "1 jobs".

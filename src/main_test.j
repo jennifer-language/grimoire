@@ -60,6 +60,8 @@ func testBuildTakesEveryFlagItDocuments() {
         "--mode",
         "--nav",
         "--toc",
+        "--clean",
+        "--no-clean",
         "--pdf",
         "--no-search",
         "--jobs",
@@ -73,7 +75,16 @@ func testBuildTakesEveryFlagItDocuments() {
 
 func testServeTakesItsOwnFlags() {
     def usage as string init args.usage(serveParser());
-    for (def flag in ["--addr", "--watch", "--no-reload", "--no-build", "--nav", "--toc"]) {
+    for (def flag in [
+        "--addr",
+        "--watch",
+        "--no-reload",
+        "--no-build",
+        "--nav",
+        "--toc",
+        "--clean",
+        "--no-clean"
+    ]) {
         testing.assertContains($usage, $flag);
     }
 }
@@ -145,9 +156,11 @@ func testEveryBuildFlagReachesItsField() {
         "--ui-language",
         "de",
         "--pdf",
+        "--clean",
         "--no-search",
         "--verbose"
     ]));
+    testing.assertTrue($c.clean);
     testing.assertEqual($c.srcDir, "chapters");
     testing.assertEqual($c.outDir, "public");
     testing.assertEqual($c.theme, "sepia");
@@ -176,6 +189,56 @@ func testThePdfFlagsReachTheirFields() {
     def c as config.Config init resolve($argv);
     testing.assertEqual($c.pdfOutput, "manual.pdf");
     testing.assertEqual($c.pdfPaper, "letter");
+}
+
+# The two together are a mistake, and the reading that deletes nothing is the one
+# to take when it is not clear which was meant.
+func testNoCleanWinsOverClean() {
+    def both as config.Config init resolve(buildArgs([
+        "--config",
+        "no-such-file.toml",
+        "--clean",
+        "--no-clean"
+    ]));
+    testing.assertFalse($both.clean);
+}
+
+# A book that turns pruning on in `grimoire.toml` still needs a way to say "not
+# this time" that is not editing the file.
+func testNoCleanOverridesTheConfiguration() {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-clean-");
+    def file as string init path.join($dir, "grimoire.toml");
+    fs.writeString($file, '[build]
+clean = true
+');
+    testing.assertTrue(resolve(buildArgs(["--config", $file])).clean);
+    testing.assertFalse(resolve(buildArgs(["--config", $file, "--no-clean"])).clean);
+    fs.removeAll($dir);
+}
+
+# `serve` writes an output directory too, and a stale preview is exactly when a
+# clean one is wanted. Only its first build prunes; `watch.j` sees to the rest.
+func testTheCleanFlagsReachServe() {
+    def argv as list of string init [
+        "grimoire",
+        "serve",
+        "--config",
+        "no-such-file.toml",
+        "--clean"
+    ];
+    testing.assertTrue(resolve($argv).clean);
+}
+
+# Not on `pdf`: it writes one file into the output directory and reads nothing
+# else there, so emptying it would be a side effect of an unrelated command.
+func testThePdfCommandTakesNoCleanFlag() {
+    testing.assertFalse(strings.contains(args.usage(pdfParser()), "--clean"));
+}
+
+func testEntryCountReadsAsEnglish() {
+    testing.assertEqual(entryCount(0), "0 entries");
+    testing.assertEqual(entryCount(1), "1 entry");
+    testing.assertEqual(entryCount(14), "14 entries");
 }
 
 # Trying an arrangement is what `serve --watch` is for, so it takes them too.

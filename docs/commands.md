@@ -26,6 +26,8 @@ Render the site.
 | `--nav WHERE` | from config | the book-contents column: `left`, `right`, `off` |
 | `--toc WHERE` | from config | the on-this-page column: `left`, `right`, `off` |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
+| `--clean` | from config | empty the output directory before building |
+| `--no-clean` | from config | keep what is already in the output directory |
 | `--pdf` | off | also render the book to PDF |
 | `--no-search` | off | skip the search index and the search UI |
 | `-j`, `--jobs N` | `0` | chapters to render in parallel; `0` is one per CPU |
@@ -37,7 +39,16 @@ grimoire build
 grimoire build --theme nordic --out /tmp/preview
 grimoire build --pdf --jobs 4
 grimoire build --nav right --toc off
+grimoire build --clean
 ```
+
+`--clean` empties the output directory before building, so a chapter deleted
+from the book stops being published. It keeps top-level dotfiles and refuses
+outright to empty a filesystem root, the working directory, or anything holding
+the sources - see
+[Configuration](configuration.md#emptying-the-output-directory) for the whole
+rule and for `[build] clean`, which is where the setting belongs once a book has
+decided. `--no-clean` is how a single run opts out of that setting.
 
 `--nav` and `--toc` place the two navigation columns, or leave them out. Both
 are covered in [Configuration](configuration.md#the-two-navigation-columns),
@@ -79,6 +90,8 @@ Build, then serve the result on a local address until interrupted.
 | `-a`, `--addr ADDR` | `127.0.0.1:8080` | address to listen on |
 | `--nav WHERE` | from config | the book-contents column: `left`, `right`, `off` |
 | `--toc WHERE` | from config | the on-this-page column: `left`, `right`, `off` |
+| `--clean` | from config | empty the output directory before the first build |
+| `--no-clean` | from config | keep what is already in the output directory |
 | `-L`, `--ui-language TAG` | from config | language for Grimoire's own strings |
 | `-w`, `--watch` | off | rebuild whenever a source file changes |
 | `--no-reload` | off | with `--watch`, do not reload the browser |
@@ -90,6 +103,10 @@ grimoire serve --watch
 grimoire serve --watch --nav right --toc left
 grimoire serve --addr 0.0.0.0:9000 --no-build
 ```
+
+Only the build `serve` does on the way in prunes. A `--watch` rebuild never
+does: it would empty the directory being served on every save, and a reader who
+reloaded at the wrong moment would get a 404 rather than a page.
 
 The two column flags are here as well as on `build` because trying an
 arrangement is what `--watch` is for. The override lives as long as the process

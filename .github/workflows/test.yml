@@ -158,6 +158,35 @@ jobs:
           fi
           echo "no dead links"
 
+      # `--clean` end to end. The unit tests cover `prune` thoroughly, but this is
+      # the only thing Grimoire does that a second run will not undo, so it is
+      # worth one assertion through the real command line: the stale chapter goes,
+      # the dotfile stays.
+      - name: Check that --clean prunes, and what it spares
+        run: |
+          set -eux
+          touch out-j1/stale-chapter.html out-j1/.nojekyll
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            run ./grimoire build --out /work/out-j1 --clean --quiet
+          test ! -e out-j1/stale-chapter.html
+          test -f out-j1/.nojekyll
+          test -s out-j1/index.html
+
+      # And that it refuses the configuration that would delete the book. A
+      # non-zero status with the sources still there is the whole contract.
+      - name: Check that --clean refuses to empty the sources
+        run: |
+          set -eu
+          if docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            run ./grimoire build --src docs --out . --clean --quiet; then
+            echo "expected the build to refuse, but it succeeded"
+            exit 1
+          fi
+          test -f docs/index.md
+          test -f grimoire.toml
+
       # The nine arrangements of the two navigation columns, since eight of them
       # are never exercised by the build above.
       - name: Build every column arrangement
