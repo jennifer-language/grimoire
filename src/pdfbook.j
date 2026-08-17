@@ -648,10 +648,10 @@ func stamp(name as string, dir as string, args as list of string) {
 # version and the commit id is noise, and off a tag it has no version and the
 # commit is the only thing that identifies the build. That is what lets one
 # template cover both - `"Grimoire {version} Manual {commit}"` reads as
-# "Grimoire 1.0.0 Manual" on a tag and "Grimoire Manual 0e173c1" off one - and
+# "Grimoire 0.1.0 Manual" on a tag and "Grimoire Manual 0e173c1" off one - and
 # why the result is squeezed afterwards, to close the gap the empty slot leaves.
 #
-# A leading `v` comes off the tag, so `v1.0.0` and `1.0.0` both print as 1.0.0.
+# A leading `v` comes off the tag, so `v0.1.0` and `0.1.0` both print as 0.1.0.
 func footerText(c as config.Config) {
     def describe as list of string init ["describe", "--tags", "--exact-match"];
     def tag as string init stamp("GRIMOIRE_VERSION", $c.srcDir, $describe);

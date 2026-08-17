@@ -228,6 +228,46 @@ func testStylesheetCarriesTheThemeMetrics() {
     testing.assertContains($css, "--gr-topbar-h:");
 }
 
+# --- the two side columns grow with the viewport ---------------------
+
+# Both hold titles, and a title is as long as it is: at a fixed width the only
+# thing that gives is the line count, which turns a list meant to be scanned into
+# a paragraph. They scale with the viewport instead.
+func testTheSideColumnsScaleWithTheViewport() {
+    def css as string init stylesheet(sampleTheme());
+    testing.assertContains($css, "--gr-sidebar-w: clamp(302px, 19vw, 400px);");
+    testing.assertContains($css, "--gr-toc-w: clamp(232px, 15vw, 340px);");
+}
+
+# The floors are the widths these columns have always had, so nothing renders
+# differently below the point where the viewport share overtakes them - about
+# 1590px for the sidebar. A narrow screen is not what this was about.
+func testTheFloorsAreTheOldFixedWidths() {
+    testing.assertEqual(SIDEBAR_MIN, 302);
+    testing.assertEqual(TOC_MIN, 232);
+    testing.assertTrue(SIDEBAR_MAX > SIDEBAR_MIN);
+    testing.assertTrue(TOC_MAX > TOC_MIN);
+}
+
+# The invariant that makes the growth free rather than borrowed: at the cap,
+# both columns at their widest still leave room for the roomiest theme's measure
+# and the padding around it. Without this, widening a column would only narrow
+# the prose.
+# 860 is the roomiest measure any shipped theme asks for, and 68 is the padding
+# the text column carries either side of it. `theme_test.j` holds the other half
+# of this: it fails if a theme is ever added that wants more than 860, which is
+# the moment this number would go quietly wrong.
+func testTheShellCapCoversBothColumnsAndTheWidestMeasure() {
+    testing.assertTrue(SHELL_MAX >= SIDEBAR_MAX + TOC_MAX + 860 + 68);
+}
+
+# A column that keeps growing stops being navigation and becomes a second column
+# of text, so both are capped well short of the measure beside them.
+func testNeitherColumnGrowsIntoASecondTextColumn() {
+    testing.assertTrue(SIDEBAR_MAX <= 460);
+    testing.assertTrue(TOC_MAX <= 400);
+}
+
 # The dark palette appears three times over: once under the media query for a
 # reader who chose nothing, and once under each explicit attribute so the in-page
 # selector can override the system preference in either direction.

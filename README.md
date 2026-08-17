@@ -15,12 +15,12 @@ Markdown files. What mdBook, MkDocs, and similar tools do - written in
 > like sorcery. This one only makes websites.
 
 ```sh
-./grimoire init my-book     # scaffold a book
-./grimoire build            # build the site
-./grimoire build --pdf      # site plus the printable book
-./grimoire pdf              # the printable book on its own
-./grimoire serve            # build, then preview on :8080
-./grimoire themes           # list the built-in themes
+bin/grimoire init my-book     # scaffold a book
+bin/grimoire build            # build the site
+bin/grimoire build --pdf      # site plus the printable book
+bin/grimoire pdf              # the printable book on its own
+bin/grimoire serve            # build, then preview on :8080
+bin/grimoire themes           # list the built-in themes
 ```
 
 Point it at a directory of Markdown. If that directory holds a `SUMMARY.md` it
@@ -53,7 +53,7 @@ Everything lives in [`docs/`](docs/index.md), which Grimoire builds with itself:
 | [Performance](docs/performance.md) | where the time goes, and why it scales the way it does |
 
 ```sh
-./grimoire build --src docs --out docs-site
+bin/grimoire build --src docs --out docs-site
 ```
 
 ## Requirements
@@ -71,7 +71,7 @@ Podman lines, which need nothing on the machine but the container runtime.
 its own worked example:
 
 ```sh
-./grimoire serve        # read it at http://127.0.0.1:8080/
+bin/grimoire serve        # read it at http://127.0.0.1:8080/
 ```
 
 ## License

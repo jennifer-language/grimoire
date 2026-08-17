@@ -548,7 +548,7 @@ a release and a working build. This manual uses:
 footerLeft = "Grimoire {version} Manual {commit}"
 ```
 
-giving `Grimoire 1.0.0 Manual` on a tagged commit and `Grimoire Manual 0e173c1`
+giving `Grimoire 0.1.0 Manual` on a tagged commit and `Grimoire Manual 0e173c1`
 on anything else. The gap the empty slot leaves is closed before the line is
 drawn. Where neither the environment nor git can answer - outside a checkout, or
 on `jennifer-tiny`, which ships no `os/exec` - both slots come back empty and the

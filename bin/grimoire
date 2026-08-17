@@ -1,0 +1,57 @@
+#!/usr/bin/env -S jennifer run
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+# pragma-jennifer-version: >=0.25.0
+
+/**
+ * The Grimoire launcher: the command a reader types.
+ *
+ * All it does is say where Grimoire is installed and hand the command line to
+ * `src/grimoire.j`, which is the actual program. The import is resolved relative
+ * to this file by the interpreter, so the launcher runs correctly from any
+ * working directory and through any symlink.
+ *
+ * It lives in `bin/` rather than at the repository root because the deck
+ * specification gives `src/` a meaning: it is the tree a consumer vendors, and
+ * everything in it is a module. A launcher is neither - it is a program with a
+ * shebang - so it sits beside `src/`, not inside it and not above it.
+ * @module grimoire
+ * @author mplx <jennifer@mplx.dev>
+ * @license LGPL-3.0-only
+ */
+use fs;
+use os;
+use path;
+
+import "../src/grimoire.j" as grimoire;
+
+# Where Grimoire's own bundled assets live, from the path this file was invoked
+# by. The path is resolved through any symlinks first, so `ln -s
+# /usr/lib/grimoire/bin/grimoire /usr/bin/grimoire` - how a command gets onto a
+# PATH - finds the assets beside the real file rather than beside the link.
+#
+# `src/` then sits one directory up, out of `bin/`. Resolving the symlink is
+# what makes that true for every way the command is reached: `/usr/bin/grimoire`
+# in the Arch package and `/opt/grimoire/grimoire` in the container are both
+# links onto this file, and both land on the same `src/` beside `bin/`.
+#
+# Only one reading, deliberately. The interpreter resolves the `import` above
+# against this file's real path too, so a *copy* of this file somewhere else
+# could never work however cleverly the assets were located - which is why the
+# compatibility path in the container is a link and not a copy.
+#
+# An unresolvable path falls back to the invocation path - a book still builds;
+# only the bundled highlight.js grammar would be missed, and the build says so
+# when it is.
+func appDir(invoked as string) {
+    def real as string init $invoked;
+    try {
+        $real = fs.realpath($invoked);
+    } catch (e) {
+        $real = $invoked;
+    }
+    # `bin/grimoire` -> `bin` -> the install root -> `src`.
+    return path.join(path.dir(path.dir($real)), "src");
+}
+
+exit grimoire.run(appDir(os.ARGS[0]), os.ARGS);

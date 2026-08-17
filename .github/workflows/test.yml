@@ -50,13 +50,13 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            fmt --check grimoire src/*.j src/themes/*.j scripts/*.j
+            fmt --check bin/grimoire src/*.j src/themes/*.j scripts/*.j
 
       - name: Lint
         run: |
           docker run --rm -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            lint grimoire src/*.j src/themes/*.j scripts/*.j
+            lint bin/grimoire src/*.j src/themes/*.j scripts/*.j
 
       # The repository writes ASCII punctuation everywhere, for two reasons: a
       # typographic character is invisible in a diff, and the printable build
@@ -87,6 +87,79 @@ jobs:
             exit 1
           fi
           echo "$found"
+
+      # The deck specification decides the layout, and the layout is the kind of
+      # thing that is correct until somebody tidies it. `src/` is the tree a
+      # consumer vendors, so it holds modules and nothing else, and the entry
+      # module is named after the deck.
+      #
+      # There is no shorter alias at the repository root to check for. One lived
+      # there briefly and could not be kept: the filesystem this project is
+      # developed on cannot store a symlink, so every commit made there dropped
+      # it. `bin/grimoire` is the only path, and everything types it.
+      - name: Check the deck layout
+        run: |
+          set -u
+          fail=0
+          # Every assertion says what it looked at and what it wanted. A bare
+          # `test` under `set -e` fails the job with no output at all, which
+          # turns a one-line problem into a round trip through the logs.
+          check() {
+            if eval "$2"; then
+              echo "ok    $1"
+            else
+              echo "FAIL  $1"
+              printf '      %s\n' "$3"
+              fail=1
+            fi
+          }
+
+          check "deck.toml exists" \
+            '[ -f deck.toml ]' \
+            "the manifest is what publishes this deck"
+          check "src/grimoire.j is the entry module" \
+            '[ -f src/grimoire.j ]' \
+            "the deck specification names it after the deck"
+          check "bin/grimoire is executable" \
+            '[ -x bin/grimoire ]' \
+            "git tracks the mode; run: chmod +x bin/grimoire && git add bin/grimoire"
+          # Static properties only. This step is plain shell on the runner, which
+          # has no interpreter - every other step reaches Jennifer through
+          # `docker run`. Whether the launcher actually *starts* is answered
+          # twice over by steps that can answer it: `lint` parses it, and the
+          # `book` job below builds a whole manual with it.
+          check "bin/grimoire is a Jennifer program" \
+            'head -1 bin/grimoire | grep -q "^#!.*jennifer"' \
+            "the launcher lost its shebang"
+          check "bin/grimoire imports the entry module" \
+            'grep -q "^import \"\.\./src/grimoire\.j\"" bin/grimoire' \
+            "the launcher must import ../src/grimoire.j - one level up, out of bin/"
+          # A launcher inside src/ would be vendored into consumers along with
+          # the modules, which is exactly what bin/ exists to prevent.
+          check "src/ holds modules only" \
+            '! grep -rlq "^#!" src/' \
+            "something under src/ has a shebang; a program belongs in bin/"
+
+          # The registry requires the manifest version to match the tag a
+          # release is published from, and `--version` is what a reader checks
+          # against it. Two copies of one number, in files that are edited for
+          # unrelated reasons.
+          manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' deck.toml)
+          program=$(sed -n 's/.*VERSION as string init "grimoire \(.*\)".*/\1/p' src/grimoire.j)
+          if [ -z "$manifest" ] || [ -z "$program" ]; then
+            echo "FAIL  a version could not be read"
+            printf '      deck.toml: %s\n' "${manifest:-<none>}"
+            printf '      src/grimoire.j: %s\n' "${program:-<none>}"
+            fail=1
+          elif [ "$manifest" != "$program" ]; then
+            echo "FAIL  version drift"
+            printf '      deck.toml says %s, src/grimoire.j says %s\n' "$manifest" "$program"
+            fail=1
+          else
+            echo "ok    version $manifest in both places"
+          fi
+
+          exit "$fail"
 
       # The package page shows `org.opencontainers.image.description`, and falls
       # back to the whole repository README when it is empty. `docker.yml` states
@@ -140,7 +213,7 @@ jobs:
           run() {
             docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
               "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-              run ./grimoire build --pdf "$@"
+              run bin/grimoire build --pdf "$@"
           }
           run --out /work/out-j1 --jobs 1 --quiet
           run --out /work/out-j7 --jobs 7 --quiet
@@ -193,7 +266,7 @@ jobs:
           touch out-j1/stale-chapter.html out-j1/.nojekyll
           docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            run ./grimoire build --out /work/out-j1 --clean --quiet
+            run bin/grimoire build --out /work/out-j1 --clean --quiet
           test ! -e out-j1/stale-chapter.html
           test -f out-j1/.nojekyll
           test -s out-j1/index.html
@@ -205,7 +278,7 @@ jobs:
           set -eu
           if docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            run ./grimoire build --src docs --out . --clean --quiet; then
+            run bin/grimoire build --src docs --out . --clean --quiet; then
             echo "expected the build to refuse, but it succeeded"
             exit 1
           fi
@@ -221,7 +294,7 @@ jobs:
             for toc in left right off; do
               docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
                 "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-                run ./grimoire build --nav "$nav" --toc "$toc" \
+                run bin/grimoire build --nav "$nav" --toc "$toc" \
                   --out "/work/out-$nav-$toc" --quiet
               grep -q "data-nav=\"$nav\" data-toc=\"$toc\"" "out-$nav-$toc/index.html"
             done

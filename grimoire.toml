@@ -58,7 +58,7 @@ bookmarkLevel = 3
 pageNumbers = true
 # The other side of that footer. {version} is the git tag the build sits on, with
 # any leading "v" removed; {commit} is the short commit id, and is filled in only
-# when there is no tag - so this reads "Grimoire 1.0.0 Manual" on a release and
+# when there is no tag - so this reads "Grimoire 0.1.0 Manual" on a release and
 # "Grimoire Manual 0e173c1" on anything else.
 footerLeft = "Grimoire {version} Manual {commit}"
 # Open the book with a title page. Off starts it at the first chapter.

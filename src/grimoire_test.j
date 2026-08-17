@@ -3,7 +3,7 @@
 # pragma-jennifer-version: >=0.25.0
 
 /**
- * White-box tests for `main.j`, run by `jennifer test src/main_test.j`.
+ * White-box tests for `grimoire.j`, run by `jennifer test src/grimoire_test.j`.
  *
  * The command line is the one part of Grimoire with no other test: a flag that
  * stops being wired to its configuration field still parses, still builds, and
@@ -16,7 +16,7 @@
  *
  * A few of these print to stdout or stderr as they go. That is the code under
  * test doing its job, not a test misbehaving.
- * @module main_test
+ * @module grimoire_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
  */

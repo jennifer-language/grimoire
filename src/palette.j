@@ -280,6 +280,40 @@ def const SYNTAX_DARK as list of string init [
     "--gr-syn-title: #61afef"
 ];
 
+# The three widths that decide how a page is proportioned. Unlike the metrics
+# beside them they are not per-theme: a book chooses a theme for its colours and
+# its type, not for how many pixels its contents column gets.
+#
+# Both side columns hold *titles*, and a title is as long as it is. At a fixed
+# width the only thing that gives is the line count - a fourteen-heading page
+# with names like "Immutability, yanking, and deletion" wraps nearly every row,
+# which turns a list that should be scannable at a glance into a paragraph. So
+# they grow with the viewport instead, `clamp` holding the old value as the
+# floor: no narrow screen renders differently than before, and a wide one stops
+# wasting the room it has.
+#
+# The lower bounds are the widths these columns have always had. The upper bounds
+# are where growing them stops helping: past about 400px a chapter list reads as
+# a second column of text rather than as navigation.
+def const SIDEBAR_MIN as int init 302;
+def const SIDEBAR_MAX as int init 400;
+def const SIDEBAR_VW as int init 19;
+def const TOC_MIN as int init 232;
+def const TOC_MAX as int init 340;
+def const TOC_VW as int init 15;
+
+# The shell cap has to cover both columns at their widest plus the roomiest
+# theme's measure, or growing the columns would only take width off the prose.
+# It stays a cap: with none, the two columns end up pinned to the far edges of a
+# wide monitor with the text stranded in the middle, and a contents list is only
+# useful beside the thing it lists.
+def const SHELL_MAX as int init 1886;
+
+func widthVar(name as string, lo as int, vw as int, hi as int) {
+    return "    --gr-" + $name + "-w: clamp(" + convert.toString($lo) + "px, " +
+        convert.toString($vw) + "vw, " + convert.toString($hi) + "px);";
+}
+
 func syntaxVars(rows as list of string, indent as string) {
     def out as list of string;
     for (def row in $rows) {
@@ -1095,10 +1129,10 @@ export func stylesheet(t as Theme) {
     $out[] = "    --gr-font-mono: " + $t.fontMono + ";";
     $out[] = "    --gr-radius: " + convert.toString($t.radius) + "px;";
     $out[] = "    --gr-content-w: " + convert.toString($t.contentWidth) + "px;";
-    $out[] = "    --gr-sidebar-w: 302px;";
-    $out[] = "    --gr-toc-w: 232px;";
+    $out[] = widthVar("sidebar", SIDEBAR_MIN, SIDEBAR_VW, SIDEBAR_MAX);
+    $out[] = widthVar("toc", TOC_MIN, TOC_VW, TOC_MAX);
     $out[] = "    --gr-topbar-h: 54px;";
-    $out[] = "    --gr-shell-w: 1720px;";
+    $out[] = "    --gr-shell-w: " + convert.toString(SHELL_MAX) + "px;";
     $out[] = vars($t.light, "    ");
     $out[] = syntaxVars(SYNTAX_LIGHT, "    ");
     $out[] = '}';

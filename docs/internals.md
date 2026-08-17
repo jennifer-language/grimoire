@@ -3,11 +3,14 @@
 ## Source layout
 
 ```
-grimoire            the launcher (a Jennifer script with a shebang)
+grimoire            a two-line shim onto bin/grimoire, so bin/grimoire works
+deck.toml           the deck manifest: name, version, capabilities, engine floor
 Dockerfile          Grimoire on top of the official Jennifer image
 grimoire.toml       the configuration that builds docs/ into site/
+bin/
+  grimoire          the launcher (a Jennifer script with a shebang)
 src/
-  main.j            the CLI
+  grimoire.j        the CLI, and the entry module the deck is named after
   build.j           the build: render, write, report; parallel across chapters
   config.j          grimoire.toml -> Config, with defaults for everything
   summary.j         SUMMARY.md parser, and the directory-tree fallback
@@ -16,7 +19,7 @@ src/
   layout.j          the page shell: top bar, sidebar, contents, pager, search
   palette.j         the theme model and the stylesheet generator
   theme.j           the theme registry
-  themes/*.j        the ten shipped themes
+  themes/*.j        the ten shipped themes, each with its own _test.j
   locale.j          Grimoire's own words, in eleven languages
   keywords.j        the per-page keyword meta tag
   watch.j           the rebuild-on-change loop behind serve --watch
@@ -39,18 +42,18 @@ scripts/
 docs/               this documentation, and the book this repository builds
 ```
 
-`grimoire` is a Jennifer program with a `#!/usr/bin/env -S jennifer run`
+`bin/grimoire` is a Jennifer program with a `#!/usr/bin/env -S jennifer run`
 shebang - the same language as the rest of the tool - and it is deliberately
-three lines of work. `src/main.j` is the program; the launcher only says where
-Grimoire is installed and hands over the command line:
+three lines of work. `src/grimoire.j` is the program; the launcher only says
+where Grimoire is installed and hands over the command line:
 
 ```jennifer
-exit main.run(path.join(path.dir(os.ARGS[0]), "src"), os.ARGS);
+exit grimoire.run(appDir(os.ARGS[0]), os.ARGS);   # ../src, from bin/
 ```
 
 That app directory is how the build finds the assets Grimoire ships - the
-highlight.js grammar - without ever consulting the working directory. `main.j`
-is a module rather than a script, so it takes the directory as an argument:
+highlight.js grammar - without ever consulting the working directory.
+`grimoire.j` is a module rather than a script, so it takes the directory as an argument:
 modules hold no mutable state in Jennifer, so there is nowhere for a program-wide
 value like this to sit except a parameter.
 
@@ -61,12 +64,36 @@ so a symlink on `PATH` - which is how a command normally gets installed - finds
 the assets beside the **real** file rather than beside the link:
 
 ```sh
-ln -s "$PWD/grimoire" ~/.local/bin/grimoire
+ln -s "$PWD/bin/grimoire" ~/.local/bin/grimoire
 ```
 
 An unresolvable path falls back to the invocation path. A book still builds
 then; only the bundled highlight.js grammar would be missed, and the build says
 so when it is.
+
+### The deck
+
+`deck.toml` publishes Grimoire to the
+[registry](https://registry.jennifer-lang.dev/), and the
+[specification](https://registry.jennifer-lang.dev/manual/publishing-a-deck.html)
+is what decides three things about the layout above:
+
+- **`src/` is the tree a consumer vendors**, and everything in it is a module.
+  That is why the launcher moved to `bin/`: a program with a shebang is not a
+  module, and it has no business in the directory that gets installed into
+  somebody else's project.
+- **The entry module is named after the deck.** `@jennifer/grimoire` needs
+  `src/grimoire.j`, which is what the CLI module used to call itself `main.j`
+  for.
+- **`capabilities` declares what the code actually reaches for.** `net` for
+  `serve`, which binds a port through `httpd`; `exec` for the one `os.run` that
+  asks git for the PDF footer's version stamp. Neither is needed to build a book,
+  which is why `jennifer-tiny` - which has neither - runs everything except
+  `serve`.
+
+Grimoire is a program rather than a library: nothing in `src/` is meant to be
+imported by another deck. The manifest is how it is published and installed, not
+an API.
 
 ## Notes on the Markdown
 
@@ -214,8 +241,8 @@ repository is its own worked example, and a change to the renderer shows up in
 the next build of this manual:
 
 ```sh
-./grimoire build        # the site and the PDF, into site/
-./grimoire serve        # read it at http://127.0.0.1:8080/
+bin/grimoire build        # the site and the PDF, into site/
+bin/grimoire serve        # read it at http://127.0.0.1:8080/
 ```
 
 `[pdf] enabled` is on, so a plain `build` produces `site/grimoire.pdf` as well -
@@ -266,8 +293,8 @@ The pipeline asserts its contents for that reason.
 Sources are formatted with `jennifer fmt` and clean under `jennifer lint`:
 
 ```sh
-jennifer fmt --write src/*.j src/themes/*.j scripts/*.j
-jennifer lint src/*.j src/themes/*.j scripts/*.j
+jennifer fmt --write bin/grimoire src/*.j src/themes/*.j scripts/*.j
+jennifer lint bin/grimoire src/*.j src/themes/*.j scripts/*.j
 ```
 
 ## Tests

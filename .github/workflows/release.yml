@@ -63,7 +63,7 @@ jobs:
             echo
             echo '```sh'
             echo "git clone --branch $tag https://github.com/jennifer-language/grimoire"
-            echo "cd grimoire && ./grimoire build"
+            echo "cd grimoire && bin/grimoire build"
             echo '```'
             if [ -n "$previous" ]; then
               echo

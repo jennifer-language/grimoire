@@ -1,0 +1,49 @@
+# The deck manifest, in the shape the registry specifies:
+# https://registry.jennifer-lang.dev/manual/publishing-a-deck.html
+#
+# Grimoire is a program rather than a library, so nothing here is meant to be
+# imported by a consumer - the deck is how it is published and installed, not an
+# API. That still decides the layout: `src/` is the tree a consumer vendors and
+# every file in it is a module, `src/grimoire.j` is the entry module named after
+# the deck, and the launcher lives in `bin/` because a program with a shebang is
+# neither of those things.
+
+[package]
+name = "@jennifer/grimoire"
+version = "0.1.0"
+description = "Build a documentation website, and a printable PDF, from a directory of Markdown files"
+license = "LGPL-3.0-only"
+authors = ["mplx <jennifer@mplx.dev>"]
+# What the code actually reaches for, which is less than it looks:
+#   net  - `serve` binds a port through `httpd`. Every other command runs
+#          without it, which is why `jennifer-tiny` builds and prints a book.
+#   exec - the PDF footer asks git for a version stamp, and takes "no" for an
+#          answer: no git, no repository, or a failed call all leave the slot
+#          empty rather than failing the build.
+# Nothing here uses `sql`.
+capabilities = ["net", "exec"]
+keywords = ["documentation", "markdown", "static-site", "pdf", "generator"]
+
+# Project URLs by role. `deck` is mandatory to publish: it is where the registry
+# reads this manifest from, so it points at the file itself on the default
+# branch rather than at the repository around it.
+#
+# No `bin` key above, deliberately. A deck's command has to live *inside* `src/`,
+# because `src/` is the only thing vendored into a consumer - and the launcher
+# is in `bin/` precisely because it is a program rather than a module. So
+# installing this deck vendors the modules and exposes no command; the ways to
+# get a `grimoire` command are the container, the Arch package, and a checkout.
+[package.urls]
+deck = "https://raw.githubusercontent.com/jennifer-language/grimoire/main/deck.toml"
+homepage = "https://github.com/jennifer-language/grimoire"
+manual = "https://grimoire.jennifer-lang.dev/"
+
+[engines]
+# The floor every source file in this repository declares in its own header
+# pragma. Grimoire uses the read-only parameter borrow that arrived during the
+# 0.24 series and the module surface as it settled for 0.25.
+jennifer = ">=0.25.0"
+
+# No [decks] table: Grimoire depends on no other deck. Everything it imports -
+# args, html, markdown, pdf - is a system library that ships with the
+# interpreter.

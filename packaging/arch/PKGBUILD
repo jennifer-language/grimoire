@@ -1,7 +1,7 @@
 # Maintainer: mplx <jennifer@mplx.dev>
 
 pkgname=grimoire
-pkgver=1.0.0
+pkgver=0.1.0
 pkgrel=1
 pkgdesc="Build a documentation website, and a printable PDF, from a directory of Markdown files"
 arch=('any')
@@ -21,7 +21,7 @@ check() {
 
 	# Catches the case this package is most likely to get wrong: an interpreter
 	# too old to parse the sources it has just been paired with.
-	jennifer lint grimoire src/*.j src/themes/*.j
+	jennifer lint bin/grimoire src/*.j src/themes/*.j
 
 	# The repository is its own book, so a real build is available here for
 	# free. Nothing is fetched - `[highlightjs]` is off, and the built-in
@@ -29,8 +29,8 @@ check() {
 	#
 	# GRIMOIRE_VERSION is how the PDF footer gets its version stamp where there
 	# is no repository to ask, which is every build from a release tarball.
-	./grimoire --version
-	GRIMOIRE_VERSION="$pkgver" ./grimoire build --pdf --out "$srcdir/smoke" --quiet
+	bin/grimoire --version
+	GRIMOIRE_VERSION="$pkgver" bin/grimoire build --pdf --out "$srcdir/smoke" --quiet
 	[[ -s "$srcdir/smoke/index.html" ]]
 	[[ -s "$srcdir/smoke/grimoire.pdf" ]]
 	[[ -s "$srcdir/smoke/assets/grimoire.css" ]]
@@ -39,15 +39,15 @@ check() {
 package() {
 	cd "$pkgname-$pkgver"
 
-	# The launcher finds `src/` relative to itself, resolving symlinks first, so
-	# the program lives in one directory and /usr/bin holds a link into it. Do
-	# not flatten this into /usr/bin: the launcher would then look for
-	# /usr/bin/src.
-	install -Dm755 grimoire "$pkgdir/usr/lib/$pkgname/grimoire"
+	# The launcher finds `src/` from its own resolved path - up out of `bin/`,
+	# then down into `src/` - so the checkout layout is reproduced under
+	# /usr/lib and /usr/bin holds a link into it. Do not flatten this into
+	# /usr/bin: the launcher would then look for /usr/src.
+	install -Dm755 bin/grimoire "$pkgdir/usr/lib/$pkgname/bin/grimoire"
 	find src -type f -exec install -Dm644 '{}' "$pkgdir/usr/lib/$pkgname/{}" ';'
 
 	install -dm755 "$pkgdir/usr/bin"
-	ln -s "/usr/lib/$pkgname/grimoire" "$pkgdir/usr/bin/$pkgname"
+	ln -s "/usr/lib/$pkgname/bin/grimoire" "$pkgdir/usr/bin/$pkgname"
 
 	install -Dm644 LICENSE.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE.md"
 	install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"

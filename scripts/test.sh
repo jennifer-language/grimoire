@@ -31,17 +31,19 @@ if [ "$#" -gt 0 ]; then
     files=""
     for name in "$@"; do
         file="src/${name%_test}_test.j"
+        [ -f "$file" ] || file="src/themes/${name%_test}_test.j"
         [ -f "$file" ] || { echo "no such test: $file" >&2; exit 2; }
         files="$files $file"
     done
 else
-    files=$(ls src/*_test.j)
+    files=$(ls src/*_test.j src/themes/*_test.j)
 fi
 
 # A module with no test file is the thing this is most likely to miss, so say so
 # rather than reporting a clean run over whatever happens to exist.
+# The themes are modules too, and the publish gate counts them.
 untested=""
-for src in src/*.j; do
+for src in src/*.j src/themes/*.j; do
     case "$src" in *_test.j) continue;; esac
     [ -f "${src%.j}_test.j" ] || untested="$untested $(basename "$src")"
 done

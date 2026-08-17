@@ -92,7 +92,7 @@ jobs:
             -v "$PWD:/work" \
             -e GRIMOIRE_VERSION="${{ steps.stamp.outputs.version }}" \
             -e GRIMOIRE_COMMIT="${{ steps.stamp.outputs.commit }}" \
-            ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG} run ./grimoire build --pdf
+            ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG} run bin/grimoire build --pdf
 
       # Assert the pieces a reader actually needs, so a silently empty publish
       # fails here instead of on the live site. The PDF is checked by name

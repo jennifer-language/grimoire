@@ -46,7 +46,7 @@ PROFILE_ROWS=40
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 JENNIFER=${JENNIFER:-jennifer}
-GRIMOIRE=${GRIMOIRE:-$root/grimoire}
+GRIMOIRE=${GRIMOIRE:-$root/bin/grimoire}
 SYSMODDIR=${SYSMODDIR:-}
 
 reps=3

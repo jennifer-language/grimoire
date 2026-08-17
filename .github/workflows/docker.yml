@@ -105,6 +105,20 @@ jobs:
 
           test -f smoke/site/index.html
           test -f smoke/site/book.pdf
+
+          # `/opt/grimoire/grimoire` is where the launcher used to live, and other
+          # projects' Dockerfiles invoke it by that path:
+          #
+          #   RUN ["jennifer", "run", "/opt/grimoire/grimoire", "build"]
+          #
+          # That bypasses the entrypoint entirely, so no other check in this
+          # pipeline touches it - which is how moving the file into `bin/` broke
+          # those builds without anything here going red. The path is a symlink
+          # now, and this is what keeps it one.
+          rm -rf smoke/site
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/smoke:/work" \
+            --entrypoint jennifer grimoire:test run /opt/grimoire/grimoire build
+          test -f smoke/site/index.html
           test -f smoke/site/assets/grimoire.css
           grep -q "wrapped" smoke/site/index.html
 

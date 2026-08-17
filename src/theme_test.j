@@ -34,6 +34,16 @@ func testAllShipsTenThemes() {
     testing.assertEqual(len(names()), 10);
 }
 
+# The shell cap in `palette.j` is sized so that both side columns at their widest
+# still leave room for the roomiest theme's measure. That sum is written there as
+# a number, and this is what keeps the number honest: a theme asking for more
+# than 860 would silently start taking width off its own prose on a wide screen.
+func testNoThemeAsksForAWiderMeasureThanTheShellAllows() {
+    for (def t in all()) {
+        testing.assertTrue($t.contentWidth <= 860);
+    }
+}
+
 func testEveryThemeIsComplete() {
     for (def t in all()) {
         testing.assertNotEqual($t.name, "");

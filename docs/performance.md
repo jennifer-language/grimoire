@@ -104,7 +104,7 @@ memory high-water mark - 1.6 GB on a book this size, growing with it.
 Re-derive the split at any time with the profiler:
 
 ```sh
-jennifer profile ./grimoire pdf --src <your-book> --out /tmp/pdfout
+jennifer profile bin/grimoire pdf --src <your-book> --out /tmp/pdfout
 ```
 
 ## What these numbers do not include

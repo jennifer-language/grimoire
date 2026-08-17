@@ -18,7 +18,7 @@
  *   grimoire serve
  *   grimoire themes
  *
- * @module main
+ * @module grimoire
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
  */
@@ -38,7 +38,9 @@ import "./locale.j" as locale;
 import "./serve.j" as serve;
 import "./watch.j" as watch;
 
-def const VERSION as string init "grimoire 1.0.0";
+# Kept in step with `version` in `deck.toml`, which the registry requires to
+# match the tag a release is published from.
+def const VERSION as string init "grimoire 0.1.0";
 def const DEFAULT_CONFIG as string init "grimoire.toml";
 def const DEFAULT_ADDR as string init "127.0.0.1:8080";
 

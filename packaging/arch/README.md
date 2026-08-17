@@ -8,16 +8,17 @@ copy, a symlink, and the documentation.
 
 | Path | |
 | ---- | - |
-| `/usr/lib/grimoire/grimoire` | the launcher, executable |
+| `/usr/lib/grimoire/bin/grimoire` | the launcher, executable |
 | `/usr/lib/grimoire/src/` | the program, including `src/themes/` and the bundled highlight.js grammar |
 | `/usr/bin/grimoire` | a symlink to the launcher |
 | `/usr/share/licenses/grimoire/` | `LICENSE.md` |
 | `/usr/share/doc/grimoire/` | `README.md` and the `docs/` sources |
 
 The split matters. The launcher locates `src/` **relative to itself**, resolving
-symlinks before it does, which is what lets one file in `/usr/bin` stand in for
-a directory in `/usr/lib`. Installing the launcher directly into `/usr/bin`
-would send it looking for `/usr/bin/src`.
+symlinks before it does, and it looks one directory *up* from itself - out of
+`bin/`, then down into `src/`. That is what lets one file in `/usr/bin` stand in
+for a tree in `/usr/lib`. Installing the launcher directly into `/usr/bin` would
+send it looking for `/usr/src`.
 
 ## Building it
 
@@ -66,7 +67,7 @@ apart from the directory they enter - `cd "${pkgname%-git}"` rather than
 
 ```sh
 pkgname=grimoire-git
-pkgver=1.0.0.r0.g0000000
+pkgver=0.1.0.r0.g0000000
 pkgrel=1
 pkgdesc="Build a documentation website, and a printable PDF, from a directory of Markdown files"
 arch=('any')

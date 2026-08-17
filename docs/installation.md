@@ -27,7 +27,7 @@ container section needs Jennifer on the host.
 ```sh
 git clone https://github.com/jennifer-language/grimoire
 cd grimoire
-./grimoire build          # builds this documentation, which is the repository's own book
+bin/grimoire build          # builds this documentation, which is the repository's own book
 ```
 
 That is the whole install. The repository is its own worked example: its
@@ -40,7 +40,7 @@ The launcher resolves its imports relative to itself, and it resolves through a
 symlink first, so it runs from any working directory under any name:
 
 ```sh
-ln -s "$PWD/grimoire" ~/.local/bin/grimoire
+ln -s "$PWD/bin/grimoire" ~/.local/bin/grimoire
 ```
 
 The leading `./` goes away after that, and `grimoire` works inside whichever
@@ -53,7 +53,7 @@ network stack. It runs everything except `serve`. The shebang names the default
 binary, so invoke the interpreter directly rather than the launcher:
 
 ```sh
-jennifer-tiny run ./grimoire build
+jennifer-tiny run bin/grimoire build
 ```
 
 ## From a package
@@ -140,11 +140,11 @@ tag is deliberate - Grimoire requires Jennifer 0.25.0 and `:latest` is still
 # From the Grimoire checkout: build the book mounted at /work.
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/work" \
-    ghcr.io/jennifer-language/jennifer:dev run ./grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:dev run bin/grimoire build --pdf
 
 podman run --rm --userns=keep-id \
     -v "$PWD:/work:Z" \
-    ghcr.io/jennifer-language/jennifer:dev run ./grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:dev run bin/grimoire build --pdf
 ```
 
 The launcher is handed to the interpreter rather than executed, because the

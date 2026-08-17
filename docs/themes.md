@@ -143,6 +143,28 @@ export func theme() {
 }
 ```
 
+`contentWidth` is the only width a theme sets. The two beside it - the book
+contents on one side, the page contents on the other - are not a matter of
+taste, so they are fixed in `palette.j` for every theme, and they **grow with
+the viewport**:
+
+| | narrow | wide |
+| - | -----: | ---: |
+| book contents | 302px | up to 400px |
+| on this page | 232px | up to 340px |
+
+Both columns hold titles, and a title is as long as it is. At a fixed width the
+only thing that gives is the line count, so a page with headings like
+"Immutability, yanking, and deletion" wraps nearly every row and a list meant to
+be scanned at a glance reads as a paragraph. Below about 1590px nothing has
+changed - the old fixed widths are the floor - and above it the columns take
+their share of the room a large screen has going spare.
+
+The shell as a whole is still capped, at 1886px, which is both columns at their
+widest plus the roomiest measure any theme asks for. Uncapped, the two columns
+end up pinned to the far edges of a wide monitor with the text stranded in the
+middle, and a contents list is only useful beside the thing it lists.
+
 `palette.palette` is positional, taking the fourteen colours in the order the
 `Palette` struct declares them, which keeps a theme file readable as a table:
 
@@ -182,7 +204,7 @@ needs to hear about it.
 
 ```sh
 jennifer fmt --write src/themes/yours.j
-./grimoire build --theme yours
+bin/grimoire build --theme yours
 ```
 
 ## Regenerating the gallery

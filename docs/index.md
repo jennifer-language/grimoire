@@ -21,17 +21,17 @@ self-contained static site - themed, searchable, with a colour-mode selector -
 plus, on request, the whole book as one paginated PDF.
 
 ```sh
-./grimoire init my-book     # scaffold a book
-./grimoire build            # build the site
-./grimoire build --pdf      # site plus the printable book
-./grimoire pdf              # the printable book on its own
-./grimoire serve            # build, then preview on :8080
-./grimoire themes           # list the built-in themes
+bin/grimoire init my-book     # scaffold a book
+bin/grimoire build            # build the site
+bin/grimoire build --pdf      # site plus the printable book
+bin/grimoire pdf              # the printable book on its own
+bin/grimoire serve            # build, then preview on :8080
+bin/grimoire themes           # list the built-in themes
 ```
 
-`grimoire` is a Jennifer script with a shebang; the program itself is
-`src/main.j`. It runs from any working directory and through any symlink, so the
-leading `./` goes away once the launcher is on your `PATH` - see
+`bin/grimoire` is a Jennifer script with a shebang; the program itself is
+`src/grimoire.j`. It runs from any working directory and through any symlink, so
+the path goes away once the launcher is on your `PATH` - see
 [Installation](installation.md), which also covers running the whole thing from
 a container instead.
 

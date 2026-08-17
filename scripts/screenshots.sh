@@ -48,14 +48,14 @@ done
 themes=$*
 if [ -z "$themes" ]; then
     # Ask Grimoire itself rather than hardcoding a list that would drift.
-    themes=$(./grimoire themes | sed -n 's/^  \([a-z][a-z0-9-]*\) - .*/\1/p')
+    themes=$(bin/grimoire themes | sed -n 's/^  \([a-z][a-z0-9-]*\) - .*/\1/p')
 fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 echo "building $SRC once (the HTML is theme-independent)"
-./grimoire build --src "$SRC" --out "$work/site" --quiet
+bin/grimoire build --src "$SRC" --out "$work/site" --quiet
 
 # Two copies of the page, each pinning a colour mode before the runtime can pick
 # one. They live inside the site so their relative asset paths still resolve.
