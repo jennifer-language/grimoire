@@ -76,6 +76,56 @@ func testRuntimeIsStable() {
     testing.assertEqual(runtime(), runtime());
 }
 
+# --- the navigation drawer -------------------------------------------
+
+# The body of `initDrawer`, sliced out of the runtime. The rule below holds
+# there and nowhere else: the search dialog uses scrollIntoView quite properly,
+# so a test over the whole runtime would have to be written to pass in spite of
+# that, and would then be one edit away from meaning nothing.
+func drawerSource() {
+    def js as string init runtime();
+    def rest as string init strings.substring(
+        $js,
+        strings.indexOf($js, "function initDrawer"),
+        len($js));
+    return strings.substring($rest, 0, strings.indexOf($rest, "function initCopy"));
+}
+
+# The slice, before anything is concluded from it. An indexOf that missed would
+# hand every test below a string that trivially satisfies them.
+func testTheDrawerSourceIsTheDrawer() {
+    def js as string init drawerSource();
+    testing.assertTrue(strings.startsWith($js, "function initDrawer"));
+    testing.assertContains($js, "gr-sidebar");
+    testing.assertContains($js, "aria-current=page");
+}
+
+# scrollIntoView scrolls every ancestor scrolling box, not just the nearest one,
+# and above 1080px the sidebar is `position: sticky` and therefore still in flow -
+# so the document is one of them. Books deep enough to need this opened their
+# later pages part-way down the article, and dragged a reader who had followed a
+# fragment link away from the heading. The sidebar scrolls itself instead.
+func testTheDrawerScrollsOnlyTheSidebar() {
+    def js as string init drawerSource();
+    testing.assertContains($js, "sidebar.scrollTop");
+    # The call, not the word: the comment above it in the runtime names the
+    # method to say why it is not used, and that is worth keeping.
+    testing.assertFalse(strings.contains($js, ".scrollIntoView("));
+}
+
+# And only when the entry is actually out of view. Centring one that can already
+# be seen scrolls the chapters above it away, on every page load of a short book.
+func testTheDrawerLeavesAVisibleEntryAlone() {
+    testing.assertContains(drawerSource(), "if (item.top < top || item.bottom > top + room)");
+}
+
+# The ban above is on the drawer, not on the runtime: this is the call it was
+# scoped around, and it is correct - the dialog is `position: fixed`, so the
+# document is not one of its ancestor scrolling boxes.
+func testTheSearchResultsStillScrollIntoView() {
+    testing.assertContains(runtime(), 'scrollIntoView({block: "nearest"})');
+}
+
 # --- boot ------------------------------------------------------------
 
 func testBootCarriesTheConfiguredDefault() {

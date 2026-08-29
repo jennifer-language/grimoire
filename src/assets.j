@@ -118,9 +118,33 @@ def const RUNTIME_JS as string init '/* grimoire runtime - no dependencies, work
                 setOpen(false);
             }
         });
+        /* The current entry, centred in the sidebar - by setting the scroll
+           offset of the sidebar directly rather than by scrollIntoView, which
+           is specified to scroll every ancestor scrolling box and not only the
+           nearest one. From 1080px up the sidebar is position: sticky and so
+           still in flow, which makes the document one of those ancestors: the
+           window scrolled down by roughly the height of the entries above the
+           current one, and any book with more nav than fits a screen opened its
+           later pages part-way into the article. With scroll-behavior: smooth
+           on the root that arrived as a visible glide a moment after the page
+           painted, and it also dragged a reader who had followed a #fragment
+           link away from the heading they had asked for.
+
+           Rects rather than offsetTop, which is measured from whatever the
+           offsetParent happens to be. Today that is the sidebar, but only
+           because nothing inside the nav is positioned.
+
+           Nothing at all when the entry is already in view, which is the common
+           case: centring it then would scroll the chapters above it away for no
+           reason. */
         var current = sidebar.querySelector("[aria-current=page]");
-        if (current && current.scrollIntoView) {
-            current.scrollIntoView({block: "center"});
+        if (current) {
+            var top = sidebar.getBoundingClientRect().top;
+            var item = current.getBoundingClientRect();
+            var room = sidebar.clientHeight;
+            if (item.top < top || item.bottom > top + room) {
+                sidebar.scrollTop += item.top - top - (room - item.height) / 2;
+            }
         }
     }
 
