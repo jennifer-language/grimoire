@@ -31,7 +31,7 @@ src/
   version.j         the version number, and the only copy of it in the sources
   *_test.j          one white-box test overlay per module, run by jennifer test
 packaging/
-  OVERVIEW.md       the short text the package page and releases carry
+  OVERVIEW.md       the few lines a release page opens with
   arch/             a PKGBUILD, and notes on building it
 scripts/
   test.sh           run every unit test

@@ -189,24 +189,38 @@ jobs:
 
           exit "$fail"
 
-      # The package page shows `org.opencontainers.image.description`, and falls
-      # back to the whole repository README when it is empty. `docker.yml` states
-      # it so that cannot happen, and the `Dockerfile` repeats it so a build by
-      # hand produces the same image - two copies of one sentence, which is
+      # The package page shows `org.opencontainers.image.description`. `docker.yml`
+      # holds it once, as an env value, and the `Dockerfile` repeats it so a build
+      # by hand produces the same image - two copies of one sentence, which is
       # exactly the arrangement that drifts. Nothing else would notice.
       - name: Check the image description has not drifted
         run: |
           set -eu
           dockerfile=$(sed -n 's/.*org\.opencontainers\.image\.description="\(.*\)".*/\1/p' Dockerfile)
-          workflow=$(sed -n 's/^ *org\.opencontainers\.image\.description=//p' \
-            .github/workflows/docker.yml)
+          workflow=$(sed -n 's/^  DESCRIPTION: "\(.*\)"$/\1/p' .github/workflows/docker.yml)
           test -n "$dockerfile"
+          test -n "$workflow"
           if [ "$dockerfile" != "$workflow" ]; then
             echo "the image description differs between Dockerfile and docker.yml:"
             echo "  Dockerfile: $dockerfile"
             echo "  docker.yml: $workflow"
             exit 1
           fi
+
+          # And that both inputs use it. A label is written into the image config,
+          # an annotation onto the index, and a multi-arch tag *is* an index - so
+          # a description that is only a label is one the registry never reads.
+          # It went out that way once; the pattern avoids naming the expression
+          # syntax, which this script would otherwise have substituted before the
+          # shell ever saw it.
+          used=$(grep -c 'image\.description=.*env\.DESCRIPTION' \
+            .github/workflows/docker.yml || true)
+          if [ "$used" -ne 2 ]; then
+            echo "expected the description in the labels and the annotations input"
+            echo "of docker.yml, found $used reference(s)"
+            exit 1
+          fi
+
           test -s packaging/OVERVIEW.md
 
       # `scripts/test.sh` splits JENNIFER on whitespace precisely so it can be a

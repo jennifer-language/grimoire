@@ -21,6 +21,11 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE: ${{ github.repository }}
+  # The one sentence the package page shows, written once and used twice below -
+  # as a label and again as an annotation, which are two different things to the
+  # registry. `Dockerfile` carries the same sentence for a build by hand, and
+  # `test.yml` fails if the two drift apart.
+  DESCRIPTION: "Build a documentation website, and a printable PDF, from a directory of Markdown files. Mount a book at /work; everything after the image name is a Grimoire command. Full manual: https://grimoire.jennifer-lang.dev/"
 
 jobs:
   image:
@@ -83,7 +88,17 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=Grimoire
-            org.opencontainers.image.description=Build a documentation website, and a printable PDF, from a directory of Markdown files. Mount a book at /work; everything after the image name is a Grimoire command. Full manual: https://grimoire.jennifer-lang.dev/
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.documentation=https://grimoire.jennifer-lang.dev/
+            org.opencontainers.image.licenses=LGPL-3.0-only
+          # The same four again, because a custom *label* does not become a
+          # custom *annotation*: the action derives its annotations from the
+          # metadata it computed itself, so what reached the index for 0.2.0 was
+          # the repository "About" text, `grimoire` in lower case, and
+          # `LGPL-3.0` - while the labels one layer down were right all along.
+          annotations: |
+            org.opencontainers.image.title=Grimoire
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
             org.opencontainers.image.documentation=https://grimoire.jennifer-lang.dev/
             org.opencontainers.image.licenses=LGPL-3.0-only
 

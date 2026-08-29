@@ -3,12 +3,13 @@
 #
 # Publish a GitHub Release for a `v*` tag.
 #
-# The body is `packaging/OVERVIEW.md` - the same brief text the container package
-# page carries - with the lines that only make sense for one tag generated on top
-# of it. A release page is read by someone deciding whether to install this
-# version, not by someone learning what the project is, so it says how to get it
-# and points at the manual for the rest. The repository README stays where it is
-# useful, which is the repository.
+# The body is `packaging/OVERVIEW.md` - a blurb of a few lines - with the parts
+# that only make sense for one tag generated on top of it: how to get this
+# version, and what changed since the last one. A release page is read by someone
+# deciding whether to install this version, not by someone learning what the
+# project is, so anything that reads like a second README belongs in the README.
+# The package page carries its own one-sentence description, capped at 512
+# characters by the registry; that one lives in `docker.yml`.
 #
 # Nothing is built here. The site publishes from `pages.yml` and the image from
 # `docker.yml`, both of which already run on a tag; this job waits for neither,
