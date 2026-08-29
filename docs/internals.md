@@ -3,7 +3,6 @@
 ## Source layout
 
 ```
-grimoire            a two-line shim onto bin/grimoire, so bin/grimoire works
 deck.toml           the deck manifest: name, version, capabilities, engine floor
 Dockerfile          Grimoire on top of the official Jennifer image
 grimoire.toml       the configuration that builds docs/ into site/
@@ -29,6 +28,7 @@ src/
   pdfbook.j         the printable build
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
+  version.j         the version number, and the only copy of it in the sources
   *_test.j          one white-box test overlay per module, run by jennifer test
 packaging/
   OVERVIEW.md       the short text the package page and releases carry

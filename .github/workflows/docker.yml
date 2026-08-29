@@ -10,7 +10,11 @@ name: docker
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    # Both spellings. Everything downstream strips a leading `v` - the release
+    # notes, the image tags, the check in `test.yml` - and the tag actually pushed
+    # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
+    # on it.
+    tags: ["v*", "[0-9]*"]
   pull_request:
   workflow_dispatch:
 
@@ -54,11 +58,21 @@ jobs:
       # about an image.
       #
       # One line, because this input is newline-delimited `key=value` pairs and a
-      # value cannot contain a newline. The longer package text lives in
+      # value cannot contain a newline - and GHCR truncates the description at
+      # 512 characters in any case. The longer package text lives in
       # `packaging/OVERVIEW.md`, which the release workflow uses as-is.
+      #
+      # `ANNOTATIONS_LEVELS: index` is what makes any of this visible. A label is
+      # written into an image *config*, and the push below is multi-arch, so what
+      # the registry stores under the tag is an index pointing at two of those.
+      # GHCR reads its description off the index, finds nothing there whatever the
+      # per-platform configs say, and shows the README instead. The same metadata
+      # has to arrive a second time, as an annotation on the index.
       - name: Derive tags and labels
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: |
@@ -131,5 +145,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Only here. Annotating an index requires the build to produce one, and
+          # the single-arch `load: true` build above produces a plain manifest -
+          # asking for `index` there fails the build rather than being ignored.
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

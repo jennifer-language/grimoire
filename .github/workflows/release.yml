@@ -19,7 +19,11 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    # Both spellings. Everything downstream strips a leading `v` - the release
+    # notes, the image tags, the check in `test.yml` - and the tag actually pushed
+    # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
+    # on it.
+    tags: ["v*", "[0-9]*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -81,11 +85,26 @@ jobs:
 
       # `--verify-tag` so a mistyped dispatch input fails here rather than
       # creating a release pointing at a tag that does not exist.
+      #
+      # An existing release is edited rather than refused. A tag pushed before
+      # this workflow existed already has a release with whatever notes GitHub
+      # generated, and `workflow_dispatch` above is how it gets these ones
+      # instead; a `create` that fails on "already exists" would make that the
+      # one case the workflow cannot fix.
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.notes.outputs.tag }}" \
-            --title "Grimoire ${{ steps.notes.outputs.tag }}" \
-            --notes-file notes.md \
-            --verify-tag
+          set -eu
+          tag="${{ steps.notes.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "the release exists; replacing its notes"
+            gh release edit "$tag" \
+              --title "Grimoire $tag" \
+              --notes-file notes.md
+          else
+            gh release create "$tag" \
+              --title "Grimoire $tag" \
+              --notes-file notes.md \
+              --verify-tag
+          fi

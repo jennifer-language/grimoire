@@ -18,7 +18,11 @@ name: test
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    # Both spellings. Everything downstream strips a leading `v` - the release
+    # notes, the image tags, the version check below - and the tag actually pushed
+    # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
+    # on it.
+    tags: ["v*", "[0-9]*"]
   pull_request:
   workflow_dispatch:
 
@@ -140,23 +144,47 @@ jobs:
             '! grep -rlq "^#!" src/' \
             "something under src/ has a shebang; a program belongs in bin/"
 
-          # The registry requires the manifest version to match the tag a
-          # release is published from, and `--version` is what a reader checks
-          # against it. Two copies of one number, in files that are edited for
-          # unrelated reasons.
+          # One number in three files, and on a tag push a fourth copy of it in
+          # the tag. Each file is edited for its own unrelated reasons: the
+          # manifest is what the registry publishes, `src/version.j` is what
+          # `--version` prints, and the PKGBUILD is what builds from a release
+          # tarball. Nothing but this keeps them together.
           manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' deck.toml)
-          program=$(sed -n 's/.*VERSION as string init "grimoire \(.*\)".*/\1/p' src/grimoire.j)
-          if [ -z "$manifest" ] || [ -z "$program" ]; then
+          program=$(sed -n 's/^def const NUMBER as string init "\(.*\)";/\1/p' src/version.j)
+          package=$(sed -n 's/^pkgver=//p' packaging/arch/PKGBUILD)
+          if [ -z "$manifest" ] || [ -z "$program" ] || [ -z "$package" ]; then
             echo "FAIL  a version could not be read"
             printf '      deck.toml: %s\n' "${manifest:-<none>}"
-            printf '      src/grimoire.j: %s\n' "${program:-<none>}"
+            printf '      src/version.j: %s\n' "${program:-<none>}"
+            printf '      packaging/arch/PKGBUILD: %s\n' "${package:-<none>}"
             fail=1
-          elif [ "$manifest" != "$program" ]; then
+          elif [ "$manifest" != "$program" ] || [ "$manifest" != "$package" ]; then
             echo "FAIL  version drift"
-            printf '      deck.toml says %s, src/grimoire.j says %s\n' "$manifest" "$program"
+            printf '      deck.toml %s, src/version.j %s, PKGBUILD %s\n' \
+              "$manifest" "$program" "$package"
             fail=1
           else
-            echo "ok    version $manifest in both places"
+            echo "ok    version $manifest in every file"
+          fi
+
+          # And the tag, on the push that creates one. This is the copy that
+          # cannot be checked any earlier and the one that costs the most to get
+          # wrong: the registry requires a deck's version to be the tag it was
+          # published from, the release notes and the image tag are both derived
+          # from the tag, and a tag is not something to move once it is pushed.
+          #
+          # A leading `v` is stripped because both spellings exist here - the
+          # workflows trigger on either - while the files never carry one.
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            if [ "$tag" != "$manifest" ]; then
+              echo "FAIL  the tag and the version disagree"
+              printf '      tag %s, the files say %s\n' "$GITHUB_REF_NAME" "$manifest"
+              printf '      bump the files and retag, or tag the version they name\n'
+              fail=1
+            else
+              echo "ok    tag $GITHUB_REF_NAME is version $manifest"
+            fi
           fi
 
           exit "$fail"

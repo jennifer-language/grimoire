@@ -37,10 +37,8 @@ import "./theme.j" as theme;
 import "./locale.j" as locale;
 import "./serve.j" as serve;
 import "./watch.j" as watch;
+import "./version.j" as version;
 
-# Kept in step with `version` in `deck.toml`, which the registry requires to
-# match the tag a release is published from.
-def const VERSION as string init "grimoire 0.1.0";
 def const DEFAULT_CONFIG as string init "grimoire.toml";
 def const DEFAULT_ADDR as string init "127.0.0.1:8080";
 
@@ -157,7 +155,7 @@ func parser() {
     def p as args.Parser init args.parser(
         "grimoire",
         "Build a documentation site and a PDF from a directory of Markdown files");
-    $p = args.version($p, VERSION);
+    $p = args.version($p, version.line());
     $p = args.command($p, "build", "Build the site", buildParser());
     $p = args.command($p, "pdf", "Render the book to PDF only", pdfParser());
     $p = args.command($p, "serve", "Build, then serve the site over HTTP", serveParser());
