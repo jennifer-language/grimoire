@@ -1,7 +1,7 @@
 # Maintainer: mplx <jennifer@mplx.dev>
 
 pkgname=grimoire
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Build a documentation website, and a printable PDF, from a directory of Markdown files"
 arch=('any')
