@@ -208,6 +208,27 @@ mode = "chartreuse"
 ').defaultMode, "auto");
 }
 
+# The dpi a drawn picture's pixels are read at. Only a picture narrower than the
+# text column is affected by it - a wider one is scaled to the column whatever it
+# says - so this is the knob that stops a small diagram filling the measure.
+func testApplyReadsTheImageDpi() {
+    testing.assertEqual(defaults().pdfImageDpi, 96);
+    testing.assertEqual(apply(defaults(), '[pdf]
+imageDpi = 192
+').pdfImageDpi, 192);
+}
+
+# Zero would divide a picture's pixels by nothing. The layout defends itself the
+# same way, but a build should report the configuration it actually used.
+func testApplyClampsAnUnusableImageDpi() {
+    testing.assertEqual(apply(defaults(), '[pdf]
+imageDpi = 0
+').pdfImageDpi, 96);
+    testing.assertEqual(apply(defaults(), '[pdf]
+imageDpi = -300
+').pdfImageDpi, 96);
+}
+
 func testApplyClampsThePaperSize() {
     testing.assertEqual(apply(defaults(), '[pdf]
 paper = "letter"

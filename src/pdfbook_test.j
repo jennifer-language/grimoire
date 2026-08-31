@@ -153,54 +153,179 @@ func testABareHashIsAHeading() {
 # A cross-reference to another chapter is not clickable on paper, so it reads as
 # its label alone.
 func testPrintLineDropsAnInternalTarget() {
-    testing.assertEqual(printLine("see [the guide](guide/x.md)"), "see the guide");
-    testing.assertEqual(printLine("see [the guide](guide/x.md#anchor)"), "see the guide");
-    testing.assertEqual(printLine("see [above](#anchor)"), "see above");
+    testing.assertEqual(printLine("see [the guide](guide/x.md)", ""), "see the guide");
+    testing.assertEqual(printLine("see [the guide](guide/x.md#anchor)", ""), "see the guide");
+    testing.assertEqual(printLine("see [above](#anchor)", ""), "see above");
 }
 
 # An external URL is worth keeping in parentheses, because the URL is the only
 # way a reader on paper can follow it.
 func testPrintLineKeepsAnExternalUrl() {
     testing.assertEqual(
-        printLine("see [the site](https://example.com)"),
+        printLine("see [the site](https://example.com)", ""),
         "see the site (https://example.com)");
 }
 
-func testPrintLineHandlesTitlesAndImages() {
-    testing.assertEqual(printLine('see [x](y.md "a title")'), "see x");
-    testing.assertEqual(printLine("![alt](diagram.png)"), "alt (diagram.png)");
+func testPrintLineDropsATitle() {
+    testing.assertEqual(printLine('see [x](y.md "a title")', ""), "see x");
+    testing.assertEqual(
+        printLine('see [x](https://example.com "a title")', ""),
+        "see x (https://example.com)");
+}
+
+# An image is left exactly as written now that the layout can draw one. Both link
+# patterns would otherwise match the `[alt](url)` inside it - an image target is
+# never a `.md` file, so it fell through to the general pattern and printed
+# `alt (diagram.png)`, a file path in the middle of the prose.
+func testPrintLineLeavesAnImageWhole() {
+    testing.assertEqual(printLine("![alt](diagram.png)", ""), "![alt](diagram.png)");
+    testing.assertEqual(
+        printLine('![alt](diagram.png "a title")', ""),
+        '![alt](diagram.png "a title")');
+    testing.assertEqual(printLine("![](bare.png)", ""), "![](bare.png)");
+}
+
+# A chapter writes its image targets relative to itself, and the printable book is
+# one document built from every chapter, so a target is resolved against the
+# chapter's own directory: two chapters that each write `images/plot.png` mean two
+# different files, and the layout is handed one map keyed by these strings.
+func testPrintLineResolvesAnImageAgainstItsChapter() {
+    testing.assertEqual(printLine("![a](images/plot.png)", "guide"), "![a](guide/images/plot.png)");
+    testing.assertEqual(
+        printLine("![a](../shared/x.png)", "guide/deep"),
+        "![a](guide/shared/x.png)");
+    testing.assertEqual(printLine('![a](x.png "t")', "guide"), '![a](guide/x.png "t")');
+}
+
+# Anything that does not name a file inside the book is left as it is - there is
+# nothing to resolve it against, and nothing will be fetched to find out.
+func testPrintLineLeavesForeignImageTargetsAlone() {
+    testing.assertEqual(
+        printLine("![a](https://e.com/i.png)", "guide"),
+        "![a](https://e.com/i.png)");
+    testing.assertEqual(printLine("![a](/logo.png)", "guide"), "![a](/logo.png)");
+    testing.assertEqual(printLine("![a](x.png)", ""), "![a](x.png)");
+}
+
+# The links around an image are still rewritten; the image spans are stepped over
+# rather than matched, so two of them back to back do not lose the boundary.
+func testPrintLineRewritesLinksAroundImages() {
+    testing.assertEqual(
+        printLine("text ![a](i.png) and [b](https://e.com) end", ""),
+        "text ![a](i.png) and b (https://e.com) end");
+    testing.assertEqual(printLine("[x](y.md) ![a](i.png) [z](w.md)", ""), "x ![a](i.png) z");
+    testing.assertEqual(printLine("![one](1.png)![two](2.png)", ""), "![one](1.png)![two](2.png)");
+    testing.assertEqual(printLine("**![bold img](c.png)**", ""), "**![bold img](c.png)**");
 }
 
 func testPrintLineLeavesOrdinaryProseAlone() {
-    testing.assertEqual(printLine("no links here"), "no links here");
-    testing.assertEqual(printLine("brackets [but] no target"), "brackets [but] no target");
-    testing.assertEqual(printLine(""), "");
+    testing.assertEqual(printLine("no links here", ""), "no links here");
+    testing.assertEqual(printLine("brackets [but] no target", ""), "brackets [but] no target");
+    testing.assertEqual(printLine("", ""), "");
 }
 
 func testPrintLineRewritesEveryLinkOnALine() {
-    testing.assertEqual(printLine("[a](a.md) and [b](b.md)"), "a and b");
+    testing.assertEqual(printLine("[a](a.md) and [b](b.md)", ""), "a and b");
+}
+
+# --- pictures --------------------------------------------------------
+
+# An 8x8 PNG, so a test can hand `pictures` a file that `pdf.loadImage` really
+# reads rather than a name that happens to end in `.png`. Base64 because a test
+# file is a module top level: a fixture is a function, and this one has to be
+# bytes.
+func tinyPng() {
+    return encoding.fromText(
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEElEQVR4nGNgOMCAHQ0tCQDB" +
+            "1jAB4smq5AAAAABJRU5ErkJggg==",
+        "base64");
+}
+
+func testImageTargetsReadsInOrder() {
+    def md as string init "![a](one.png)\n\ntext\n\n![b](two.jpg) and ![c](three.png)\n";
+    def urls as list of string init imageTargets($md);
+    testing.assertEqual(len($urls), 3);
+    testing.assertEqual($urls[0], "one.png");
+    testing.assertEqual($urls[1], "two.jpg");
+    testing.assertEqual($urls[2], "three.png");
+}
+
+# A chapter that documents the syntax writes an image inside a fence. Loading it
+# would put bytes in the PDF that nothing ever draws.
+func testImageTargetsSkipsFencedExamples() {
+    def md as string init "![real](r.png)\n\n```md\n![example](e.png)\n```\n";
+    def urls as list of string init imageTargets($md);
+    testing.assertEqual(len($urls), 1);
+    testing.assertEqual($urls[0], "r.png");
+}
+
+# The formats `pdf.loadImage` accepts, tested on the name so a book of SVG
+# diagrams is not read into memory to find out.
+func testDrawableAcceptsRastersOnly() {
+    testing.assertTrue(drawable("a.png"));
+    testing.assertTrue(drawable("shots/A.JPG"));
+    testing.assertTrue(drawable("a.jpeg"));
+    testing.assertFalse(drawable("a.svg"));
+    testing.assertFalse(drawable("a.png.gz"));
+    testing.assertFalse(drawable("png"));
+}
+
+# What is drawable and present is loaded once and keyed by the target as the
+# document writes it; everything else is left out, and the layout falls back to
+# the alt text for those.
+func testPicturesLoadsWhatItCanDraw() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-pdf-pictures-");
+    fs.mkdirAll(path.join($root, "shots"));
+    fs.writeBytes(path.join($root, "shots/a.png"), tinyPng());
+    fs.writeString(path.join($root, "shots/d.svg"), "<svg></svg>");
+    def c as config.Config init book();
+    $c.srcDir = $root;
+    def md as string init "![a](shots/a.png)\n\n![again](shots/a.png)\n\n" +
+        "![d](shots/d.svg)\n\n![gone](shots/missing.png)\n\n![x](https://e.com/x.png)\n";
+    def imgs as map of string to pdf.Image init pictures($c, $md);
+    testing.assertEqual(len(maps.keys($imgs)), 1);
+    testing.assertTrue(maps.has($imgs, "shots/a.png"));
+    testing.assertEqual($imgs["shots/a.png"].width, 8);
+    testing.assertEqual($imgs["shots/a.png"].height, 8);
+    fs.removeAll($root);
+}
+
+# The resource names follow reading order, because the layout registers one PDF
+# resource per entry as it iterates the map: a name that moved between runs would
+# break the promise that `--jobs` cannot change a byte of the output.
+func testPicturesNamesInReadingOrder() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-pdf-order-");
+    fs.writeBytes(path.join($root, "first.png"), tinyPng());
+    fs.writeBytes(path.join($root, "second.png"), tinyPng());
+    def c as config.Config init book();
+    $c.srcDir = $root;
+    def imgs as map of string to pdf.Image init pictures(
+        $c,
+        "![b](second.png)\n\n![a](first.png)\n");
+    testing.assertEqual($imgs["second.png"].name, "img0");
+    testing.assertEqual($imgs["first.png"].name, "img1");
 }
 
 # --- prepare ---------------------------------------------------------
 
 func testPrepareDemotesHeadings() {
-    def out as string init prepare("# Title\n\n## Section\n", 1);
+    def out as string init prepare("# Title\n\n## Section\n", 1, "");
     testing.assertContains($out, "## Title");
     testing.assertContains($out, "### Section");
 }
 
 func testPrepareDemotesNothingAtZero() {
-    testing.assertContains(prepare("# Title\n", 0), "# Title");
+    testing.assertContains(prepare("# Title\n", 0, ""), "# Title");
 }
 
 func testPrepareClampsAtSix() {
-    testing.assertContains(prepare("###### Deep\n", 1), "###### Deep");
+    testing.assertContains(prepare("###### Deep\n", 1, ""), "###### Deep");
 }
 
 # Headings and rules inside a fence are content, not structure.
 func testPrepareLeavesFencedContentAlone() {
     def src as string init "# Real\n\n```sh\n# not a heading\n[not](a.md) link\n```\n";
-    def out as string init prepare($src, 1);
+    def out as string init prepare($src, 1, "");
     testing.assertContains($out, "## Real");
     testing.assertContains($out, "# not a heading");
     testing.assertContains($out, "[not](a.md) link");
@@ -210,17 +335,19 @@ func testPrepareLeavesFencedContentAlone() {
 # indent stops belonging to its list item and becomes a stranded paragraph.
 func testPrepareKeepsIndentation() {
     def src as string init "- item\n  continuation\n    deeper\n";
-    def out as string init prepare($src, 0);
+    def out as string init prepare($src, 0, "");
     testing.assertContains($out, "  continuation");
     testing.assertContains($out, "    deeper");
 }
 
 func testPrepareResolvesLinksOutsideFences() {
-    testing.assertContains(prepare("see [x](y.md)\n", 0), "see x");
+    testing.assertContains(prepare("see [x](y.md)\n", 0, ""), "see x");
 }
 
 func testPrepareSanitisesFirst() {
-    testing.assertContains(prepare(convert.fromCodepoint(0x2192) + " onward\n", 0), "-> onward");
+    testing.assertContains(
+        prepare(convert.fromCodepoint(0x2192) + " onward\n", 0, ""),
+        "-> onward");
 }
 
 # --- hasTitle --------------------------------------------------------
@@ -374,6 +501,15 @@ func testPdfOptionsFollowTheBookmarkLevel() {
     testing.assertEqual(pdfOptions($c).bookmarkLevel, 2);
     $c.pdfBookmarkLevel = 0;
     testing.assertEqual(pdfOptions($c).bookmarkLevel, 0);
+}
+
+# The dpi the layout reads a drawn picture's pixels at, which is the one control
+# a book has over how big its screenshots come out on the page.
+func testPdfOptionsFollowTheImageDpi() {
+    def c as config.Config init book();
+    testing.assertEqual(pdfOptions($c).imageDpi, 96);
+    $c.pdfImageDpi = 192;
+    testing.assertEqual(pdfOptions($c).imageDpi, 192);
 }
 
 # A visible marker beats a silent hole for anything `sanitize` did not already

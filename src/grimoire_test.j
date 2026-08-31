@@ -66,6 +66,7 @@ func testBuildTakesEveryFlagItDocuments() {
         "--no-raw-html",
         "--title-url",
         "--pdf",
+        "--image-dpi",
         "--no-search",
         "--jobs",
         "--verbose",
@@ -101,6 +102,7 @@ func testPdfTakesNoChromeFlags() {
     def usage as string init args.usage(pdfParser());
     testing.assertContains($usage, "--paper");
     testing.assertContains($usage, "--output");
+    testing.assertContains($usage, "--image-dpi");
     testing.assertFalse(strings.contains($usage, "--nav"));
     testing.assertFalse(strings.contains($usage, "--ui-language"));
 }
@@ -195,6 +197,35 @@ func testThePdfFlagsReachTheirFields() {
     def c as config.Config init resolve($argv);
     testing.assertEqual($c.pdfOutput, "manual.pdf");
     testing.assertEqual($c.pdfPaper, "letter");
+}
+
+# How big a picture comes out on the page, for the run that is trying three
+# values in a row rather than editing a file between them.
+func testImageDpiOverridesTheConfig() {
+    def argv as list of string init [
+        "grimoire",
+        "pdf",
+        "--config",
+        "no-such-file.toml",
+        "--image-dpi",
+        "192"
+    ];
+    testing.assertEqual(resolve($argv).pdfImageDpi, 192);
+    testing.assertEqual(resolve(buildArgs(["--config", "no-such-file.toml"])).pdfImageDpi, 96);
+}
+
+# Through the same clamp the configuration file goes through, rather than
+# reaching the layout as a division by nothing.
+func testImageDpiClampsAnUnusableValue() {
+    def argv as list of string init [
+        "grimoire",
+        "pdf",
+        "--config",
+        "no-such-file.toml",
+        "--image-dpi",
+        "0"
+    ];
+    testing.assertEqual(resolve($argv).pdfImageDpi, 96);
 }
 
 # The two together are a mistake, and the reading that deletes nothing is the one

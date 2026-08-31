@@ -32,6 +32,7 @@ Render the site.
 | `--no-raw-html` | from config | escape hand-written HTML blocks |
 | `--title-url URL` | from config | where the title in the top bar links; `""` is the book itself |
 | `--pdf` | off | also render the book to PDF |
+| `--image-dpi N` | from config | dpi a picture is drawn at in the PDF; `0` keeps the configured value |
 | `--no-search` | off | skip the search index and the search UI |
 | `-j`, `--jobs N` | `0` | chapters to render in parallel; `0` is one per CPU |
 | `-v`, `--verbose` | off | report each chapter as it is rendered |
@@ -85,11 +86,19 @@ Render only the PDF, skipping the site.
 | `-v`, `--verbose` | off | report each chapter as it is laid out |
 | `--output FILE` | from config | PDF filename, relative to the output directory |
 | `--paper SIZE` | from config | `a4` or `letter` |
+| `--image-dpi N` | from config | dpi a picture is drawn at; `0` keeps the configured value |
 
 ```sh
 grimoire pdf
 grimoire pdf --paper letter --output manual.pdf
+grimoire pdf --image-dpi 192            # the same diagrams, at half the size
 ```
+
+`--image-dpi` is the one PDF setting worth trying from the command line rather
+than from `grimoire.toml`: how a diagram lands on the page is a thing to look at
+two or three times in a row. It only reaches a picture narrower than the text
+column - a wider one is scaled to the column whatever its dpi - and
+[`[pdf] imageDpi`](configuration.md#pdf) is where a book settles on a value.
 
 ## `grimoire serve`
 

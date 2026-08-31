@@ -238,7 +238,7 @@ func headingLevel(line as string) {
     return 0;
 }
 
-# --- links in print -------------------------------------------------
+# --- links and images in print --------------------------------------
 #
 # The PDF layout does not nest inline spans, so a link inside `**bold**` arrives
 # as flat text and is typeset as the literal `[label](target.md)`. Rewriting the
@@ -246,43 +246,119 @@ func headingLevel(line as string) {
 # cross-reference to another chapter is not clickable on paper, so it should read
 # as its label alone, while an external URL is worth keeping in parentheses
 # because the URL is the only way a reader can follow it.
+#
+# An image is left exactly as written, because the layout can now draw one: it is
+# handed the bytes for every picture in the book and falls back to the bracketed
+# alt text for anything it was not given. What the image needs from this pass is
+# the other thing - its target resolved from chapter-relative to book-relative,
+# since the whole book is parsed as one document and two chapters may each write
+# `images/plot.png` meaning two different files.
 
-# An inline link or image: an optional `!`, a bracketed label, and a target with
-# an optional quoted title.
-def const LINK_INTERNAL as string init '!?\[([^\]]*)\]\(' +
+# An image: the alt text, the target, and an optional quoted title, each captured
+# so the span can be rebuilt around a different target.
+def const IMAGE as string init '!\[([^\]]*)\]\(([^)\s]+)((?:\s+"[^"]*")?)\)';
+
+# An inline link: a bracketed label, and a target with an optional quoted title.
+# Neither pattern carries the `!` an image opens with - images are stepped over
+# rather than matched, see printLinks.
+def const LINK_INTERNAL as string init '\[([^\]]*)\]\(' +
     '(?:[^)\s]*\.md(?:#[^)\s]*)?|#[^)\s]*)(?:\s+"[^"]*")?\)';
-def const LINK_OTHER as string init '!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)';
+def const LINK_OTHER as string init '\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)';
 
+# bookPath resolves one image target against the directory of the chapter that
+# wrote it. Anything that does not name a file in the book - a URL, a data URI, a
+# site-absolute path - is left alone, and so is every target when the caller has
+# no directory to resolve against.
+func bookPath(dir as string, url as string) {
+    if ($dir == "" or util.isExternal($url) or strings.startsWith($url, "/") or
+        strings.startsWith($url, "data:")) {
+        return $url;
+    }
+    return path.join($dir, $url);
+}
+
+# resolveImages rewrites the target of every image on a line, and touches nothing
+# else on it.
+func resolveImages(line as string, dir as string) {
+    if ($dir == "") {
+        return $line;
+    }
+    def spans as list of regex.Match init regex.findAll(IMAGE, $line);
+    if (len($spans) == 0) {
+        return $line;
+    }
+    def out as list of string;
+    def at as int init 0;
+    for (def m in $spans) {
+        $out[] = strings.substring($line, $at, $m.start);
+        $out[] = "![" + $m.groups[0] + "](" + bookPath($dir, $m.groups[1]) + $m.groups[2] + ")";
+        $at = $m.end;
+    }
+    $out[] = strings.substring($line, $at, len($line));
+    return strings.join($out, "");
+}
+
+# linksIn rewrites the links in one stretch of a line, which is where the two
+# patterns above are safe to run.
+func linksIn(part as string) {
+    def out as string init regex.replace(LINK_INTERNAL, $part, "$1");
+    return regex.replace(LINK_OTHER, $out, "$1 ($2)");
+}
+
+# printLinks rewrites the links on a line while leaving its images whole. Both
+# link patterns would otherwise match the `[alt](url)` inside an image - an image
+# target is never a `.md` file, so it falls through to the general pattern and
+# collects its own path, which is how a picture used to print as
+# `alt (screenshots/x.png)`. Stepping over the image spans is what keeps them out
+# of it: RE2 has no lookbehind, so there is no pattern for "a `[` with no `!`
+# before it", and a prefix like `(^|[^!])` would swallow the character that
+# separates two adjacent links.
 func printLinks(line as string) {
     if (not strings.contains($line, "](")) {
         return $line;
     }
-    def out as string init regex.replace(LINK_INTERNAL, $line, "$1");
-    return regex.replace(LINK_OTHER, $out, "$1 ($2)");
+    def spans as list of regex.Match init regex.findAll(IMAGE, $line);
+    if (len($spans) == 0) {
+        return linksIn($line);
+    }
+    def out as list of string;
+    def at as int init 0;
+    for (def m in $spans) {
+        $out[] = linksIn(strings.substring($line, $at, $m.start));
+        $out[] = $m.text;
+        $at = $m.end;
+    }
+    $out[] = linksIn(strings.substring($line, $at, len($line)));
+    return strings.join($out, "");
 }
 
 /**
- * Apply every print-only inline rewrite to one line, which means resolving links
- * for paper and nothing else: the layout nests inline spans itself, and hard-folds
- * a token too wide for its column, so neither needs help here. Exported so the
- * rewrite can be exercised directly, since it is the one place a bad pattern
- * mangles prose rather than failing loudly.
+ * Apply every print-only inline rewrite to one line: links resolved for paper,
+ * image targets resolved against the chapter that wrote them, and nothing else -
+ * the layout nests inline spans itself, and hard-folds a token too wide for its
+ * column, so neither needs help here. Exported so the rewrite can be exercised
+ * directly, since it is the one place a bad pattern mangles prose rather than
+ * failing loudly.
  * @param line {string} one line of Markdown, outside any fenced code block
+ * @param dir {string} the chapter's directory within the source tree, relative
+ *     and without a trailing slash (`""` to leave image targets alone)
  * @return {string} the rewritten line
  */
-export func printLine(line as string) {
-    return printLinks($line);
+export func printLine(line as string, dir as string) {
+    return printLinks(resolveImages($line, $dir));
 }
 
 # prepare demotes a chapter's headings by `by` levels, resolves its links for
-# paper, and leaves everything else exactly as written.
+# paper and its image targets against `dir` - the chapter's own directory, since
+# the book is parsed as one document - and leaves everything else exactly as
+# written.
 #
 # "Exactly as written" is load-bearing: every line keeps its own indentation.
 # Reflowing a paragraph here - gathering its lines and trimming each one - would
 # strip the indent from a continuation line, and an indented continuation that
 # loses its indent stops belonging to its list item and becomes a paragraph of
 # its own, stranded between the items. The layout reflows paragraphs anyway.
-func prepare(md as string, by as int) {
+func prepare(md as string, by as int, dir as string) {
     def out as list of string;
     def inFence as bool init false;
     # Transliterate before the layout sees the text: the module substitutes a
@@ -308,13 +384,13 @@ func prepare(md as string, by as int) {
                 $target = 6;
             }
             $out[] = strings.repeat("#", $target) +
-                printLine(strings.substring($line, $level, len($line)));
+                printLine(strings.substring($line, $level, len($line)), $dir);
             continue;
         }
         # Every other line keeps its own shape, indentation included: the layout
         # reflows paragraphs itself, and an indented line is how a continuation
         # stays inside the list item it belongs to.
-        $out[] = printLine($line);
+        $out[] = printLine($line, $dir);
     }
     return strings.join($out, "\n");
 }
@@ -500,7 +576,7 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
             io.printf("  chapter %s\n", $e.src);
         }
         def source as string init fs.readString($file);
-        def body as string init prepare($source, $shift);
+        def body as string init prepare($source, $shift, path.dir($e.src));
         $lines[] = "";
         # A demoted chapter has to ask for its page; an undemoted one gets it from
         # its own level-one heading, and the first chapter of a part gets it from
@@ -562,6 +638,7 @@ export func pdfOptions(c as config.Config) {
 
 func options(c as config.Config) {
     def opts as markdown.PdfOptions init markdown.pdfDefaults();
+    $opts.imageDpi = $c.pdfImageDpi;
     $opts.pageWidth = A4_WIDTH;
     $opts.pageHeight = A4_HEIGHT;
     if ($c.pdfPaper == "letter") {
@@ -701,6 +778,91 @@ func footer(c as config.Config, doc as pdf.Document) {
     return pdf.setFooter($doc, $label);
 }
 
+# --- pictures --------------------------------------------------------
+#
+# The layout draws a picture when it is handed the bytes, keyed by the target
+# exactly as the combined document writes it - which is what the resolution in
+# `prepare` is for - and falls back to the bracketed alt text for anything it was
+# not given. So an SVG, a file that is not there, and a picture on another host
+# all cost nothing here: they are simply not in the map, and the reader gets the
+# caption instead of a hole.
+#
+# Nothing is fetched. A build makes no network request, and an image on another
+# host is not a file this can read.
+
+# What `pdf.loadImage` accepts. Tested on the name before the read rather than
+# caught after the throw, so a book of SVG diagrams does not read every one of
+# them into memory to find out.
+def const RASTER as list of string init [".png", ".jpg", ".jpeg"];
+
+func drawable(url as string) {
+    def lower as string init strings.lower($url);
+    for (def ext in RASTER) {
+        if (strings.endsWith($lower, $ext)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+# imageTargets lists every image target in the book, in reading order and without
+# the ones inside a fence: a chapter that *documents* the syntax writes
+# `![alt](x.png)` in a code block, and loading that file would put bytes in the
+# PDF that nothing ever draws.
+func imageTargets(md as string) {
+    def out as list of string;
+    def inFence as bool init false;
+    for (def line in strings.split($md, "\n")) {
+        if (fenceAt($line)) {
+            $inFence = not $inFence;
+            continue;
+        }
+        if ($inFence or not strings.contains($line, "](")) {
+            continue;
+        }
+        for (def m in regex.findAll(IMAGE, $line)) {
+            $out[] = $m.groups[1];
+        }
+    }
+    return $out;
+}
+
+# pictures loads every drawable image the book refers to, once each, keyed by the
+# target the document writes.
+#
+# Reading order, not map order. The map is handed to the layout, which registers
+# a PDF resource per entry in the order it iterates, so building it from anything
+# order-dependent - a directory listing, a set - would name the same picture
+# differently on two runs and break the promise that `--jobs` cannot change a
+# byte of the output.
+func pictures(c as config.Config, md as string) {
+    def out as map of string to pdf.Image init {};
+    def n as int init 0;
+    for (def url in imageTargets($md)) {
+        if (maps.has($out, $url) or util.isExternal($url) or
+            strings.startsWith($url, "/") or not drawable($url)) {
+            continue;
+        }
+        def file as string init path.join($c.srcDir, $url);
+        if (not fs.isFile($file)) {
+            if ($c.verbose) {
+                io.printf("  image %s is not in the source tree\n", $url);
+            }
+            continue;
+        }
+        try {
+            $out[$url] = pdf.loadImage("img" + convert.toString($n), fs.readBytes($file));
+            $n = $n + 1;
+            if ($c.verbose) {
+                io.printf("  image %s\n", $url);
+            }
+        } catch (e) {
+            io.printf("  image %s could not be embedded: %s\n", $url, $e.message);
+        }
+    }
+    return $out;
+}
+
 /**
  * Render the book to PDF bytes.
  *
@@ -713,6 +875,8 @@ func footer(c as config.Config, doc as pdf.Document) {
  * @throws {Error} kind "markdown" or "pdf" when a document cannot be laid out
  */
 export func render(c as config.Config, entries as list of summary.Entry) {
-    def tree as markdown.Node init markdown.parse(combine($c, $entries));
-    return pdf.render(footer($c, markdown.renderPdfDoc($tree, options($c))));
+    def book as string init combine($c, $entries);
+    def opts as markdown.PdfOptions init options($c);
+    $opts.images = pictures($c, $book);
+    return pdf.render(footer($c, markdown.renderPdfDoc(markdown.parse($book), $opts)));
 }

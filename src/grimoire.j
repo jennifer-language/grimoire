@@ -108,6 +108,19 @@ func rawHtmlFlags(p as args.Parser) {
     return $out;
 }
 
+# The dpi a picture is drawn at in the printable book, on the two commands that
+# render one. A book that settles on a value puts it in `grimoire.toml`; the flag
+# is for the run that is checking how a diagram lands on the page, which is a
+# thing to try three times in a row rather than to edit a file for.
+func imageDpiFlag(p as args.Parser) {
+    return args.intFlag(
+        $p,
+        "image-dpi",
+        "",
+        0,
+        "dpi a picture is drawn at in the PDF (0 = as configured)");
+}
+
 func buildParser() {
     def p as args.Parser init commonFlags(args.parser("build", "Build the site"));
     $p = args.flag($p, "theme", "t", "", "theme name (overrides the config)");
@@ -117,6 +130,7 @@ func buildParser() {
     $p = rawHtmlFlags($p);
     $p = titleUrlFlag($p);
     $p = args.boolFlag($p, "pdf", "", "also render the book to PDF");
+    $p = imageDpiFlag($p);
     $p = args.boolFlag($p, "no-search", "", "skip the search index");
     $p = args.intFlag($p, "jobs", "j", 0, "chapters to render in parallel (0 = one per CPU)");
     $p = args.boolFlag($p, "quiet", "q", "print nothing on success");
@@ -127,7 +141,7 @@ func pdfParser() {
     def p as args.Parser init commonFlags(args.parser("pdf", "Render the book to PDF only"));
     $p = args.flag($p, "output", "", "", "PDF path, relative to the output directory");
     $p = args.flag($p, "paper", "", "", "page size: a4 or letter");
-    return $p;
+    return imageDpiFlag($p);
 }
 
 func serveParser() {
@@ -222,6 +236,12 @@ func configure(r as args.Result, appDir as string) {
     }
     if (args.has($r, "paper")) {
         $c.pdfPaper = args.asString($r, "paper");
+    }
+    # Through the same clamp the file goes through, so `--image-dpi 0` means what
+    # `imageDpi = 0` means rather than reaching the layout as a division by
+    # nothing.
+    if (args.has($r, "image-dpi")) {
+        $c.pdfImageDpi = config.usableDpi(args.asInt($r, "image-dpi"));
     }
     if (args.has($r, "pdf")) {
         $c.pdf = true;

@@ -84,7 +84,9 @@ default.
 - **A printable book**: every chapter in one PDF, with a cover page, chapters
   starting on fresh pages, a nested bookmark outline, and document metadata. It
   wears the book's theme too - heading bars, table headers, code panels, and the
-  tint and rule on a blockquote all come from the theme's light palette.
+  tint and rule on a blockquote all come from the theme's light palette. A PNG
+  or JPEG on a line of its own is drawn into the page, scaled to the measure;
+  anything else keeps its alt text.
 - **Chapters render in parallel**, one task per CPU, with the work split
   longest-chapter-first. With `--pdf`, the PDF is laid out *alongside* the site
   rather than after it.

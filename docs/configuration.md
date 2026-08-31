@@ -70,6 +70,7 @@ bookmarkLevel = 3
 pageNumbers = false
 footerLeft = ""
 titlePage = true
+imageDpi = 96
 exclude = []
 ```
 
@@ -516,6 +517,7 @@ single build without touching the file.
 | `pageNumbers` | bool | `false` | print `page/total` at the outside edge of every page footer |
 | `footerLeft` | string | `""` | a template for the other side of that footer; `""` leaves it empty |
 | `titlePage` | bool | `true` | open the book with a title page; off starts it at the first chapter |
+| `imageDpi` | int | `96` | the resolution a drawn picture's pixels are read at |
 | `exclude` | list of string | `[]` | chapters to leave out of the PDF; the site still carries them |
 
 `enabled` is what `--pdf` sets, and `grimoire pdf` renders the PDF regardless of
@@ -556,6 +558,17 @@ rest of the template still prints.
 
 `titlePage` off drops the cover entirely and starts the PDF at the first chapter,
 for a book that would rather supply its own front matter as a prefix chapter.
+
+`imageDpi` decides how big a picture is on the page. A PNG or a JPEG on a line of
+its own is drawn into the printable book, and its pixels are read at this
+resolution: 96 puts a 480-pixel-wide screenshot in a 360-point box, 192 puts the
+same screenshot in half that. It only has the last word on a picture narrower
+than the text column, because a wider one is scaled down to the column whatever
+its dpi - so raising it is how a small diagram stops filling the measure, and
+lowering it is how one stops being a postage stamp. A value below 1 falls back to
+96. Everything else keeps its alt text: an image inline in a sentence, a format
+the PDF cannot carry, a file that is not in the source tree, and a picture on
+another host, which is not fetched.
 
 `exclude` names chapters that belong on the site but not on paper. Each entry is
 a source path relative to `src`; one ending in `/` excludes everything beneath

@@ -73,6 +73,10 @@ use convert;
  *   with `{version}` and `{commit}` slots ("" leaves that side empty)
  * @field pdfTitlePage {bool} open the PDF with a title page; off starts it at the
  *   first chapter
+ * @field pdfImageDpi {int} the resolution a picture's pixels are read at when it
+ *     is drawn into the PDF: higher packs the same picture into a smaller box on
+ *     the page. Only reaches a picture narrower than the text column, since a
+ *     wider one is scaled to the column whatever its dpi
  * @field pdfExclude {list of string} chapters to leave out of the PDF, as source
  *   paths relative to `src`; a trailing `/` excludes a whole directory
  * @field jobs {int} chapters to render in parallel (0 = one per CPU)
@@ -127,6 +131,7 @@ export def struct Config {
     pdfPageNumbers as bool,
     pdfFooterLeft as string,
     pdfTitlePage as bool,
+    pdfImageDpi as int,
     pdfExclude as list of string,
     jobs as int,
     highlight as bool,
@@ -205,6 +210,7 @@ export func defaults() {
         pdfPageNumbers: false,
         pdfFooterLeft: "",
         pdfTitlePage: true,
+        pdfImageDpi: 96,
         pdfExclude: [],
         jobs: 0,
         highlight: false,
@@ -324,6 +330,7 @@ export func apply(base as Config, text as string) {
     $c.pdfPageNumbers = boolAt($doc, "/pdf/pageNumbers", $c.pdfPageNumbers);
     $c.pdfFooterLeft = strAt($doc, "/pdf/footerLeft", $c.pdfFooterLeft);
     $c.pdfTitlePage = boolAt($doc, "/pdf/titlePage", $c.pdfTitlePage);
+    $c.pdfImageDpi = intAt($doc, "/pdf/imageDpi", $c.pdfImageDpi);
     $c.pdfExclude = stringsAt($doc, "/pdf/exclude", $c.pdfExclude);
     $c.jobs = intAt($doc, "/build/jobs", $c.jobs);
     $c.highlight = boolAt($doc, "/highlight/enabled", $c.highlight);
@@ -341,7 +348,25 @@ export func apply(base as Config, text as string) {
     if ($c.searchBodyChars < 120) {
         $c.searchBodyChars = 120;
     }
+    $c.pdfImageDpi = usableDpi($c.pdfImageDpi);
     return $c;
+}
+
+/**
+ * The resolution a drawn picture's pixels are read at, with an unusable value
+ * replaced by the default. Zero or less would divide a picture's pixels by
+ * nothing; the layout guards against that too, by falling back to 96, but a
+ * build should report the configuration it used rather than one the renderer
+ * quietly corrected. Exported because the CLI flag needs the same rule and there
+ * should be one of it.
+ * @param dpi {int} the configured or requested resolution
+ * @return {int} the same value, or 96 when it cannot be used
+ */
+export func usableDpi(dpi as int) {
+    if ($dpi < 1) {
+        return 96;
+    }
+    return $dpi;
 }
 
 /**

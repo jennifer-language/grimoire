@@ -188,7 +188,7 @@ a glance.
 The tool credit lives in the document metadata rather than on the title page,
 in `Creator` and `Producer`, where a reader's document properties show it.
 
-Print differs from the site in two deliberate ways:
+Print differs from the site in three deliberate ways:
 
 - **Raw HTML is dropped**, by the layout. A hand-written block has no rendering
   on paper, and left in place the Jennifer introduction's inline SVG wordmark
@@ -197,6 +197,20 @@ Print differs from the site in two deliberate ways:
 - **Links are resolved for paper.** A cross-reference is not clickable in print,
   so it reads as its label alone, while an external URL keeps its address in
   parentheses.
+- **Pictures are drawn.** A paragraph that is a single image - a PNG or a JPEG
+  inside the book - is embedded and scaled to the text column, never wider than
+  the measure and never taller than a page. An image inline in a sentence, one
+  in a format the PDF cannot carry (an SVG), one that is not in the source tree,
+  and one on another host all fall back to the alt text in brackets,
+  `[a green rectangle]`, or `[image]` where there is no alt text. Nothing is
+  fetched: a build makes no network request, so a picture on another host is a
+  caption on paper.
+
+  Image targets are written relative to the chapter that uses them, and the
+  printable book is one document built from every chapter, so each target is
+  resolved against its own chapter's directory before the book is assembled -
+  two chapters that both write `images/plot.png` mean two different files, and
+  they stay two.
 
 Beyond those, the print path passes each line through untouched, **indentation
 included** - which matters more than it sounds. Reflowing a paragraph here, by
