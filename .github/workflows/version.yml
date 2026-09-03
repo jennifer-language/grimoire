@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# One number, four places, checked once and reusable by everything that would
+# ship it: `deck.toml`, `src/version.j`, `packaging/arch/PKGBUILD`, and - on a
+# tag - the tag itself.
+#
+# This is a `workflow_call` workflow rather than a step inside `test.yml`
+# because of what a tag push actually does: `test.yml`, `release.yml` and
+# `docker.yml` all trigger on it, at the same moment, with no ordering between
+# them. A check that lives in `test.yml` therefore does not gate anything. It
+# reports the drift some minutes after the release is published and the image is
+# pushed, on a pipeline whose failure is the only trace, and the two things it
+# was meant to prevent have already happened.
+#
+# A called workflow is the one way a job in another workflow can wait for this
+# without `workflow_run`, which sees a run only after it has finished and
+# resolves `github.ref` to the default branch rather than the tag. Called here it
+# inherits the caller's event, ref and sha, so a tag push checks the tag.
+#
+# It installs nothing and pulls no image: four `sed` invocations against a fresh
+# checkout, a few seconds ahead of jobs that take minutes.
+
+name: version
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: >
+          The tag to check the files against, for a run that a tag did not
+          trigger - `release.yml` accepts one by hand. Left empty, a tag push
+          checks its own tag and any other run checks only that the files agree
+          with each other.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      # An explicit `ref`, because a dispatched release names a tag that is not
+      # the ref the run started from: the files to compare are the ones at that
+      # tag, not the ones on the branch. An empty input is falsy here, so a
+      # normal run checks out what triggered it.
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Check the version agrees with itself
+        env:
+          # Through the environment rather than into the script text: an
+          # interpolation the shell never sees cannot end a quote early.
+          ASKED_TAG: ${{ inputs.tag }}
+        run: |
+          set -u
+          fail=0
+
+          # Each file is edited for its own unrelated reasons. The manifest is
+          # what the registry publishes, `src/version.j` is what `--version`
+          # prints, and the PKGBUILD is what builds from a release tarball.
+          # Nothing but this keeps them together.
+          manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' deck.toml)
+          program=$(sed -n 's/^def const NUMBER as string init "\(.*\)";/\1/p' src/version.j)
+          package=$(sed -n 's/^pkgver=//p' packaging/arch/PKGBUILD)
+
+          if [ -z "$manifest" ] || [ -z "$program" ] || [ -z "$package" ]; then
+            echo "FAIL  a version could not be read"
+            printf '      deck.toml: %s\n' "${manifest:-<none>}"
+            printf '      src/version.j: %s\n' "${program:-<none>}"
+            printf '      packaging/arch/PKGBUILD: %s\n' "${package:-<none>}"
+            exit 1
+          elif [ "$manifest" != "$program" ] || [ "$manifest" != "$package" ]; then
+            echo "FAIL  version drift"
+            printf '      deck.toml %s, src/version.j %s, PKGBUILD %s\n' \
+              "$manifest" "$program" "$package"
+            fail=1
+          else
+            echo "ok    version $manifest in every file"
+          fi
+
+          # And the tag, which is the copy that costs the most to get wrong: the
+          # registry requires a deck's version to be the tag it was published
+          # from, the release notes and the image tags are both derived from the
+          # tag, and a tag is not something to move once it is pushed.
+          #
+          # A leading `v` is stripped because both spellings exist here - the
+          # workflows trigger on either - while the files never carry one.
+          tag="$ASKED_TAG"
+          if [ -z "$tag" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          fi
+          if [ -n "$tag" ]; then
+            if [ "${tag#v}" != "$manifest" ]; then
+              echo "FAIL  the tag and the version disagree"
+              printf '      tag %s, the files say %s\n' "$tag" "$manifest"
+              printf '      nothing has been published; bump the files and retag,\n'
+              printf '      or tag the version they name\n'
+              fail=1
+            else
+              echo "ok    tag $tag is version $manifest"
+            fi
+          else
+            echo "ok    no tag to check"
+          fi
+
+          exit "$fail"

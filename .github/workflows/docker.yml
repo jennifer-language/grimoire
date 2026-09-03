@@ -11,7 +11,7 @@ on:
   push:
     branches: [main]
     # Both spellings. Everything downstream strips a leading `v` - the release
-    # notes, the image tags, the check in `test.yml` - and the tag actually pushed
+    # notes, the image tags, the check in `version.yml` - and the tag actually pushed
     # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
     # on it.
     tags: ["v*", "[0-9]*"]
@@ -28,7 +28,17 @@ env:
   DESCRIPTION: "Build a documentation website, and a printable PDF, from a directory of Markdown files. Mount a book at /work; everything after the image name is a Grimoire command. Full manual: https://grimoire.jennifer-lang.dev/"
 
 jobs:
+  # An image tag is a version number, so it gets the same gate the release does.
+  # A tag push starts this workflow, `test.yml` and `release.yml` together, and
+  # the one that checks the numbers is not this one - so without this job an
+  # image called 0.3.0 whose `--version` says 0.2.0 is published minutes before
+  # anything says so, and a pushed tag is not a thing to move. Seconds of plain
+  # shell in front of a build that takes minutes.
+  version:
+    uses: ./.github/workflows/version.yml
+
   image:
+    needs: version
     runs-on: ubuntu-latest
     permissions:
       contents: read

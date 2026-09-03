@@ -272,6 +272,30 @@ non-empty PDF, and the link between the last two - so an empty publish fails in
 CI rather than on the live site. A pull request builds and checks without
 publishing.
 
+### One version number, checked before anything ships
+
+The number lives in four places that cannot see each other: `deck.toml`, which
+the registry publishes; `src/version.j`, which `--version` prints;
+`packaging/arch/PKGBUILD`, which builds from a release tarball; and the tag
+itself. Each is edited for its own unrelated reason, so nothing but a check
+keeps them together.
+
+`.github/workflows/version.yml` is that check, and it is a **callable** workflow
+rather than a step, which is the whole point. A tag push starts `test.yml`,
+`release.yml` and `docker.yml` at the same moment, with no ordering between
+them. A check inside `test.yml` therefore gates nothing: it reports the drift
+some minutes after the release page exists and the image is in the registry,
+and a pushed tag is not a thing to move. Both publishing workflows now call
+`version.yml` first and stop when it fails, so a wrong number costs a deleted
+tag rather than a retracted release and an image nobody can unpublish.
+
+`workflow_run` would not do: it fires only once the other run has finished, and
+resolves `github.ref` to the default branch rather than to the tag being
+released. A called workflow inherits the caller's event, ref and sha, so it
+checks out the tag that triggered the run - or, for a release composed by hand
+from `workflow_dispatch`, the tag named in the input, which is passed through as
+a parameter for exactly that reason.
+
 ### The short version, for pages that are not this one
 
 A container registry and a release page are read by someone deciding whether to

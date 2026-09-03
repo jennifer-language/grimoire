@@ -14,9 +14,11 @@
  *
  * It is also the copy the pipeline reads. `deck.toml` carries the same number,
  * the registry requires that one to match the tag a release is published from,
- * and a tagged build in `.github/workflows/test.yml` checks all three against
- * each other. That check reads `NUMBER` below with a regular expression, so the
- * literal stays on one line with nothing computed around it.
+ * and `.github/workflows/version.yml` compares all three against each other and
+ * against the tag. That workflow is called by the release and the image builds
+ * before either publishes anything, so a number that drifted stops a tag rather
+ * than being reported after it shipped. It reads `NUMBER` below with a regular
+ * expression, so the literal stays on one line with nothing computed around it.
  * @module version
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
