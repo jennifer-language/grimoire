@@ -524,6 +524,12 @@ languages = ["bash", "go", "json", "yaml", "xml", "ini"]
 enabled = true
 bodyChars = 1200
 
+# Two files for a reader that is a program rather than a person: llms.txt at the
+# site root, and the search index as JSON beside its JavaScript twin. Static
+# files, written at build time - there is nothing to run and nothing to serve.
+[agents]
+enabled = true
+
 [pdf]
 enabled = false
 output = "my-book.pdf"

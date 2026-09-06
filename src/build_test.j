@@ -217,11 +217,17 @@ func testPluralPicksTheRightNoun() {
     testing.assertEqual(plural(0, "job", "jobs"), "0 jobs");
 }
 
+# The note names what the build is about to write, so both switches show in it
+# and a book with neither says nothing.
 func testSearchNoteFollowsTheSetting() {
     def c as config.Config init config.defaults();
+    testing.assertEqual(searchNote($c), ", search index, llms.txt");
+    $c.agents = false;
     testing.assertEqual(searchNote($c), ", search index");
     $c.search = false;
     testing.assertEqual(searchNote($c), "");
+    $c.agents = true;
+    testing.assertEqual(searchNote($c), ", llms.txt");
 }
 
 # --- editUrl ---------------------------------------------------------

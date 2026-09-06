@@ -272,6 +272,19 @@ tocDepth = -5
 ').tocDepth, 1);
 }
 
+# On by default: the two machine-readable files cost a re-encoding of what the
+# build already has, and a book nobody can read with a program is a book with a
+# missing audience.
+func testAgentFilesAreOnUntilTurnedOff() {
+    testing.assertTrue(defaults().agents);
+    testing.assertFalse(apply(defaults(), '[agents]
+enabled = false
+').agents);
+    testing.assertTrue(apply(defaults(), '[agents]
+enabled = true
+').agents);
+}
+
 func testApplyEnforcesASearchBodyFloor() {
     testing.assertEqual(apply(defaults(), '[search]
 bodyChars = 10

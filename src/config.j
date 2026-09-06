@@ -61,9 +61,11 @@ use convert;
  * @field keywords {bool} derive a `keywords` meta tag for each page from its own
  *   title, headings, and code spans
  * @field keywordStopwords {list of string} further words this book's keyword pass
- *   should ignore, on top of the built-in English stop list
+ *   should ignore, on top of the list for the book's language
  * @field search {bool} whether to build the search index and ship the search UI
  * @field searchBodyChars {int} how much body text each search record keeps
+ * @field agents {bool} write the two files a program reads rather than a reader:
+ *   `llms.txt` at the site root and the search index as JSON
  * @field pdf {bool} whether `grimoire build` also renders the PDF
  * @field pdfOutput {string} the PDF path, relative to the output directory
  * @field pdfPaper {string} the page size: "a4" or "letter"
@@ -124,6 +126,7 @@ export def struct Config {
     keywordStopwords as list of string,
     search as bool,
     searchBodyChars as int,
+    agents as bool,
     pdf as bool,
     pdfOutput as string,
     pdfPaper as string,
@@ -203,6 +206,7 @@ export func defaults() {
         keywordStopwords: [],
         search: true,
         searchBodyChars: 1200,
+        agents: true,
         pdf: false,
         pdfOutput: "book.pdf",
         pdfPaper: "a4",
@@ -323,6 +327,7 @@ export func apply(base as Config, text as string) {
     $c.keywordStopwords = stringsAt($doc, "/html/keywordStopwords", $c.keywordStopwords);
     $c.search = boolAt($doc, "/search/enabled", $c.search);
     $c.searchBodyChars = intAt($doc, "/search/bodyChars", $c.searchBodyChars);
+    $c.agents = boolAt($doc, "/agents/enabled", $c.agents);
     $c.pdf = boolAt($doc, "/pdf/enabled", $c.pdf);
     $c.pdfOutput = strAt($doc, "/pdf/output", $c.pdfOutput);
     $c.pdfPaper = oneOf(strAt($doc, "/pdf/paper", $c.pdfPaper), ["a4", "letter"], $c.pdfPaper);

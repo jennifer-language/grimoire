@@ -26,6 +26,7 @@ src/
   assets.j          the client runtime (mode selector, search, copy buttons)
   assets/           vendored: the Jennifer highlight.js grammar
   search.j          the search index
+  agents.j          llms.txt and the JSON index, for a reader that is a program
   pdfbook.j         the printable build
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
@@ -401,3 +402,16 @@ the `PKGBUILD`'s `check()` runs one.
 Not built, but the shape is there for them: a link checker over the resolved
 outline (the build already knows every output path and anchor), and
 multi-language books.
+
+An MCP server is a third, and `agents.j` is the half of it worth having first. A
+`grimoire mcp` subcommand over stdio - the transport the protocol leads with, so
+a subprocess the agent spawns rather than a daemon with a port and a lifetime -
+would be a *reader* of a built site: `outline`, `page`, `search`, and the anchor
+for a heading, answered from `llms.txt` and `assets/search-index.json` rather
+than by rendering anything. The system `mcp` module has the server side of it.
+Two things to know before starting. A tool handler is a bare top-level `func`
+taking only its JSON arguments, so it cannot close over the book and would
+re-read the site per call - which suits the stateless profile that module
+targets. And the honest test is whether it beats `grep -rn docs/`: on a checkout
+it does not, which is why the static files come first and cover the case where
+there is no checkout to grep.

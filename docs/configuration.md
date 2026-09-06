@@ -62,6 +62,9 @@ languages = ["bash", "go", "json", "yaml", "xml", "ini", "nginx"]
 enabled = true
 bodyChars = 1200
 
+[agents]
+enabled = true
+
 [pdf]
 enabled = false
 output = "book.pdf"
@@ -543,6 +546,43 @@ Indexing is per **section**, not per page, so a hit lands on the paragraph rathe
 than at the top of a long chapter. `bodyChars` trades index size against how
 deep into a section a match can still be found. `--no-search` turns it off for a
 single build without touching the file.
+
+## `[agents]`
+
+| Key | Type | Default | Meaning |
+| --- | ---- | ------- | ------- |
+| `enabled` | bool | `true` | write the two files a program reads rather than a reader |
+
+A built book is for people, and increasingly also for something reading on their
+behalf. Two files make it legible to one, both written at build time and served
+as static files:
+
+| | |
+| - | - |
+| `llms.txt` | at the site root, following the [llms.txt convention](https://llmstxt.org): the title, the description as a summary, and every chapter as a link, grouped by the parts of `SUMMARY.md` |
+| `assets/search-index.json` | the search index as JSON - the book's own metadata, then one named object per indexed section: `path`, `title`, `heading`, `anchor`, `body` |
+
+`llms.txt` is the entry point and links to the index, so nothing has to guess a
+path. Paths in both are relative to the site root, because a book does not know
+where it is published; a fetcher resolves them against the URL it read the file
+from.
+
+The index is the same data the browser search already ships, in a second dress.
+`assets/search-index.js` assigns a global and packs each record as a positional
+array, which is right for code that was shipped alongside it and wrong for
+anything else; the JSON names its fields. Turning `[search]` off does not turn
+this off - the records are still collected, because `[agents]` is a reason to
+have them.
+
+What this deliberately is **not** is a service. There is no daemon, no protocol,
+and no capability: a book on a static host is machine-readable the moment it is
+deployed, and stays that way with nothing running anywhere. On a checkout none of
+it is worth having - the Markdown is right there and `grep` beats any index - so
+the audience is the published book, where there is no `grep` and the alternative
+is fetching every page to re-derive what the build already knew.
+
+Drafts are left out, and so is any chapter whose source is missing: a link in
+`llms.txt` is meant to be followed, so a dead one is worse than a short list.
 
 ## `[pdf]`
 

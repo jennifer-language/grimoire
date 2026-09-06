@@ -32,6 +32,7 @@ import "./summary.j" as summary;
 import "./content.j" as content;
 import "./layout.j" as layout;
 import "./theme.j" as theme;
+import "./agents.j" as agents;
 import "./assets.j" as assets;
 import "./keywords.j" as keywords;
 import "./search.j" as search;
@@ -197,10 +198,14 @@ func plural(n as int, one as string, many as string) {
 }
 
 func searchNote(c as config.Config) {
+    def out as string init "";
     if ($c.search) {
-        return ", search index";
+        $out = $out + ", search index";
     }
-    return "";
+    if ($c.agents) {
+        $out = $out + ", " + agents.llmsFile();
+    }
+    return $out;
 }
 
 # resolvePages drops outline entries whose source is missing and de-duplicates
@@ -671,7 +676,9 @@ func renderSlice(
         }
         $written = $written +
             writeFile(path.join($c.outDir, $entry.out), layout.page($c, $view, $nav, $brand));
-        if ($c.search) {
+        # The records feed the browser index and the JSON one, so either reason
+        # is reason enough to collect them.
+        if ($c.search or $c.agents) {
             $chapters[] = $i;
             $chapterRecords[] = pageRecords($c, $entry.out, $view.title, $rendered);
         }
@@ -763,6 +770,15 @@ export func run(c as config.Config) {
     if ($c.search) {
         $written = $written +
             writeFile(path.join($c.outDir, "assets/search-index.js"), search.script($records));
+    }
+    # The same records, plus the outline, for a reader that is a program. Static
+    # files rather than a service: a published book is machine-readable the
+    # moment it is deployed, with nothing running anywhere.
+    if ($c.agents) {
+        $written = $written +
+            writeFile(path.join($c.outDir, agents.indexFile()), agents.index($c, $records));
+        $written = $written +
+            writeFile(path.join($c.outDir, agents.llmsFile()), agents.llms($c, $entries, $pages));
     }
     # A book whose outline never lands on the site root still needs a landing page,
     # and it is rewritten on every build: the first chapter, the title, or the
