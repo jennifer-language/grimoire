@@ -27,6 +27,9 @@
  */
 use testing;
 use strings;
+use fs;
+use os;
+use path;
 
 func book() {
     def c as config.Config init config.defaults();
@@ -516,4 +519,130 @@ func testPdfOptionsFollowTheImageDpi() {
 # reach.
 func testPdfOptionsMarkAnUnencodableCharacter() {
     testing.assertEqual(pdfOptions(book()).unencodable, "?");
+}
+
+# --- combine: where a part ends --------------------------------------
+#
+# A part heading used to be a one-way door: the state that demotes a chapter was
+# set at the first part and never cleared, so an appendix listed after the parts
+# was demoted and page-broken as though it sat inside the last one - the shape
+# the module's own docblock says a suffix chapter keeps. A separator ends the
+# part, which is the only mark a `SUMMARY.md` has for saying so.
+
+func chapters() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-parts-");
+    fs.writeString(path.join($root, "intro.md"), "# Intro\n\nbefore the parts\n");
+    fs.writeString(path.join($root, "one.md"), "# One\n\ninside the part\n");
+    fs.writeString(path.join($root, "appendix.md"), "# Appendix\n\nafter the parts\n");
+    return $root;
+}
+
+func partsConfig(root as string) {
+    def c as config.Config init config.defaults();
+    $c.srcDir = $root;
+    $c.pdfTitlePage = false;
+    return $c;
+}
+
+func page(title as string, src as string) {
+    return summary.Entry{
+        kind: summary.pageKind(),
+        title: $title,
+        src: $src,
+        out: "",
+        level: 0,
+        number: ""
+    };
+}
+
+func part(title as string) {
+    return summary.Entry{
+        kind: summary.partKind(),
+        title: $title,
+        src: "",
+        out: "",
+        level: 0,
+        number: ""
+    };
+}
+
+func separator() {
+    return summary.Entry{
+        kind: summary.separatorKind(),
+        title: "",
+        src: "",
+        out: "",
+        level: 0,
+        number: ""
+    };
+}
+
+# The headings of the combined document, which is what decides the printed
+# outline: a level-one heading takes a page of its own, a demoted one does not.
+func headingsOf(text as string) {
+    def out as list of string;
+    for (def line in strings.split($text, "\n")) {
+        if (strings.startsWith($line, "#")) {
+            $out[] = $line;
+        }
+    }
+    return $out;
+}
+
+func testCombineDemotesChaptersInsideAPart() {
+    def root as string init chapters();
+    def entries as list of summary.Entry init [
+        page("Intro", "intro.md"),
+        part("Part One"),
+        page("One", "one.md")
+    ];
+    def headings as list of string init headingsOf(combine(partsConfig($root), $entries));
+    testing.assertEqual($headings[0], "# Intro");
+    testing.assertEqual($headings[1], "# Part One");
+    testing.assertEqual($headings[2], "## One");
+}
+
+func testCombineEndsAPartAtASeparator() {
+    def root as string init chapters();
+    def entries as list of summary.Entry init [
+        part("Part One"),
+        page("One", "one.md"),
+        separator(),
+        page("Appendix", "appendix.md")
+    ];
+    def combined as string init combine(partsConfig($root), $entries);
+    def headings as list of string init headingsOf($combined);
+    testing.assertEqual($headings[0], "# Part One");
+    testing.assertEqual($headings[1], "## One");
+    testing.assertEqual($headings[2], "# Appendix");
+    # A level-one heading breaks the page by itself, so the suffix chapter must
+    # not also carry the directive a demoted chapter needs.
+    testing.assertEqual(len(strings.split($combined, PAGE_BREAK)), 1);
+}
+
+# Without the separator the appendix belongs to the part, which is what the
+# outline actually said.
+func testCombineKeepsAChapterInThePartWithoutASeparator() {
+    def root as string init chapters();
+    def entries as list of summary.Entry init [
+        part("Part One"),
+        page("One", "one.md"),
+        page("Appendix", "appendix.md")
+    ];
+    def headings as list of string init headingsOf(combine(partsConfig($root), $entries));
+    testing.assertEqual($headings[2], "## Appendix");
+}
+
+# A separator before any part is not an end to anything, and must not disturb a
+# book that has no parts at all.
+func testCombineIgnoresASeparatorOutsideAPart() {
+    def root as string init chapters();
+    def entries as list of summary.Entry init [
+        page("Intro", "intro.md"),
+        separator(),
+        page("Appendix", "appendix.md")
+    ];
+    def headings as list of string init headingsOf(combine(partsConfig($root), $entries));
+    testing.assertEqual($headings[0], "# Intro");
+    testing.assertEqual($headings[1], "# Appendix");
 }

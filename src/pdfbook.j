@@ -519,6 +519,14 @@ func excluded(c as config.Config, src as string) {
  * a fresh page at every level-one heading. That is also what gives the cover a
  * page to itself.
  *
+ * A part runs from its heading to the **next separator**, and `SUMMARY.md` has
+ * no other way to say that the parts are over. Without that rule the promise
+ * above was only half kept: the state was set at the first part heading and
+ * never cleared, so a prefix chapter stayed at level one while an appendix
+ * listed after the parts was demoted and page-broken as though it sat inside
+ * the last one. A `---` between the parts and the suffix chapters ends the part
+ * and puts them back where the sidebar already shows them.
+ *
  * A chapter **under a part** is demoted one level, so the part heading can take
  * the top of the outline and the PDF bookmarks get the same part / chapter /
  * section shape the sidebar has. A demoted heading no longer breaks the page, so
@@ -543,6 +551,16 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
             $underPart = true;
             $opensPart = true;
             $pendingPart = $e.title;
+            continue;
+        }
+        # A separator ends the part it follows. It is the only mark in a
+        # `SUMMARY.md` that can say so, and the sidebar already draws it as a
+        # rule between sections, so a book that wants suffix chapters after its
+        # parts writes the `---` it would have written anyway.
+        if ($e.kind == summary.separatorKind()) {
+            $underPart = false;
+            $opensPart = false;
+            $pendingPart = "";
             continue;
         }
         if ($e.kind != summary.pageKind()) {

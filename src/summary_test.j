@@ -145,6 +145,61 @@ func testParseDropsTheSummaryHeadingButKeepsOtherParts() {
     testing.assertEqual($entries[0].title, "Getting started");
 }
 
+# --- hashRun, isHeading and headingText ------------------------------
+
+func testHashRunCountsOnlyTheLeadingRun() {
+    testing.assertEqual(hashRun("# Title"), 1);
+    testing.assertEqual(hashRun("### Deep"), 3);
+    testing.assertEqual(hashRun("no hash"), 0);
+    testing.assertEqual(hashRun("# C# and F#"), 1);
+}
+
+# A heading needs a space after its hashes. Without that test a note or a tag in
+# a hand-maintained SUMMARY opened a part.
+func testIsHeadingNeedsASpaceAfterTheHashes() {
+    testing.assertTrue(isHeading("# Title", hashRun("# Title")));
+    testing.assertTrue(isHeading("###### Deep", hashRun("###### Deep")));
+    testing.assertFalse(isHeading("#tag", hashRun("#tag")));
+    testing.assertFalse(isHeading("#!/bin/sh", hashRun("#!/bin/sh")));
+    testing.assertFalse(isHeading("plain", hashRun("plain")));
+}
+
+# Seven is not a heading in Markdown either.
+func testIsHeadingStopsAtSixHashes() {
+    testing.assertFalse(isHeading("####### Too deep", hashRun("####### Too deep")));
+}
+
+# A hash inside the text is text. Stripping every one of them renamed a part
+# about C# to "C".
+func testHeadingTextKeepsAHashInTheTitle() {
+    testing.assertEqual(headingText("# C# and F#", 1), "C# and F#");
+    testing.assertEqual(headingText("# Issue #42", 1), "Issue #42");
+}
+
+# A closing run is syntax only when a space stands before it, which is what
+# Markdown means by a closing sequence.
+func testHeadingTextDropsAClosingSequence() {
+    testing.assertEqual(headingText("## Title ##", 2), "Title");
+    testing.assertEqual(headingText("# Title#", 1), "Title#");
+    testing.assertEqual(headingText("# ###", 1), "");
+}
+
+# --- parse: headings -------------------------------------------------
+
+func testParseKeepsAHashInAPartTitle() {
+    def entries as list of Entry init parse("# Summary\n\n# C# and F#\n\n- [One](one.md)\n");
+    testing.assertEqual($entries[0].kind, partKind());
+    testing.assertEqual($entries[0].title, "C# and F#");
+}
+
+# A line that is not a heading is not an outline entry either, so it is passed
+# over like any other prose in the file rather than opening a part named "tag".
+func testParseIgnoresAHashThatIsNotAHeading() {
+    def entries as list of Entry init parse("# Summary\n\n#tag\n\n- [One](one.md)\n");
+    testing.assertEqual(len($entries), 1);
+    testing.assertEqual($entries[0].kind, pageKind());
+}
+
 func testParseNestsByIndentation() {
     def src as string init "- [One](one.md)\n  - [Deep](deep.md)\n- [Two](two.md)\n";
     def entries as list of Entry init parse($src);

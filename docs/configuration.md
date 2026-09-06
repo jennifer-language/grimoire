@@ -111,6 +111,13 @@ authorsLabel = ""                     # -> Ada Lovelace, Grace Hopper
 `jobs` above the chapter count simply idles the extra workers. See
 [Performance](performance.md) for what raising it actually buys.
 
+`out` may sit **inside** `src` - `src = "docs"` with `out = "docs/site"` is a
+tidy layout, and it is the one `serve --watch` is built around. Everything under
+the output directory is skipped by the pass that copies images and downloads
+across, so a build never copies the last build into this one. The two paths are
+compared as directories rather than as strings, so an absolute `--out` under a
+relative `--src` is recognised as well.
+
 ### Emptying the output directory
 
 The output directory is created if it is missing, and by default nothing in it is
@@ -187,7 +194,7 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 | `favicon` | string | `""` | a favicon path, copied into the site |
 | `logo` | string | `""` | a logo shown beside the title, relative to `src` |
 | `keywords` | bool | `true` | derive a `keywords` meta tag for each page from the page itself |
-| `keywordStopwords` | list of string | `[]` | further words the keyword pass should ignore |
+| `keywordStopwords` | list of string | `[]` | further words the keyword pass should ignore, on top of the list for `book.language` |
 
 `mode` only decides the **first** visit. Once a reader touches the selector,
 their choice is remembered and this setting no longer applies to them. Whatever
@@ -338,6 +345,9 @@ German. A book in a language not on that list still builds - the interface stays
 English, and the build says so once on stderr rather than filling the page with
 untranslated key names.
 
+`book.language` does one other thing: it picks the stop list the keyword pass
+uses, which is nine of these eleven languages. See `keywords` below.
+
 `uiLanguage` is for when the two should differ: a book written in German whose
 readers expect English furniture, or the reverse.
 
@@ -403,11 +413,39 @@ Three details make the difference on technical prose:
 - **Boolean literals are stopped.** Code spans score 3, so a configuration page
   full of `enabled = false` would otherwise rank `false` above the settings it is
   describing.
+- **Every alphabet is read.** A term is a run of letters and digits in any script
+  that writes spaces between its words, so a German or French word carrying an
+  umlaut or an accent is one term rather than the two fragments an ASCII-only
+  pattern leaves behind.
 
-`keywordStopwords` adds to the built-in list, which can only know about English.
-A book knows what is furniture in *its* subject - and those terms are exactly the
-ones that describe every chapter equally, and so describe none. A language manual
-is the clearest case:
+**The stop list follows the book's language.** `and`, `the`, and `of` carry no
+subject on their own, and neither do `und`, `die`, and `das` - but a list that
+only knows English leaves a German book tagging every chapter with its grammar.
+`book.language` picks the second list:
+
+| | | | |
+| - | - | - | - |
+| `de` German | `es` Spanish | `fr` French | `it` Italian |
+| `nl` Dutch | `pl` Polish | `pt` Portuguese | `ru` Russian |
+
+The English list is applied to every book on top of it, because technical writing
+quotes identifiers whatever language it is written in - and so are the boolean
+literals. A region tag counts as its language, so `de-AT` is German. A language
+with no list of its own is not an error and is not reported: the book keeps the
+English one, and `keywordStopwords` is where its author fills the gap.
+
+Japanese and Chinese have an interface translation but no stop list, and get no
+keywords from their prose either. Both write without spaces between words, so
+what a list would have to match is a clause rather than a word; separating one
+into words needs a segmenter Grimoire does not have. Such a book still gets
+keywords - from its title, its headings, and the identifiers in its code spans -
+rather than a meta tag full of sentence fragments.
+
+`keywordStopwords` adds to whichever lists are in force. A list can only know
+what is furniture in a *language*; a book knows what is furniture in its own
+*subject*.
+Those terms are exactly the ones that describe every chapter equally, and so
+describe none. A language manual is the clearest case:
 
 ```toml
 keywordStopwords = ["def", "init", "return", "int"]

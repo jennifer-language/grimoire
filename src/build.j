@@ -24,6 +24,7 @@ use strings;
 use lists;
 use maps;
 use convert;
+use encoding;
 
 import "html.j" as html;
 import "./config.j" as config;
@@ -171,13 +172,18 @@ func prune(c as config.Config) {
 
 # writeFile creates the parent directory and writes the file, returning the byte
 # count so the report can total the output without a second stat pass.
+#
+# `len` on a string is its rune count, and the total is printed as "55 KiB", so a
+# book with any non-ASCII text in it - which `util.slugify` deliberately supports
+# - reported less than it wrote. `encoding.lenBytes` is what the file actually
+# costs on disk.
 func writeFile(target as string, text as string) {
     def dir as string init path.dir($target);
     if ($dir != "" and $dir != ".") {
         fs.mkdirAll($dir);
     }
     fs.writeString($target, $text);
-    return len($text);
+    return encoding.lenBytes($text);
 }
 
 # searchNote names the search index in the asset line only when one is built.
@@ -251,7 +257,7 @@ func pageKeywords(c as config.Config, rendered as content.Rendered) {
     if (not $c.keywords) {
         return "";
     }
-    return keywords.line($rendered, KEYWORD_LIMIT, $c.keywordStopwords);
+    return keywords.line($rendered, KEYWORD_LIMIT, $c.language, $c.keywordStopwords);
 }
 
 # editUrl fills the `{path}` slot of the configured template with the chapter's
@@ -280,11 +286,28 @@ func plainTitle(title as string) {
 
 # copyAssets mirrors every non-Markdown file from the source tree into the
 # output, so images, downloads, and a favicon sit beside the pages that use them.
+#
+# Everything under the output directory is skipped, because for a book whose
+# `out` sits inside its `src` - `src = "docs"`, `out = "docs/site"`, the layout
+# `serve --watch` is built around - the walk reaches the last build. Copying that
+# into this one nests a `site/` inside `site/` and does it again every run: the
+# tree grows without bound, the asset count doubles, and a chapter deleted from
+# the sources is republished for ever.
+#
+# The containment test is `absolutePath` and `contains`, the pair `refuseToPrune`
+# already uses one screen up, so a relative `out` and an absolute `--out` are
+# both recognised and the answer to "is this path inside the output" is written
+# once in this file. `prune` has refused this arrangement since it existed; the
+# copy pass was simply never told.
 func copyAssets(c as config.Config) {
     def count as int init 0;
     def prefix as int init len($c.srcDir) + 1;
+    def ours as string init absolutePath($c.outDir);
     for (def st in fs.walk($c.srcDir)) {
         if ($st.isDir) {
+            continue;
+        }
+        if (contains($ours, absolutePath($st.path))) {
             continue;
         }
         def rel as string init strings.replace(

@@ -21,6 +21,7 @@ src/
   themes/*.j        the ten shipped themes, each with its own _test.j
   locale.j          Grimoire's own words, in eleven languages
   keywords.j        the per-page keyword meta tag
+  stopwords.j       the words that carry no subject, in nine languages
   watch.j           the rebuild-on-change loop behind serve --watch
   assets.j          the client runtime (mode selector, search, copy buttons)
   assets/           vendored: the Jennifer highlight.js grammar
@@ -176,6 +177,23 @@ second break would leave the part title alone on a sheet.
 
 Writing the directive as an HTML comment is deliberate - the same combined source
 still renders as HTML, where a browser shows nothing at all.
+
+A part runs from its heading to the next **separator**. That is the only mark a
+`SUMMARY.md` has for saying the parts are over, and without it an appendix listed
+after them was demoted as though it sat inside the last one - printed as a
+subsection of a part it has nothing to do with. A `---` between the parts and the
+suffix chapters ends the part and puts those chapters back at level one, where
+the sidebar has always shown them:
+
+```markdown
+# Part One
+
+- [Chapter](one.md)
+
+---
+
+[Appendix](appendix.md)
+```
 
 It picks up the book's theme throughout. Heading bars, the table header band,
 the panel behind a code block, and the tint and rule on a blockquote are all
@@ -366,7 +384,10 @@ What the tests are for, beyond the obvious:
   added to English and forgotten in Polish shows up as a raw key name on a Polish
   reader's page and nowhere else. `locale_test.j` compares all eleven on every
   run, and enforces the punctuation rule that the ASCII grep cannot, since it
-  excludes that file by name.
+  excludes that file by name. `stopwords_test.j` does the same for the other
+  file the grep excludes, and checks the shape every entry has to have to work at
+  all: lowercase, no spaces, no apostrophes, since the scoring lowercases before
+  it looks and the term pattern breaks on both.
 - **The runtime.** `assets.j` holds JavaScript in a raw Jennifer string, which
   ends at the first apostrophe with no escape available. One in a comment would
   truncate the runtime and the build would carry on quite happily.

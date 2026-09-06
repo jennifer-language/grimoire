@@ -77,10 +77,11 @@ jobs:
       # The repository writes ASCII punctuation everywhere, for two reasons: a
       # typographic character is invisible in a diff, and the printable build
       # encodes WinAnsi so every one of them is a transliteration away from the
-      # page. `src/pdfbook.j` holds the transliteration table and `src/locale.j`
-      # holds eleven languages, so both are exempt from the grep - `locale.j` is
-      # checked by `src/locale_test.j` instead, which bans the punctuation while
-      # allowing the letters.
+      # page. `src/pdfbook.j` holds the transliteration table, `src/locale.j`
+      # holds eleven languages, and `src/stopwords.j` holds the keyword stop
+      # lists for nine, so all three are exempt from the grep - the two language
+      # files are checked by `src/locale_test.j` and `src/stopwords_test.j`
+      # instead, which ban the punctuation while allowing the letters.
       #
       # Two lines are expected: the example in `docs/internals.md` and the
       # `authorsLabel` in `grimoire.toml`, both of which are the character as
@@ -93,7 +94,7 @@ jobs:
           found=$(grep -rnP '[^\x00-\x7F]' \
             --include='*.j' --include='*.md' --include='*.toml' \
             --include='*.sh' --include='*.yml' . \
-            | grep -Ev 'src/(pdfbook|locale)\.j' || true)
+            | grep -Ev 'src/(pdfbook|locale|stopwords)\.j' || true)
           unexpected=$(printf '%s\n' "$found" \
             | grep -Ev '^\./(docs/internals\.md|grimoire\.toml):' | grep -c . || true)
           total=$(printf '%s\n' "$found" | grep -c . || true)

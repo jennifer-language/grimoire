@@ -14,6 +14,13 @@
  * ends so `join,` and `(spawn` never appear, and the ranking breaks ties
  * alphabetically so the same page produces the same tag on every build. That
  * last one is part of the byte-identical-output promise, not a nicety.
+ *
+ * Two of the tests below are a bug report in the shape of an assertion. A German
+ * book tagged its chapters `und, die, das, ist, der` because the stop list was
+ * English, and no book in any accented language had whole words to tag at all,
+ * because the term pattern was `[a-z0-9]`. Both are named after what went wrong.
+ * This file is ASCII like the rest of the repository, so the words that need an
+ * umlaut are spelled with escapes and the comment above them says which.
  * @module keywords_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -78,6 +85,17 @@ func testScoreableRejectsBareNumbers() {
     testing.assertTrue(scoreable("utf-8"));
 }
 
+# Everything below the CJK boundary separates its words, so a Cyrillic or Greek
+# term is a term - the two here are Russian `dannye` and Greek `logos`. At or
+# above it a run of letters is a clause rather than a word, and splitting it
+# needs a segmenter Grimoire does not have; the two rejected here are Japanese.
+func testScoreableSkipsTheUnsegmentedScripts() {
+    testing.assertTrue(scoreable("\u0434\u0430\u043d\u043d\u044b\u0435"));
+    testing.assertTrue(scoreable("\u03bb\u03cc\u03b3\u03bf\u03c2"));
+    testing.assertFalse(scoreable("\u65e5\u672c\u8a9e"));
+    testing.assertFalse(scoreable("\u3059\u3054\u3044\u3067\u3059"));
+}
+
 # --- terms -----------------------------------------------------------
 
 # Anchoring both ends is what keeps `join,` and `(spawn` and `module.` out
@@ -100,11 +118,33 @@ func testTermsLowercases() {
     testing.assertFalse(lists.contains(terms("Spawn And Task"), "Spawn"));
 }
 
+# `[a-z]` does not match an umlaut, so a word carrying one used to arrive as two
+# fragments. The escape spells the German for compensation, `Verg` + u-umlaut +
+# `tung`: nine runes, one term, and not the `verg` and `tung` it scored as
+# before.
+func testTermsKeepAnAccentedWordWhole() {
+    def word as string init "Verg\u00fctung";
+    testing.assertEqual(len($word), 9);
+    testing.assertTrue(lists.contains(terms($word), strings.lower($word)));
+    testing.assertFalse(lists.contains(terms($word), "verg"));
+    testing.assertFalse(lists.contains(terms($word), "tung"));
+}
+
+# The scripts that separate their words all pass through the same pattern. These
+# are Russian `dannye`, Greek `logos`, and French `cafe` with its accent.
+func testTermsReadTheOtherAlphabets() {
+    def ru as string init "\u0434\u0430\u043d\u043d\u044b\u0435";
+    def gr as string init "\u03bb\u03cc\u03b3\u03bf\u03c2";
+    def sample as string init $ru + " " + $gr + " caf\u00e9";
+    testing.assertEqual(len(terms($sample)), 3);
+    testing.assertTrue(lists.contains(terms($sample), "caf\u00e9"));
+}
+
 # --- stopSet ---------------------------------------------------------
 
 func testStopSetCarriesTheBuiltInList() {
     def none as list of string;
-    def stops as map of string to int init stopSet($none);
+    def stops as map of string to int init stopSet("en", $none);
     testing.assertTrue(maps.has($stops, "the"));
     testing.assertTrue(maps.has($stops, "and"));
     testing.assertFalse(maps.has($stops, "spawn"));
@@ -114,10 +154,30 @@ func testStopSetCarriesTheBuiltInList() {
 # in its own subject - the keywords of the language it documents, its own name on
 # every page - and those describe every chapter equally, so they describe none.
 func testStopSetTakesTheBooksOwnAdditions() {
-    def stops as map of string to int init stopSet(["Spawn", "  task  ", ""]);
+    def stops as map of string to int init stopSet("en", ["Spawn", "  task  ", ""]);
     testing.assertTrue(maps.has($stops, "spawn"));
     testing.assertTrue(maps.has($stops, "task"));
     testing.assertFalse(maps.has($stops, ""));
+}
+
+# The book's language adds a second list on top of the English one, which every
+# book gets because technical writing quotes identifiers whatever it is written
+# in.
+func testStopSetAddsTheBooksOwnLanguage() {
+    def none as list of string;
+    def de as map of string to int init stopSet("de", $none);
+    testing.assertTrue(maps.has($de, "und"));
+    testing.assertTrue(maps.has($de, "der"));
+    testing.assertTrue(maps.has($de, "the"));
+    testing.assertFalse(maps.has(stopSet("en", $none), "und"));
+}
+
+# `de-AT` is German; an unknown tag is not an error and keeps the English list.
+func testStopSetReadsTheTagLoosely() {
+    def none as list of string;
+    testing.assertTrue(maps.has(stopSet("de-AT", $none), "und"));
+    testing.assertTrue(maps.has(stopSet("xx", $none), "the"));
+    testing.assertFalse(maps.has(stopSet("xx", $none), "und"));
 }
 
 # --- foldPlurals -----------------------------------------------------
@@ -178,19 +238,19 @@ func testATitleWordOutranksRepeatedProse() {
     def r as content.Rendered init plain(
         "Concurrency",
         "spawn spawn spawn spawn spawn spawn spawn");
-    def out as list of string init extract($r, 10, []);
+    def out as list of string init extract($r, 10, "en", []);
     testing.assertEqual($out[0], "concurrency");
 }
 
 func testAHeadingOutranksProse() {
     def r as content.Rendered init page("", [h(2, "Marshalling")], "buffer buffer", "");
-    def out as list of string init extract($r, 10, []);
+    def out as list of string init extract($r, 10, "en", []);
     testing.assertEqual($out[0], "marshalling");
 }
 
 func testALevelTwoHeadingOutranksADeeperOne() {
     def r as content.Rendered init page("T", [h(2, "shallow"), h(3, "deeper")], "", "");
-    def out as list of string init extract($r, 10, []);
+    def out as list of string init extract($r, 10, "en", []);
     testing.assertEqual($out[0], "shallow");
 }
 
@@ -200,18 +260,18 @@ func testALevelOneHeadingIsNotCountedTwice() {
     def withH1 as content.Rendered init page("Subject", [h(1, "Subject")], "", "");
     def withoutH1 as content.Rendered init plain("Subject", "");
     testing.assertEqual(
-        strings.join(extract($withH1, 10, []), ","),
-        strings.join(extract($withoutH1, 10, []), ","));
+        strings.join(extract($withH1, 10, "en", []), ","),
+        strings.join(extract($withoutH1, 10, "en", []), ","));
 }
 
 func testCodeSpansAreRead() {
     def r as content.Rendered init page("T", [], "", "<p>see <code>marshalling</code></p>");
-    testing.assertTrue(lists.contains(extract($r, 10, []), "marshalling"));
+    testing.assertTrue(lists.contains(extract($r, 10, "en", []), "marshalling"));
 }
 
 func testCodeSpansAreUnescapedBeforeScoring() {
     def r as content.Rendered init page("T", [], "", "<code>alpha&amp;beta</code>");
-    def out as list of string init extract($r, 10, []);
+    def out as list of string init extract($r, 10, "en", []);
     testing.assertFalse(lists.contains($out, "amp"));
 }
 
@@ -219,39 +279,115 @@ func testCodeSpansAreUnescapedBeforeScoring() {
 
 func testExtractDropsStopWords() {
     def r as content.Rendered init plain("The And Of", "the and of but with");
-    testing.assertEqual(len(extract($r, 10, [])), 0);
+    testing.assertEqual(len(extract($r, 10, "en", [])), 0);
 }
 
 func testExtractHonoursTheBooksStopWords() {
     def r as content.Rendered init plain("Grimoire", "grimoire builds books");
-    testing.assertTrue(lists.contains(extract($r, 10, []), "grimoire"));
-    testing.assertFalse(lists.contains(extract($r, 10, ["grimoire"]), "grimoire"));
+    testing.assertTrue(lists.contains(extract($r, 10, "en", []), "grimoire"));
+    testing.assertFalse(lists.contains(extract($r, 10, "en", ["grimoire"]), "grimoire"));
 }
 
 func testExtractHonoursTheLimit() {
     def r as content.Rendered init plain("", "alpha beta gamma delta epsilon zeta");
-    testing.assertEqual(len(extract($r, 3, [])), 3);
-    testing.assertEqual(len(extract($r, 0, [])), 0);
+    testing.assertEqual(len(extract($r, 3, "en", [])), 3);
+    testing.assertEqual(len(extract($r, 0, "en", [])), 0);
+}
+
+# The report this came from: every keyword in the tag was a German function word
+# and the page's subject was nowhere in it.
+func testExtractOfAGermanPageDropsTheGermanFunctionWords() {
+    def r as content.Rendered init plain(
+        "Steuerberatung",
+        "Die Familie und das Guthaben: der Zugang ist nicht eine Ausgabe, oder?");
+    def out as list of string init extract($r, 10, "de", []);
+    testing.assertEqual($out[0], "steuerberatung");
+    for (def word in ["und", "die", "das", "der", "ist", "eine", "oder", "nicht"]) {
+        testing.assertFalse(lists.contains($out, $word));
+    }
+    testing.assertTrue(lists.contains($out, "familie"));
+    testing.assertTrue(lists.contains($out, "guthaben"));
+}
+
+# The same page in a book that never said what language it is in keeps them,
+# which is what makes the list - rather than the length floor - the thing doing
+# the work. Three letters is a word in every language; `und` is not a short word,
+# it is a common one.
+func testTheSamePageWithoutTheLanguageKeepsThem() {
+    def r as content.Rendered init plain(
+        "Steuerberatung",
+        "Die Familie und das Guthaben: der Zugang ist nicht eine Ausgabe, oder?");
+    def out as list of string init extract($r, 20, "en", []);
+    for (def word in ["und", "die", "das", "der", "ist", "eine", "oder", "nicht"]) {
+        testing.assertTrue(lists.contains($out, $word));
+    }
+}
+
+# A Japanese page keeps the keywords it has always had - its title, and the
+# identifiers in its code spans - rather than gaining a meta tag full of clauses.
+# The body is `nihongo wa sugoi` with no spaces in it, as the script is written.
+func testExtractSkipsUnsegmentedProse() {
+    def r as content.Rendered init plain("grimoire", "\u65e5\u672c\u8a9e\u306f\u3059\u3054\u3044");
+    def out as list of string init extract($r, 10, "ja", []);
+    testing.assertEqual(len($out), 1);
+    testing.assertEqual($out[0], "grimoire");
 }
 
 func testExtractOfAnEmptyPageIsEmpty() {
-    testing.assertEqual(len(extract(plain("", ""), 10, [])), 0);
+    testing.assertEqual(len(extract(plain("", ""), 10, "en", [])), 0);
 }
 
 # --- line ------------------------------------------------------------
 
 func testLineJoinsWithCommas() {
     def r as content.Rendered init plain("Concurrency", "spawn and channel");
-    def value as string init line($r, 10, []);
+    def value as string init line($r, 10, "en", []);
     testing.assertContains($value, "concurrency");
     testing.assertContains($value, ", ");
 }
 
 func testLineOfAnEmptyPageIsEmpty() {
-    testing.assertEqual(line(plain("", ""), 10, []), "");
+    testing.assertEqual(line(plain("", ""), 10, "en", []), "");
 }
 
 func testLineAgreesWithExtract() {
     def r as content.Rendered init plain("Modules", "module module spawn");
-    testing.assertEqual(line($r, 5, []), strings.join(extract($r, 5, []), ", "));
+    testing.assertEqual(line($r, 5, "en", []), strings.join(extract($r, 5, "en", []), ", "));
+}
+
+# --- ranked: the padded sort key -------------------------------------
+#
+# The key is `SCORE_SCALE - score` as text, which sorts numerically only while
+# every inverted score has the same width. A score at or above the scale would go
+# negative, and negative keys sort by their digits - "-9" before "-95" - putting
+# the smaller score first. Clamping keeps the invariant true by construction, so
+# a weight raised later cannot quietly reorder a page's keywords.
+
+func testRankedOrdersByScoreThenAlphabetically() {
+    def scores as map of string to int init {"low": 1, "high": 90, "also": 90};
+    def out as list of string init ranked($scores);
+    testing.assertEqual($out[0], "also");
+    testing.assertEqual($out[1], "high");
+    testing.assertEqual($out[2], "low");
+}
+
+func testRankedKeepsAScoreAtTheScaleOnTop() {
+    def scores as map of string to int init {"ordinary": 500, "huge": SCORE_SCALE};
+    def out as list of string init ranked($scores);
+    testing.assertEqual($out[0], "huge");
+    testing.assertEqual($out[1], "ordinary");
+}
+
+# Two terms past the scale clamp to the same key, so they tie and break
+# alphabetically rather than by the digits of a negative number.
+func testRankedTiesTwoScoresAboveTheScale() {
+    def scores as map of string to int init {
+        "beta": SCORE_SCALE + 9,
+        "alpha": SCORE_SCALE + 95,
+        "small": 1
+    };
+    def out as list of string init ranked($scores);
+    testing.assertEqual($out[0], "alpha");
+    testing.assertEqual($out[1], "beta");
+    testing.assertEqual($out[2], "small");
 }

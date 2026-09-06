@@ -624,3 +624,90 @@ func testTocForFollowsTheSetting() {
     testing.assertEqual(tocFor($c, $r), "");
     testing.assertEqual(len($r.headings), 2);
 }
+
+# --- copyAssets ------------------------------------------------------
+#
+# The output directory sitting inside the source tree is a supported layout -
+# `serve --watch` carries a whole mechanism for it - and the asset walk used to
+# copy the last build into this one, nesting `site/site/site/` a level deeper on
+# every run and republishing chapters deleted from the sources.
+
+func bookWithNestedOutput() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-nested-");
+    fs.mkdirAll(path.join($root, "docs"));
+    fs.writeString(path.join($root, "docs/index.md"), "# Book\n");
+    fs.writeString(path.join($root, "docs/logo.png"), "x");
+    return $root;
+}
+
+func nestedConfig(root as string) {
+    def c as config.Config init config.defaults();
+    $c.srcDir = path.join($root, "docs");
+    $c.outDir = path.join($root, "docs/site");
+    return $c;
+}
+
+func testCopyAssetsSkipsItsOwnOutput() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init nestedConfig($root);
+    # Stand in for a previous build: assets already written under the output.
+    fs.mkdirAll(path.join($root, "docs/site/assets"));
+    fs.writeString(path.join($root, "docs/site/index.html"), "<html></html>");
+    fs.writeString(path.join($root, "docs/site/assets/grimoire.css"), 'body{}');
+
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertFalse(fs.isDir(path.join($root, "docs/site/site")));
+}
+
+# Twice, because the failure was cumulative: the count doubled and the tree grew
+# a level with each run, so a single call could not have shown it.
+func testCopyAssetsIsStableAcrossRuns() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init nestedConfig($root);
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertFalse(fs.isDir(path.join($root, "docs/site/site")));
+}
+
+# The same directory written another way is still the same directory. A textual
+# prefix test would compare the spellings and miss this; `absolutePath` resolves
+# both sides first, which is also what makes a relative `src` and an absolute
+# `--out` comparable.
+func testCopyAssetsSkipsItsOutputHoweverItIsSpelled() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init config.defaults();
+    $c.srcDir = path.join($root, "docs");
+    $c.outDir = $root + "/docs/../docs/./site/";
+    fs.mkdirAll(path.join($root, "docs/site"));
+    fs.writeString(path.join($root, "docs/site/index.html"), "<html></html>");
+    testing.assertEqual(copyAssets($c), 1);
+}
+
+# An output directory outside the sources is not excluded from anything: the
+# ordinary layout still copies every asset it finds.
+func testCopyAssetsCopiesEverythingWhenTheOutputIsElsewhere() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init config.defaults();
+    $c.srcDir = path.join($root, "docs");
+    $c.outDir = path.join($root, "site");
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertTrue(fs.isFile(path.join($root, "site/logo.png")));
+}
+
+# --- writeFile -------------------------------------------------------
+
+# The report prints this as "55 KiB". `len` on a string is its rune count, so a
+# book with any non-ASCII text in it under-reported what it had written.
+func testWriteFileReturnsBytesNotRunes() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-bytes-");
+    def target as string init path.join($root, "page.html");
+    testing.assertEqual(writeFile($target, "abc"), 3);
+    # Three umlauts, written as escapes so this file stays ASCII: three
+    # characters, six bytes. `len` would say three, and the build summary would
+    # under-report every page of a book that is not written in English.
+    def umlauts as string init "\u00e4\u00f6\u00fc";
+    testing.assertEqual(len($umlauts), 3);
+    testing.assertEqual(writeFile($target, $umlauts), 6);
+    testing.assertEqual(len(fs.readBytes($target)), 6);
+}

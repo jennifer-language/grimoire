@@ -528,3 +528,35 @@ func testAMissingSourceDirectoryFailsCleanly() {
     ];
     testing.assertEqual(run(".", $argv), 1);
 }
+
+# --- buildStatus -----------------------------------------------------
+#
+# The status a build ends with, decided from the report alone. It used to be
+# worked out at the bottom of `runBuild`, below the summary that `--quiet`
+# returns early from - so a book with a missing chapter exited 0 as soon as the
+# flag a CI job reaches for was added, which is the one case the status is for.
+
+func reportWith(missing as list of string) {
+    return build.Report{
+        pages: 1,
+        assets: 0,
+        records: 0,
+        written: 100,
+        missing: $missing,
+        warnings: [],
+        pdfBytes: 0,
+        pruned: 0
+    };
+}
+
+func testBuildStatusIsZeroForACompleteBook() {
+    testing.assertEqual(buildStatus(reportWith([])), 0);
+}
+
+func testBuildStatusIsOneWhenAChapterIsMissing() {
+    testing.assertEqual(buildStatus(reportWith(["nowhere.md"])), 1);
+}
+
+func testBuildStatusCountsEveryMissingChapterAsOneFailure() {
+    testing.assertEqual(buildStatus(reportWith(["a.md", "b.md"])), 1);
+}

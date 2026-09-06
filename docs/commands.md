@@ -236,3 +236,7 @@ you want outline order.
 
 `--verbose` and `--quiet` are not exclusive: verbose adds progress, quiet
 suppresses the closing summary. Passing both gives progress and no summary.
+
+`--quiet` suppresses output, never the answer. A build whose outline names a
+chapter with no file behind it still warns on stderr and still exits non-zero,
+because that status is the whole reason a script runs the build at all.

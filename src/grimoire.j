@@ -338,6 +338,21 @@ func humanBytes(n as int) {
 
 # --- commands -------------------------------------------------------
 
+# buildStatus is the exit status a finished build has earned: non-zero when the
+# outline named a chapter with no file behind it.
+#
+# It reads the report and nothing else, which is the point. The status used to be
+# decided at the bottom of `runBuild`, below the summary - so `--quiet` returned
+# from above it and reported success for a book with chapters missing, which is
+# the one condition the status exists to signal and `--quiet` is the flag a CI
+# job reaches for.
+func buildStatus(report as build.Report) {
+    if (len($report.missing) > 0) {
+        return 1;
+    }
+    return 0;
+}
+
 func runBuild(r as args.Result, appDir as string) {
     def c as config.Config init configure($r, $appDir);
     checkTheme($c);
@@ -346,8 +361,9 @@ func runBuild(r as args.Result, appDir as string) {
     def report as build.Report init build.run($c);
     def elapsed as int init time.milliseconds(time.sub(time.now(), $started));
     reportMissing($report);
+    def status as int init buildStatus($report);
     if (args.has($r, "quiet")) {
-        return 0;
+        return $status;
     }
     io.printf(
         "built %d pages into %s/ (%s, %d assets) in %d ms\n",
@@ -371,10 +387,7 @@ func runBuild(r as args.Result, appDir as string) {
             path.join($c.outDir, $c.pdfOutput),
             humanBytes($report.pdfBytes));
     }
-    if (len($report.missing) > 0) {
-        return 1;
-    }
-    return 0;
+    return $status;
 }
 
 func runPdf(r as args.Result, appDir as string) {
@@ -486,8 +499,8 @@ footer = "Rendered with <a href=\"https://grimoire.jennifer-lang.dev/\">Grimoire
 # Give each page a `keywords` meta tag, worked out from its own title, headings,
 # and code spans.
 keywords = true
-# Words the keyword pass should ignore on top of the built-in English list -
-# whatever is furniture in the subject this book covers.
+# Words the keyword pass should ignore on top of the list for the language this
+# book is written in - whatever is furniture in the subject it covers.
 # keywordStopwords = ["def", "init", "return"]
 
 [highlight]

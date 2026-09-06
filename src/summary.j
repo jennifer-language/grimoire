@@ -159,6 +159,61 @@ func renderNumber(counters as list of int) {
     return strings.join($parts, ".");
 }
 
+# hashRun counts the leading `#` characters of a trimmed line.
+func hashRun(trimmed as string) {
+    def count as int init 0;
+    for (def ch in strings.chars($trimmed)) {
+        if ($ch != "#") {
+            return $count;
+        }
+        $count = $count + 1;
+    }
+    return $count;
+}
+
+# isHeading reports whether a trimmed line is a heading. The run of hashes has to
+# be one to six long and followed by a space or by nothing, which is what Markdown
+# asks for and what this file used to skip: a bare `#` test opened a part named
+# "tag" for a line reading `#tag`. A line that fails here is not an outline entry
+# either, so it is passed over like any other prose in the file.
+func isHeading(trimmed as string, hashes as int) {
+    if ($hashes < 1 or $hashes > 6) {
+        return false;
+    }
+    if ($hashes == len($trimmed)) {
+        return true;
+    }
+    def next as string init strings.substring($trimmed, $hashes, $hashes + 1);
+    return $next == " " or $next == "\t";
+}
+
+# headingText is a heading's text: the leading run of hashes removed, and a
+# closing run removed only when a space stands before it - which is what Markdown
+# means by a closing sequence.
+#
+# The distinction is the whole point. This was `strings.replace($trimmed, "#", "")`,
+# which took out every hash in the line, so a part titled "C# and F#" was published
+# as "C and F" - in the sidebar and, through `pdfbook.combine`, in the printed
+# outline as well. A hash inside the text has nothing to do with the syntax.
+func headingText(trimmed as string, hashes as int) {
+    def body as string init strings.trim(strings.substring($trimmed, $hashes, len($trimmed)));
+    def cut as int init len($body);
+    while ($cut > 0 and strings.substring($body, $cut - 1, $cut) == "#") {
+        $cut = $cut - 1;
+    }
+    if ($cut == len($body)) {
+        return $body;
+    }
+    if ($cut == 0) {
+        return "";
+    }
+    def before as string init strings.substring($body, $cut - 1, $cut);
+    if ($before != " " and $before != "\t") {
+        return $body;
+    }
+    return strings.trim(strings.substring($body, 0, $cut));
+}
+
 /**
  * Parse `SUMMARY.md` source into the book outline. Recognised lines are a
  * `# Part heading`, a `- [Title](path.md)` entry (nested by indentation, and
@@ -182,8 +237,9 @@ export func parse(text as string) {
             $out[] = Entry{kind: SEPARATOR, title: "", src: "", out: "", level: 0, number: ""};
             continue;
         }
-        if (strings.startsWith($trimmed, "#")) {
-            def heading as string init strings.trim(strings.replace($trimmed, "#", ""));
+        def hashes as int init hashRun($trimmed);
+        if (isHeading($trimmed, $hashes)) {
+            def heading as string init headingText($trimmed, $hashes);
             # The conventional `# Summary` title is the document's own heading, not
             # a part of the book; every other heading opens a part.
             if (strings.lower($heading) != "summary") {

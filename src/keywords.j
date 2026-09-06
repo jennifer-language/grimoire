@@ -27,6 +27,12 @@
  * So a word in the title outranks eight mentions in prose, and an identifier the
  * page discusses outranks three - which is the right answer for a reference page
  * whose subject is named twice and used everywhere.
+ *
+ * What the weights cannot do is recognise a word that appears everywhere in the
+ * *language* rather than everywhere in the page. That is `src/stopwords.j`, and
+ * it is per language: a German book was tagging its chapters `und, die, das,
+ * ist, der` until there was a German list to consult. The book's `language`
+ * decides which list is added to the English one, which every book gets.
  * @module keywords
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -38,6 +44,7 @@ use convert;
 use regex;
 
 import "./content.j" as content;
+import "./stopwords.j" as stopwords;
 import "./util.j" as util;
 
 # The weights above.
@@ -60,190 +67,6 @@ def const BODY_CHARS as int init 600;
 # Folded into the sort key so a higher score sorts first; it only has to exceed
 # any score a single page can produce.
 def const SCORE_SCALE as int init 1000000;
-
-# Words that carry no subject on their own. Deliberately English-only and
-# deliberately short: this is a stop list, not a linguistic model, and a term
-# that survives it still has to outscore the page's real subject to appear.
-#
-# The literals at the end are here because code spans score 3: a configuration
-# page full of `enabled = false` would otherwise rank `false` above the settings
-# it is describing.
-def const STOPWORDS as list of string init [
-    "a",
-    "about",
-    "above",
-    "after",
-    "again",
-    "against",
-    "all",
-    "also",
-    "am",
-    "an",
-    "and",
-    "any",
-    "are",
-    "as",
-    "at",
-    "be",
-    "because",
-    "been",
-    "before",
-    "being",
-    "below",
-    "between",
-    "both",
-    "but",
-    "by",
-    "can",
-    "cannot",
-    "could",
-    "did",
-    "do",
-    "does",
-    "doing",
-    "done",
-    "down",
-    "during",
-    "each",
-    "either",
-    "else",
-    "enough",
-    "even",
-    "every",
-    "few",
-    "for",
-    "from",
-    "further",
-    "get",
-    "gets",
-    "give",
-    "gives",
-    "had",
-    "has",
-    "have",
-    "having",
-    "he",
-    "her",
-    "here",
-    "hers",
-    "him",
-    "his",
-    "how",
-    "however",
-    "i",
-    "if",
-    "in",
-    "into",
-    "is",
-    "it",
-    "its",
-    "itself",
-    "just",
-    "keep",
-    "keeps",
-    "let",
-    "like",
-    "make",
-    "makes",
-    "many",
-    "may",
-    "me",
-    "might",
-    "more",
-    "most",
-    "much",
-    "must",
-    "my",
-    "need",
-    "needs",
-    "no",
-    "nor",
-    "not",
-    "now",
-    "of",
-    "off",
-    "on",
-    "once",
-    "one",
-    "only",
-    "onto",
-    "or",
-    "other",
-    "others",
-    "our",
-    "ours",
-    "out",
-    "over",
-    "own",
-    "per",
-    "put",
-    "rather",
-    "same",
-    "see",
-    "she",
-    "should",
-    "since",
-    "so",
-    "some",
-    "still",
-    "such",
-    "take",
-    "takes",
-    "than",
-    "that",
-    "the",
-    "their",
-    "theirs",
-    "them",
-    "then",
-    "there",
-    "these",
-    "they",
-    "thing",
-    "things",
-    "this",
-    "those",
-    "though",
-    "through",
-    "to",
-    "too",
-    "under",
-    "until",
-    "up",
-    "use",
-    "used",
-    "uses",
-    "using",
-    "very",
-    "was",
-    "way",
-    "ways",
-    "we",
-    "well",
-    "were",
-    "what",
-    "when",
-    "where",
-    "whether",
-    "which",
-    "while",
-    "who",
-    "whom",
-    "why",
-    "will",
-    "with",
-    "within",
-    "without",
-    "would",
-    "you",
-    "your",
-    "yours",
-    "true",
-    "false",
-    "null",
-    "nil",
-    "none"
-];
 
 # The code spans on a page, read back out of the rendered HTML.
 #
@@ -273,28 +96,51 @@ func unescape(text as string) {
 # inside. Anchoring both ends is what keeps `join,` and `(spawn` and `module.`
 # out without a separate trimming pass.
 #
+# The classes are Unicode rather than `a-z0-9`, and that is a fix rather than a
+# flourish. `[a-z]` does not match an umlaut, so a word carrying one arrived
+# here in pieces: German `Verg` + u-umlaut + `tung` scored as `verg` and `tung`,
+# two fragments that are not words, that no stop list can name, and that mean
+# nothing to a reader of the tag. Every accented language was shredded the same
+# way; the ASCII ones were not, which is why it went unnoticed.
+#
 # Extracting terms with one regex rather than a character loop is not a
 # micro-optimisation. A loop over `strings.chars` of every section of every
 # chapter runs in the interpreter, and on a 2.3 MiB book it tripled the build;
 # the same work inside the regex engine is free by comparison.
-def const TERM as string init '[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?';
+def const TERM as string init '[\p{L}\p{N}](?:[\p{L}\p{N}._-]*[\p{L}\p{N}])?';
 
 # A term that is only digits and separators - a version number, a page count -
 # names nothing on its own.
-def const NUMERIC as string init '^[0-9._-]+$';
+def const NUMERIC as string init '^[\p{N}._-]+$';
 
-# stopSet turns the stop list into a set, once per page. Every term on the page
+# The first codepoint of the CJK blocks. A term whose first rune is at or above
+# it is in a script that writes without spaces between words, so what the
+# pattern above matched is a clause rather than a term - splitting it needs a
+# segmenter, which Grimoire does not have and a stop list cannot replace.
+#
+# Skipping them leaves a Japanese or Chinese book with the keywords it already
+# had, drawn from its titles and its identifiers, rather than with sentence
+# fragments in a meta tag. Everything below the boundary - Latin, Greek,
+# Cyrillic, Hebrew, Arabic - separates its words and passes through. Thai and
+# Khmer do not, and sit below it; no stop list here claims them either.
+def const UNSEGMENTED as string init "\u2e80";
+
+# stopSet turns the stop lists into a set, once per page. Every term on the page
 # is tested against it, so the difference between a hash lookup and a walk down a
-# 140-element list is the difference between a keyword pass that costs nothing
+# 300-element list is the difference between a keyword pass that costs nothing
 # and one that doubles the build.
 #
-# `extra` is the book's own additions. The built-in list can only know about
-# English; a book knows what is furniture in *its* subject - the keywords of the
-# language it documents, the name of its own product on every page - and those
-# are exactly the terms that describe every chapter equally and so describe none.
-func stopSet(extra as list of string) {
+# `language` is the book's own, and picks up the list for it on top of the
+# English one that every book gets; an unknown tag simply adds nothing.
+#
+# `extra` is the book's own additions. A list can only know what is furniture in
+# a *language*; a book knows what is furniture in its *subject* - the keywords of
+# the language it documents, the name of its own product on every page - and
+# those are exactly the terms that describe every chapter equally and so
+# describe none.
+func stopSet(language as string, extra as list of string) {
     def out as map of string to int;
-    for (def word in STOPWORDS) {
+    for (def word in stopwords.forLanguage($language)) {
         $out[$word] = 1;
     }
     for (def word in $extra) {
@@ -315,14 +161,17 @@ func stopSet(extra as list of string) {
 # the book and a sixth of the site build. The lookup is a hash either way; it is
 # the crossing of the call boundary that costs.
 #
-# The order inside is by cost. The length test is free; the regex runs only for a
-# term that starts with a digit, which is the only kind that can be all digits
-# and separators.
+# The order inside is by cost. The length test is free, and so are the two
+# comparisons on the first rune; the regex runs only for a term that starts with
+# a digit, which is the only kind that can be all digits and separators.
 func scoreable(term as string) {
     if (len($term) < MIN_LENGTH) {
         return false;
     }
     def first as string init strings.substring($term, 0, 1);
+    if ($first >= UNSEGMENTED) {
+        return false;
+    }
     if ($first < "0" or $first > "9") {
         return true;
     }
@@ -381,6 +230,16 @@ func ranked(scores as map of string to int) {
     def keys as list of string;
     for (def term in maps.keys($scores)) {
         def inverted as int init SCORE_SCALE - $scores[$term];
+        # The padding is what makes a text sort a numeric one, and it only holds
+        # while every inverted score has the same width. A score at or above the
+        # scale would go negative, and negative keys sort by their digits: "-9"
+        # lands before "-95", putting a smaller score first. Clamping keeps the
+        # invariant true by construction rather than by arithmetic nobody
+        # re-checks when a weight changes; a term that reaches the scale ranks
+        # top and ties alphabetically, which is the answer anyway.
+        if ($inverted < 0) {
+            $inverted = 0;
+        }
         $keys[] = convert.toString($inverted) + ":" + $term;
     }
     def out as list of string;
@@ -396,10 +255,15 @@ func ranked(scores as map of string to int) {
  *
  * @param r {content.Rendered} the rendered page
  * @param limit {int} how many keywords to return at most
+ * @param language {string} the book's language tag, which picks the stop list
  * @param extra {list of string} further stop words, from the book's configuration
  * @return {list of string} the keywords, highest scoring first
  */
-export func extract(r as content.Rendered, limit as int, extra as list of string) {
+export func extract(
+    r as content.Rendered,
+    limit as int,
+    language as string,
+    extra as list of string) {
     def runs as list of Run;
     $runs[] = Run{text: $r.title, weight: W_TITLE};
     for (def h in $r.headings) {
@@ -424,7 +288,7 @@ export func extract(r as content.Rendered, limit as int, extra as list of string
     # merely *read* the stop set would copy it once per token. Both are filled
     # and tested where they live; on a book of any size that copying, not the
     # tokenizing, is the whole cost.
-    def stops as map of string to int init stopSet($extra);
+    def stops as map of string to int init stopSet($language, $extra);
     def scores as map of string to int;
     for (def run in $runs) {
         for (def term in terms($run.text)) {
@@ -453,9 +317,10 @@ export func extract(r as content.Rendered, limit as int, extra as list of string
  * page yields none).
  * @param r {content.Rendered} the rendered page
  * @param limit {int} how many keywords to include at most
+ * @param language {string} the book's language tag, which picks the stop list
  * @param extra {list of string} further stop words, from the book's configuration
  * @return {string} the comma-separated keyword list
  */
-export func line(r as content.Rendered, limit as int, extra as list of string) {
-    return strings.join(extract($r, $limit, $extra), ", ");
+export func line(r as content.Rendered, limit as int, language as string, extra as list of string) {
+    return strings.join(extract($r, $limit, $language, $extra), ", ");
 }
