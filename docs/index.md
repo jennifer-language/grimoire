@@ -41,6 +41,7 @@ included. Nothing is fetched from anywhere unless you opt in, and the only
 setting that reaches off the machine at all is `[highlightjs]`, which is off by
 default.
 
+> [!TIP]
 > **[Read this manual as a single PDF](grimoire.pdf).** Every page in one
 > paginated file, with a clickable outline in your reader's bookmark panel and
 > `page/total` in the footer - handy for reading offline. It is built from these
@@ -65,6 +66,11 @@ default.
 - **A preview that reloads itself.** `serve --watch` rebuilds on save and
   reloads the open page, with the script that does it spliced into the response
   rather than written to disk - the published files never carry it.
+- **[Admonitions](configuration.md#admonitions)** in the syntax GitHub and
+  Obsidian already read - `> [!WARNING]` and four others, with an optional title
+  of your own - labelled in the book's language, and coloured the same way in
+  all ten themes. A renderer that has never heard of them still shows the
+  quotation.
 - **[Eleven interface languages](configuration.md#the-interface-language).** The
   twenty-odd words Grimoire adds around your text - "Search", "On this page",
   "Previous" - follow the book's `language`, with English wherever no

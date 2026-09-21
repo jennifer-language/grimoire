@@ -185,7 +185,16 @@ func testTintStaysInRange() {
     }
 }
 
-# --- vars and syntaxVars ---------------------------------------------
+# The property names of a row list, for the parity tests below.
+func names(rows as list of string) {
+    def out as list of string;
+    for (def row in $rows) {
+        $out[] = strings.trim(strings.split($row, ":")[0]);
+    }
+    return $out;
+}
+
+# --- vars and varRows ------------------------------------------------
 
 func testVarsRendersOnePropertyPerLine() {
     def block as string init vars(swatch(), "    ");
@@ -194,10 +203,45 @@ func testVarsRendersOnePropertyPerLine() {
     testing.assertEqual(len(strings.split($block, "\n")), 14);
 }
 
-func testSyntaxVarsRendersOnePropertyPerLine() {
-    def block as string init syntaxVars(SYNTAX_LIGHT, "  ");
+func testVarRowsRendersOnePropertyPerLine() {
+    def block as string init varRows(SYNTAX_LIGHT, "  ");
     testing.assertContains($block, "  --gr-syn-keyword: ");
     testing.assertEqual(len(strings.split($block, "\n")), len(SYNTAX_LIGHT));
+}
+
+# --- the admonition palette ------------------------------------------
+
+# Five kinds, each with an accent and a fill, and the sheet reads both through
+# the modifier classes - a kind with one of them missing renders a panel with no
+# colour or a label with none.
+func testEveryAdmonitionKindHasAnAccentAndAFill() {
+    testing.assertEqual(len(ADMONITION_LIGHT), 10);
+    for (def kind in ["note", "tip", "important", "warning", "caution"]) {
+        testing.assertTrue(lists.contains(names(ADMONITION_LIGHT), "--gr-adm-" + $kind));
+        testing.assertTrue(lists.contains(names(ADMONITION_LIGHT), "--gr-adm-" + $kind + "-fill"));
+    }
+}
+
+# The fill composes with whatever the theme put behind it rather than covering
+# it, which is what lets one palette sit on ten themes.
+func testTheFillsAreTranslucent() {
+    for (def row in ADMONITION_LIGHT) {
+        if (strings.contains($row, "-fill:")) {
+            testing.assertContains($row, "rgba(");
+        }
+    }
+    for (def row in ADMONITION_DARK) {
+        if (strings.contains($row, "-fill:")) {
+            testing.assertContains($row, "rgba(");
+        }
+    }
+}
+
+func testBothAdmonitionSchemesDefineTheSameProperties() {
+    testing.assertEqual(len(ADMONITION_LIGHT), len(ADMONITION_DARK));
+    for (def name in names(ADMONITION_LIGHT)) {
+        testing.assertTrue(lists.contains(names(ADMONITION_DARK), $name));
+    }
 }
 
 # Nothing in the layout sheet ever has to know which mode is active, which only
@@ -277,6 +321,58 @@ func testStylesheetCoversAllThreeWaysAModeCanBeChosen() {
     testing.assertContains($css, ':root:not([data-theme="light"])');
     testing.assertContains($css, ':root[data-theme="dark"]');
     testing.assertContains($css, ':root[data-theme="light"]');
+}
+
+# A reader whose system is dark and who never touched the selector gets the
+# `@media` block and nothing else, so every palette that is not per-theme has to
+# be in it. The syntax colours were missing from it for a while, which left light
+# token colours on a dark page.
+func testEveryModeBlockCarriesEveryPalette() {
+    def blocks as list of string init strings.split(stylesheet(sampleTheme()), '}');
+    def dark as int init 0;
+    def light as int init 0;
+    for (def block in $blocks) {
+        if (strings.contains($block, "--gr-syn-keyword: #c678dd")) {
+            testing.assertContains($block, "--gr-adm-note: #6cb0f8");
+            $dark = $dark + 1;
+        }
+        if (strings.contains($block, "--gr-syn-keyword: #a626a4")) {
+            testing.assertContains($block, "--gr-adm-note: #1f6feb");
+            $light = $light + 1;
+        }
+    }
+    testing.assertEqual($dark, 2);
+    testing.assertEqual($light, 2);
+}
+
+# The panel and its label both read the two properties a modifier class sets, so
+# the class and the ramp can only be right together.
+func testTheAdmonitionRulesReadTheRamp() {
+    def css as string init stylesheet(sampleTheme());
+    testing.assertContains($css, '.gr-content .gr-adm {');
+    testing.assertContains($css, "background: var(--gr-adm-fill);");
+    testing.assertContains($css, "border-left: 3px solid var(--gr-adm-accent);");
+    testing.assertContains($css, "color: var(--gr-adm-accent);");
+    for (def kind in ["note", "tip", "important", "warning", "caution"]) {
+        testing.assertContains($css, ".gr-adm-" + $kind);
+        testing.assertContains($css, "--gr-adm-accent: var(--gr-adm-" + $kind + ");");
+    }
+}
+
+# A title is the author's words and is left as written; the standing labels are
+# the engine's and are set in small capitals.
+func testACustomTitleIsNotSetInCapitals() {
+    testing.assertContains(stylesheet(sampleTheme()), "text-transform: none;");
+    testing.assertContains(stylesheet(sampleTheme()), ".gr-content .gr-adm-titled");
+}
+
+# A callout is a unit the way a code block and a table are: split across a page
+# break it reads as two things, one of them unlabelled.
+func testACalloutIsNotBrokenAcrossAPrintedPage() {
+    # A raw string: a cooked one reads the braces as an interpolation.
+    testing.assertContains(
+        stylesheet(sampleTheme()),
+        '.gr-content .gr-adm { break-inside: avoid; }');
 }
 
 func testStylesheetEndsWithTheLayoutRules() {

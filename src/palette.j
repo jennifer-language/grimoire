@@ -280,6 +280,42 @@ def const SYNTAX_DARK as list of string init [
     "--gr-syn-title: #61afef"
 ];
 
+# The admonition palette, and not per-theme either, for the reason above and one
+# more: these colours *mean* something. A warning is amber in every book or it is
+# not a warning, and a reader who has seen one on GitHub should recognise it here
+# without being told - which is why the five hues are GitHub's.
+#
+# Each kind names an accent, used for the rule down the side and for the label,
+# and a fill. The fill is the same hue at low alpha rather than an opaque tint,
+# so it composes with whatever the theme put behind it: the panel reads as a wash
+# of colour over parchment, slate, or anything else a palette chooses, and no
+# theme file has to know these exist. A book that wants other colours overrides
+# the ten properties.
+def const ADMONITION_LIGHT as list of string init [
+    "--gr-adm-note: #1f6feb",
+    "--gr-adm-note-fill: rgba(31, 111, 235, 0.08)",
+    "--gr-adm-tip: #1a7f37",
+    "--gr-adm-tip-fill: rgba(26, 127, 55, 0.08)",
+    "--gr-adm-important: #8250df",
+    "--gr-adm-important-fill: rgba(130, 80, 223, 0.08)",
+    "--gr-adm-warning: #9a6700",
+    "--gr-adm-warning-fill: rgba(154, 103, 0, 0.09)",
+    "--gr-adm-caution: #cf222e",
+    "--gr-adm-caution-fill: rgba(207, 34, 46, 0.08)"
+];
+def const ADMONITION_DARK as list of string init [
+    "--gr-adm-note: #6cb0f8",
+    "--gr-adm-note-fill: rgba(108, 176, 248, 0.13)",
+    "--gr-adm-tip: #55d07f",
+    "--gr-adm-tip-fill: rgba(85, 208, 127, 0.13)",
+    "--gr-adm-important: #b287f7",
+    "--gr-adm-important-fill: rgba(178, 135, 247, 0.13)",
+    "--gr-adm-warning: #e0aa3a",
+    "--gr-adm-warning-fill: rgba(224, 170, 58, 0.14)",
+    "--gr-adm-caution: #f77f7f",
+    "--gr-adm-caution-fill: rgba(247, 127, 127, 0.13)"
+];
+
 # The three widths that decide how a page is proportioned. Unlike the metrics
 # beside them they are not per-theme: a book chooses a theme for its colours and
 # its type, not for how many pixels its contents column gets.
@@ -314,7 +350,10 @@ func widthVar(name as string, lo as int, vw as int, hi as int) {
         convert.toString($vw) + "vw, " + convert.toString($hi) + "px);";
 }
 
-func syntaxVars(rows as list of string, indent as string) {
+# varRows indents a list of `--gr-x: value` rows into a custom-property block.
+# Used for the two palettes that are not per-theme - the syntax colours and the
+# admonition colours - which arrive as rows rather than as a struct.
+func varRows(rows as list of string, indent as string) {
     def out as list of string;
     for (def row in $rows) {
         $out[] = $indent + $row + ";";
@@ -733,6 +772,45 @@ a:hover { color: var(--gr-accent-hover); }
 }
 .gr-content blockquote > :last-child { margin-bottom: 0; }
 
+.gr-content .gr-adm {
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--gr-adm-accent);
+    border-radius: 0 var(--gr-radius) var(--gr-radius) 0;
+    background: var(--gr-adm-fill);
+}
+.gr-content .gr-adm > :last-child { margin-bottom: 0; }
+.gr-content .gr-adm-label {
+    margin: 0 0 6px;
+    font-family: var(--gr-font-heading);
+    font-size: 0.8em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gr-adm-accent);
+}
+/* A standing label is a word the engine chose, set small and in capitals like
+   the other chrome. A title is the author speaking, so it is left as written. */
+.gr-content .gr-adm-titled {
+    font-size: 0.95em;
+    letter-spacing: normal;
+    text-transform: none;
+}
+.gr-adm-note { --gr-adm-accent: var(--gr-adm-note); --gr-adm-fill: var(--gr-adm-note-fill); }
+.gr-adm-tip { --gr-adm-accent: var(--gr-adm-tip); --gr-adm-fill: var(--gr-adm-tip-fill); }
+.gr-adm-important {
+    --gr-adm-accent: var(--gr-adm-important);
+    --gr-adm-fill: var(--gr-adm-important-fill);
+}
+.gr-adm-warning {
+    --gr-adm-accent: var(--gr-adm-warning);
+    --gr-adm-fill: var(--gr-adm-warning-fill);
+}
+.gr-adm-caution {
+    --gr-adm-accent: var(--gr-adm-caution);
+    --gr-adm-fill: var(--gr-adm-caution-fill);
+}
+
 .gr-content code {
     font-family: var(--gr-font-mono);
     font-size: 0.875em;
@@ -1108,7 +1186,7 @@ a:hover { color: var(--gr-accent-hover); }
     .gr-main { padding: 0; }
     .gr-content { max-width: none; }
     body { background: #fff; color: #000; }
-    .gr-codeblock, .gr-content table { break-inside: avoid; }
+    .gr-codeblock, .gr-content table, .gr-content .gr-adm { break-inside: avoid; }
 }
 ';
 
@@ -1134,23 +1212,32 @@ export func stylesheet(t as Theme) {
     $out[] = "    --gr-topbar-h: 54px;";
     $out[] = "    --gr-shell-w: " + convert.toString(SHELL_MAX) + "px;";
     $out[] = vars($t.light, "    ");
-    $out[] = syntaxVars(SYNTAX_LIGHT, "    ");
+    $out[] = varRows(SYNTAX_LIGHT, "    ");
+    $out[] = varRows(ADMONITION_LIGHT, "    ");
     $out[] = '}';
     $out[] = "";
+    # The system-dark block carries the palettes that are not per-theme as well
+    # as the theme's own. It used to carry only the theme's, which left a reader
+    # whose system is dark - and who never touched the selector, which is most of
+    # them - reading light syntax colours on a dark page.
     $out[] = '@media (prefers-color-scheme: dark) {';
     $out[] = '    :root:not([data-theme="light"]) {';
     $out[] = vars($t.dark, "        ");
+    $out[] = varRows(SYNTAX_DARK, "        ");
+    $out[] = varRows(ADMONITION_DARK, "        ");
     $out[] = '    }';
     $out[] = '}';
     $out[] = "";
     $out[] = ':root[data-theme="dark"] {';
     $out[] = vars($t.dark, "    ");
-    $out[] = syntaxVars(SYNTAX_DARK, "    ");
+    $out[] = varRows(SYNTAX_DARK, "    ");
+    $out[] = varRows(ADMONITION_DARK, "    ");
     $out[] = '}';
     $out[] = "";
     $out[] = ':root[data-theme="light"] {';
     $out[] = vars($t.light, "    ");
-    $out[] = syntaxVars(SYNTAX_LIGHT, "    ");
+    $out[] = varRows(SYNTAX_LIGHT, "    ");
+    $out[] = varRows(ADMONITION_LIGHT, "    ");
     $out[] = '}';
     $out[] = LAYOUT_CSS;
     return strings.join($out, "\n");

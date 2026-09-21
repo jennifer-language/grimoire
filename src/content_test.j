@@ -348,6 +348,205 @@ func testRenderKeepsMarkupAndRulesOutOfTheIndex() {
     testing.assertFalse(strings.contains($r.sections[0].text, "raw"));
 }
 
+# --- admonitions -----------------------------------------------------
+
+# The five GitHub kinds, each labelled in the interface language and each
+# carrying the class the theme's ramp reads.
+func testEveryKindRendersItsOwnPanel() {
+    english();
+    for (def kind in ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"]) {
+        def html as string init render("> [" + "!" + $kind + "]\n> body\n", false, true).html;
+        testing.assertContains($html, 'class="gr-adm gr-adm-' + strings.lower($kind) + '"');
+        testing.assertContains($html, '<p class="gr-adm-label">');
+        testing.assertContains($html, "<p>body</p>");
+        testing.assertFalse(strings.contains($html, "<blockquote>"));
+    }
+}
+
+# The label is Grimoire's word, not the author's, so it follows the book rather
+# than the source.
+func testTheLabelIsTranslated() {
+    english();
+    testing.assertContains(render("> [!NOTE]\n> x\n", false, true).html, ">Note</p>");
+    locale.install("de");
+    testing.assertContains(render("> [!NOTE]\n> x\n", false, true).html, ">Hinweis</p>");
+    english();
+}
+
+# GitHub writes the marker in capitals; a book that lowercases it means the same
+# thing.
+func testTheMarkerIsCaseInsensitive() {
+    english();
+    testing.assertContains(render("> [!note]\n> x\n", false, true).html, "gr-adm-note");
+    testing.assertContains(render("> [!Warning]\n> x\n", false, true).html, "gr-adm-warning");
+}
+
+# Everything the quote holds belongs to the callout, not just its first
+# paragraph.
+func testTheWholeQuoteIsTheCallout() {
+    english();
+    def html as string init render("> [!TIP]\n> first\n>\n> - a\n> - b\n", false, true).html;
+    testing.assertContains($html, "<p>first</p>");
+    testing.assertContains($html, "<ul><li>a</li><li>b</li></ul>");
+    testing.assertEqual(len(strings.split($html, "<div class=")), 2);
+}
+
+# The marker comes off the front of the rendered paragraph, so the markup in it
+# has to survive the cut.
+func testInlineMarkupSurvivesTheMarker() {
+    english();
+    def html as string init render("> [!NOTE]\n> a **b** `c`\n", false, true).html;
+    testing.assertContains($html, "<p>a <strong>b</strong> <code>c</code></p>");
+}
+
+# A marker with nothing after it is a callout with no body rather than one with
+# an empty paragraph in it.
+func testAMarkerAloneHasNoEmptyParagraph() {
+    english();
+    def html as string init render("> [!NOTE]\n", false, true).html;
+    testing.assertContains($html, 'class="gr-adm gr-adm-note"');
+    testing.assertFalse(strings.contains($html, "<p></p>"));
+}
+
+# Everything that is not one of the five is a quotation, which is what every
+# other renderer makes of the same source.
+func testWhatIsNotACalloutStaysAQuote() {
+    english();
+    for (def md in [
+        "> [!NOTES]\n> x\n",
+        "> [!NOTE]: x\n",
+        "> [!]\n> x\n",
+        "> quoted\n",
+        "> **[!NOTE]** x\n"
+    ]) {
+        def html as string init render($md, false, true).html;
+        testing.assertContains($html, "<blockquote>");
+        testing.assertFalse(strings.contains($html, "gr-adm"));
+    }
+}
+
+# A callout is prose and belongs in the index; its marker is machinery and does
+# not. Indexed, `[!NOTE]` would be findable text on every page that warns about
+# anything.
+func testTheMarkerIsNotIndexed() {
+    english();
+    def r as Rendered init render("# T\n\n> [!WARNING]\n> mind the gap\n", false, true);
+    testing.assertContains($r.sections[0].text, "mind the gap");
+    testing.assertFalse(strings.contains($r.sections[0].text, "[!"));
+    testing.assertFalse(strings.contains($r.sections[0].text, "WARNING"));
+}
+
+# The label is chrome. It is drawn on the page in the reader's language and has
+# no business in a search record.
+func testTheLabelIsNotIndexed() {
+    english();
+    def r as Rendered init render("# T\n\n> [!NOTE]\n> body\n", false, true);
+    testing.assertFalse(strings.contains($r.sections[0].text, "Note"));
+}
+
+# A callout holds blocks, not just paragraphs: what is inside the quotation is
+# inside the panel.
+func testACalloutHoldsWholeBlocks() {
+    english();
+    def md as string init "> [!IMPORTANT]\n> lead\n>\n> ```sh\n> echo hi\n> ```\n";
+    def html as string init render($md, false, true).html;
+    testing.assertContains($html, "gr-adm-important");
+    testing.assertContains($html, '<div class="gr-codeblock">');
+    testing.assertContains($html, "echo hi");
+}
+
+# A quotation nested in a callout is read the same way the outer one was, so a
+# callout can hold a callout. Nothing needs it, but the alternative is a panel
+# with a stray `[!TIP]` in it.
+func testACalloutCanHoldACallout() {
+    english();
+    def md as string init "> [!WARNING]\n> outer\n>\n> > [!TIP]\n> > inner\n";
+    def html as string init render($md, false, true).html;
+    testing.assertContains($html, "gr-adm-warning");
+    testing.assertContains($html, "gr-adm-tip");
+    testing.assertContains($html, "<p>inner</p>");
+    testing.assertFalse(strings.contains($html, "[!TIP]"));
+}
+
+# --- admonition titles -----------------------------------------------
+
+# A callout nested in a quotation, or in another callout, prints its title on
+# the page like any other - and a title is an attribute rather than a child, so
+# nothing else in the walk would have found it. Unfindable words that are
+# visible on the page is the worst shape a search index has.
+func testANestedTitleIsIndexed() {
+    english();
+    def md as string init "# T\n\n> quoting\n>\n> > [!TIP] SentinelTitle\n> > inner\n";
+    testing.assertContains(render($md, false, true).sections[0].text, "SentinelTitle");
+}
+
+func testATitleInsideACalloutIsIndexed() {
+    english();
+    def md as string init "# T\n\n> [!NOTE] Outer\n> a\n>\n> > [!WARNING] Inner\n> > b\n";
+    def text as string init render($md, false, true).sections[0].text;
+    testing.assertContains($text, "Outer");
+    testing.assertContains($text, "Inner");
+}
+
+# The titles lead, because the body is truncated to `searchBodyChars` and a
+# title that went in at its own position could be cut off the end of the long
+# section it was announcing.
+func testTitlesLeadTheRecord() {
+    english();
+    def r as Rendered init render("# T\n\n> [!NOTE] TheTitle\n> the body\n", false, true);
+    def text as string init $r.sections[0].text;
+    testing.assertTrue(strings.indexOf($text, "TheTitle") < strings.indexOf($text, "the body"));
+}
+
+# A page with no callouts pays nothing and reads the same as it always did.
+func testAPageWithoutCalloutsIsUnchanged() {
+    english();
+    def r as Rendered init render("# T\n\n> quoted\n\n- a\n- b\n\npara\n", false, true);
+    testing.assertEqual($r.sections[0].text, "quoted ab para");
+}
+
+# A marker can carry a title, and a title is the author speaking: it is used as
+# written, and marked so the sheet does not put it in small capitals the way it
+# does a standing label.
+func testATitleBecomesTheLabel() {
+    english();
+    def html as string init render("> [!NOTE] Mind the gap\n> body\n", false, true).html;
+    testing.assertContains($html, '<p class="gr-adm-label gr-adm-titled">Mind the gap</p>');
+    testing.assertFalse(strings.contains($html, ">Note</p>"));
+    testing.assertContains($html, "<p>body</p>");
+}
+
+func testATitleIsEscaped() {
+    english();
+    testing.assertContains(
+        render("> [!TIP] a <b> & c\n> body\n", false, true).html,
+        "a &lt;b&gt; &amp; c");
+}
+
+# Without a title the standing label stands, and it follows the book rather than
+# the source.
+func testWithoutATitleTheLabelIsTranslated() {
+    english();
+    testing.assertContains(render("> [!NOTE]\n> x\n", false, true).html, ">Note</p>");
+    locale.install("de");
+    testing.assertContains(render("> [!NOTE]\n> x\n", false, true).html, ">Hinweis</p>");
+    english();
+}
+
+# The parser keeps the marker out of the text, so nothing has to strip it. The
+# title is an attribute rather than a child, so it would be missed instead -
+# and a title is the author's words, which belong in the index the way a heading
+# does.
+func testTheTitleIsIndexedAndTheLabelIsNot() {
+    english();
+    def r as Rendered init render("# T\n\n> [!WARNING] Mind the gap\n> body\n", false, true);
+    testing.assertContains($r.sections[0].text, "Mind the gap");
+    testing.assertContains($r.sections[0].text, "body");
+    testing.assertFalse(strings.contains($r.sections[0].text, "[!"));
+    def plain as Rendered init render("# T\n\n> [!NOTE]\n> body\n", false, true);
+    testing.assertFalse(strings.contains($plain.sections[0].text, "Note"));
+}
+
 func testRenderOfNothingIsEmpty() {
     english();
     def r as Rendered init render("", false, true);

@@ -7,8 +7,9 @@
  *
  * A book's own text is the author's; these are the few strings the engine adds
  * around it - "Search", "On this page", the colour-mode buttons, the keyboard
- * hints in the search dialog, the copy-code button. There are twenty-two of
- * them, and until now they were English wherever the book was not.
+ * hints in the search dialog, the copy-code button, the label on an
+ * admonition. There are twenty-seven of them, and until now they were English
+ * wherever the book was not.
  *
  * `intl` holds the catalogs and the current locale as library state, and that
  * state is **per module**: a `use intl` in two files is two catalogs, and the one
@@ -36,6 +37,7 @@
  */
 use intl;
 use lists;
+use maps;
 use strings;
 
 # The languages, in the order they load. English is first because `intl` treats
@@ -59,6 +61,11 @@ def const LANGUAGES as list of string init [
 # the reader typed. The marker is `intl`'s rather than Jennifer's `{}`, so these
 # read the same in a cooked or a raw string.
 def const EN as map of string to string init {
+    "admonitionCaution": "Caution",
+    "admonitionImportant": "Important",
+    "admonitionNote": "Note",
+    "admonitionTip": "Tip",
+    "admonitionWarning": "Warning",
     "bookContents": "Book contents",
     "chapterNav": "Chapter navigation",
     "colourMode": "Colour mode",
@@ -84,6 +91,11 @@ def const EN as map of string to string init {
 };
 
 def const DE as map of string to string init {
+    "admonitionCaution": "Achtung",
+    "admonitionImportant": "Wichtig",
+    "admonitionNote": "Hinweis",
+    "admonitionTip": "Tipp",
+    "admonitionWarning": "Warnung",
     "bookContents": "Inhalt des Buchs",
     "chapterNav": "Kapitelnavigation",
     "colourMode": "Farbmodus",
@@ -109,6 +121,11 @@ def const DE as map of string to string init {
 };
 
 def const ES as map of string to string init {
+    "admonitionCaution": "Precaución",
+    "admonitionImportant": "Importante",
+    "admonitionNote": "Nota",
+    "admonitionTip": "Consejo",
+    "admonitionWarning": "Advertencia",
     "bookContents": "Contenido del libro",
     "chapterNav": "Navegación por capítulos",
     "colourMode": "Modo de color",
@@ -134,6 +151,11 @@ def const ES as map of string to string init {
 };
 
 def const FR as map of string to string init {
+    "admonitionCaution": "Attention",
+    "admonitionImportant": "Important",
+    "admonitionNote": "Note",
+    "admonitionTip": "Astuce",
+    "admonitionWarning": "Avertissement",
     "bookContents": "Contenu du livre",
     "chapterNav": "Navigation entre chapitres",
     "colourMode": "Mode de couleur",
@@ -159,6 +181,11 @@ def const FR as map of string to string init {
 };
 
 def const IT as map of string to string init {
+    "admonitionCaution": "Attenzione",
+    "admonitionImportant": "Importante",
+    "admonitionNote": "Nota",
+    "admonitionTip": "Suggerimento",
+    "admonitionWarning": "Avviso",
     "bookContents": "Contenuto del libro",
     "chapterNav": "Navigazione tra capitoli",
     "colourMode": "Modalità colore",
@@ -186,6 +213,11 @@ def const IT as map of string to string init {
 # The keyboard hints read as one line after their key caps, so the Japanese
 # entries carry the particle that joins them: "arrow arrow で移動".
 def const JA as map of string to string init {
+    "admonitionCaution": "注意",
+    "admonitionImportant": "重要",
+    "admonitionNote": "メモ",
+    "admonitionTip": "ヒント",
+    "admonitionWarning": "警告",
     "bookContents": "本の目次",
     "chapterNav": "章のナビゲーション",
     "colourMode": "カラーモード",
@@ -211,6 +243,11 @@ def const JA as map of string to string init {
 };
 
 def const NL as map of string to string init {
+    "admonitionCaution": "Let op",
+    "admonitionImportant": "Belangrijk",
+    "admonitionNote": "Opmerking",
+    "admonitionTip": "Tip",
+    "admonitionWarning": "Waarschuwing",
     "bookContents": "Inhoud van het boek",
     "chapterNav": "Hoofdstuknavigatie",
     "colourMode": "Kleurmodus",
@@ -236,6 +273,11 @@ def const NL as map of string to string init {
 };
 
 def const PL as map of string to string init {
+    "admonitionCaution": "Uwaga",
+    "admonitionImportant": "Ważne",
+    "admonitionNote": "Notatka",
+    "admonitionTip": "Wskazówka",
+    "admonitionWarning": "Ostrzeżenie",
     "bookContents": "Spis treści",
     "chapterNav": "Nawigacja po rozdziałach",
     "colourMode": "Tryb kolorów",
@@ -261,6 +303,11 @@ def const PL as map of string to string init {
 };
 
 def const PT as map of string to string init {
+    "admonitionCaution": "Cuidado",
+    "admonitionImportant": "Importante",
+    "admonitionNote": "Nota",
+    "admonitionTip": "Dica",
+    "admonitionWarning": "Aviso",
     "bookContents": "Conteúdo do livro",
     "chapterNav": "Navegação entre capítulos",
     "colourMode": "Modo de cor",
@@ -286,6 +333,11 @@ def const PT as map of string to string init {
 };
 
 def const RU as map of string to string init {
+    "admonitionCaution": "Внимание",
+    "admonitionImportant": "Важно",
+    "admonitionNote": "Примечание",
+    "admonitionTip": "Совет",
+    "admonitionWarning": "Предупреждение",
     "bookContents": "Содержание книги",
     "chapterNav": "Навигация по главам",
     "colourMode": "Цветовая тема",
@@ -311,6 +363,11 @@ def const RU as map of string to string init {
 };
 
 def const ZH as map of string to string init {
+    "admonitionCaution": "注意",
+    "admonitionImportant": "重要",
+    "admonitionNote": "说明",
+    "admonitionTip": "提示",
+    "admonitionWarning": "警告",
     "bookContents": "本书目录",
     "chapterNav": "章节导航",
     "colourMode": "颜色模式",
@@ -387,6 +444,43 @@ export func install(lang as string) {
     intl.load("ru", RU);
     intl.load("zh", ZH);
     intl.setLocale($lang);
+}
+
+# The admonition kinds `markdown.j` parses, and the catalog key that labels each.
+# The kinds are the parser's vocabulary; the words are this module's.
+def const ADMONITIONS as map of string to string init {
+    "note": "admonitionNote",
+    "tip": "admonitionTip",
+    "important": "admonitionImportant",
+    "warning": "admonitionWarning",
+    "caution": "admonitionCaution"
+};
+
+/**
+ * What to call one kind of admonition, in the selected language. An unknown kind
+ * is called by its own name rather than blank - the parser only produces the
+ * five, so this is a guard rather than a path.
+ * @param kind {string} the admonition kind, as `markdown.attr(n, "kind")` gives it
+ * @return {string} the label
+ */
+export func admonitionLabel(kind as string) {
+    if (not maps.has(ADMONITIONS, $kind)) {
+        return $kind;
+    }
+    return intl.tr(ADMONITIONS[$kind]);
+}
+
+/**
+ * Every admonition label, keyed by kind - what `markdown.PdfOptions` wants, so
+ * the printable book calls a callout what the site calls it.
+ * @return {map of string to string} the labels in the selected language
+ */
+export func admonitionLabels() {
+    def out as map of string to string;
+    for (def kind in maps.keys(ADMONITIONS)) {
+        $out[$kind] = intl.tr(ADMONITIONS[$kind]);
+    }
+    return $out;
 }
 
 /**

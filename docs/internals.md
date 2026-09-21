@@ -260,6 +260,8 @@ do not:
 | `quoteFill`, `quoteRule`, `codeFill`, `codeBorder` | themed panels in print |
 | `creator`, `producer`, `unencodable` | metadata, and the encoding fallback |
 | `page_break` / `<!-- pagebreak -->` | a demoted chapter can still open a page |
+| `admonition` nodes | `> [!NOTE]` is parsed, marker and title separated; the label and the markup are ours |
+| `admonitionLabels` | what the printable build calls a callout, in the book's language |
 
 One thing the printable build cannot do: running headers and a "page N of M"
 footer. `pdf.setHeader` / `setFooter` and the `%page%` / `%pages%` placeholders
@@ -381,7 +383,7 @@ What the tests are for, beyond the obvious:
 - **The determinism promise.** `assignWork` and `placeRecords` both have cases
   that fail if a tie-break disappears - a failure a single-threaded build would
   never show.
-- **The catalogs.** Eleven parallel maps of twenty-two keys rot quietly; a key
+- **The catalogs.** Eleven parallel maps of twenty-seven keys rot quietly; a key
   added to English and forgotten in Polish shows up as a raw key name on a Polish
   reader's page and nowhere else. `locale_test.j` compares all eleven on every
   run, and enforces the punctuation rule that the ASCII grep cannot, since it

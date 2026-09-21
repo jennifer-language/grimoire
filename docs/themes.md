@@ -188,6 +188,25 @@ middle, and a contents list is only useful beside the thing it lists.
 Any CSS colour notation works; the shipped themes use hex for opaque colours and
 `rgba()` for `selection` and `shadow`.
 
+Two sets of colours are deliberately **not** in a theme's hands, for the same
+reason the two side columns are not. Code-token colours (`--gr-syn-*`) are one
+pair tuned to sit on both a warm parchment and a cool slate surface, which reads
+better across ten themes than ten hand-tuned sets would - and is one place to
+fix rather than ten. [Admonition](configuration.md#admonitions) colours
+(`--gr-adm-*`) are the other, and those also *mean* something: a warning is
+amber in every book or it is not a warning, and a reader who has seen one
+elsewhere should recognise it here. Each callout's fill is its hue at low alpha,
+so it composes with whatever the theme put behind it; a theme does not have to
+know they exist.
+
+A book that wants different values for either set redefines the properties
+itself. `html.footer` is emitted verbatim, so a `<style>` block there is the
+seam, and it lands after the theme's stylesheet. Match the selectors the sheet
+uses, though - the dark values are set under `:root[data-theme="dark"]` and
+inside a `prefers-color-scheme` block, both of which outrank a bare `:root`, so
+an override written only for `:root` takes effect in light mode and nowhere
+else.
+
 Three font helpers - `palette.sans()`, `palette.serif()`, `palette.mono()` -
 return stacks that each end in a generic family, so a machine with none of the
 named faces still renders the intended shape. A theme is free to pass its own

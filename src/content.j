@@ -26,6 +26,11 @@
  * Off, it is escaped and shown, for a book assembled from Markdown its author did
  * not write.
  *
+ * A `> [!NOTE]` callout is the parser's work rather than this module's: it hands
+ * back an `admonition` node carrying the kind and any title the marker had, and
+ * what is left here is the markup and the label. The label is Grimoire's word,
+ * so it comes from the catalogs and follows the book's language.
+ *
  * `markdown.toHtml` is not used for any of this. It gained the same choice as
  * `toHtmlWith(md, HtmlOptions{allowRawHtml: ...})` and defaults to escaping now,
  * but nothing here has ever called it: a documentation site needs more than the
@@ -278,6 +283,80 @@ func renderCode(n as markdown.Node, highlighting as bool) {
         $body + "</code></pre></div>";
 }
 
+# renderAdmonition draws a callout: the label, then the blocks the parser put
+# inside it.
+#
+# The label is Grimoire's word unless the author supplied one. A marker can carry
+# a title - `> [!NOTE] Mind the gap` - and a title is the author speaking, so it
+# is used as written and is not uppercased the way the standing labels are.
+# Without one, the kind's name arrives in the book's language from the catalogs.
+func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool) {
+    def kind as string init markdown.attr($n, "kind");
+    def title as string init markdown.attr($n, "title");
+    def label as string init locale.admonitionLabel($kind);
+    def labelClass as string init "gr-adm-label";
+    if ($title != "") {
+        $label = $title;
+        $labelClass = "gr-adm-label gr-adm-titled";
+    }
+    def out as list of string init [
+        '<div class="gr-adm gr-adm-' + attrEsc($kind) + '" role="note">',
+        '<p class="' + $labelClass + '">' + html.escape($label) + "</p>"
+    ];
+    for (def child in markdown.children($n)) {
+        $out[] = renderBlock($child, $highlighting, $rawHtml);
+    }
+    $out[] = "</div>";
+    return strings.join($out, "");
+}
+
+# titlesIn collects the title of every callout at or below a node, in document
+# order.
+#
+# A title is an attribute rather than a child, so `markdown.text` walks straight
+# past it: without this, words printed on the page would be unfindable by the
+# search that indexes that page.
+#
+# The descent stops at anything that cannot hold a block. A paragraph's children
+# are inline, a table cell holds no blocks, and a code block is text - so this
+# visits the handful of container nodes and nothing else, which is strictly less
+# of the tree than the `markdown.text` beside it already walks.
+func titlesIn(n as markdown.Node) {
+    def kind as string init markdown.typeOf($n);
+    def parts as list of string;
+    if ($kind == "admonition") {
+        def title as string init markdown.attr($n, "title");
+        if ($title != "") {
+            $parts[] = $title;
+        }
+    }
+    if ($kind == "quote" or $kind == "admonition" or $kind == "list" or $kind == "item") {
+        for (def child in markdown.children($n)) {
+            def inner as string init titlesIn($child);
+            if ($inner != "") {
+                $parts[] = $inner;
+            }
+        }
+    }
+    return strings.join($parts, " ");
+}
+
+# indexText is the text a block contributes to the search index: its own, plus
+# the titles of any callouts in it. The parser keeps a callout's marker out of
+# its text already - the marker is machinery - but a title is the author's own
+# words and belongs in the index the way a heading does.
+#
+# The titles lead. A record is a bag of words to the scorer, and the body is
+# truncated to `searchBodyChars`, so a title that went in at its own position
+# could be cut off the end of a long section it was announcing.
+func indexText(n as markdown.Node) {
+    def titles as string init titlesIn($n);
+    if ($titles == "") {
+        return markdown.text($n);
+    }
+    return $titles + " " + markdown.text($n);
+}
+
 func renderQuote(n as markdown.Node, highlighting as bool, rawHtml as bool) {
     def out as list of string init ["<blockquote>"];
     for (def child in markdown.children($n)) {
@@ -300,6 +379,7 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
         when "list" { return renderList($n); }
         when "table" { return renderTable($n); }
         when "quote" { return renderQuote($n, $highlighting, $rawHtml); }
+        when "admonition" { return renderAdmonition($n, $highlighting, $rawHtml); }
         when "thematic_break" { return "<hr>"; }
         # The one place anything reaches the page unescaped, and the only reason
         # `rawHtml` is threaded this far down.
@@ -373,7 +453,7 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
             if ($kind == "html_block" or $kind == "thematic_break") {
                 continue;
             }
-            def flat as string init util.squeeze(markdown.text($node));
+            def flat as string init util.squeeze(indexText($node));
             if ($flat != "") {
                 $buffer[] = $flat;
             }

@@ -31,6 +31,7 @@ use encoding;
 import "markdown.j" as markdown;
 import "pdf.j" as pdf;
 import "./config.j" as config;
+import "./locale.j" as locale;
 import "./palette.j" as palette;
 import "./theme.j" as theme;
 import "./summary.j" as summary;
@@ -690,6 +691,10 @@ func options(c as config.Config) {
     $opts.creator = PDF_CREDIT;
     $opts.producer = PDF_CREDIT;
     $opts.bookmarkLevel = $c.pdfBookmarkLevel;
+    # What the layout calls a callout. The markers are the parser's to recognise
+    # and the words are Grimoire's, so the printable book calls one what the site
+    # calls it, in the book's own language.
+    $opts.admonitionLabels = locale.admonitionLabels();
     # The module substitutes this for anything the standard-14 fonts cannot
     # encode. Grimoire transliterates the characters worth keeping (an arrow, a
     # box-drawing rule) before the text ever gets here, so this is the last

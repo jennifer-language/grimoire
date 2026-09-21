@@ -486,6 +486,78 @@ That is deliberate - the footer is your own configuration, not untrusted input.
 Everything else that renders text, including the book and chapter titles, goes
 through the Markdown renderer and is escaped.
 
+## Admonitions
+
+A blockquote that opens with an alert marker becomes a coloured callout:
+
+```markdown
+> [!NOTE]
+> Useful to know, and not in the way of the sentence you were reading.
+```
+
+> [!NOTE]
+> Useful to know, and not in the way of the sentence you were reading.
+
+The block above is the source; the panel under it is this page rendering it.
+
+Five kinds, GitHub's: `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`,
+`[!CAUTION]`. The marker is not case-sensitive, and everything else in the
+quotation - lists, code blocks, several paragraphs - belongs to the callout.
+
+There is no key for this. It is the syntax GitHub, Obsidian, and a growing pile
+of other tools already read, so a chapter written for one of those renders here
+without being touched, and a chapter written here stays legible everywhere else:
+a renderer that has never heard of alerts shows the quotation the author meant,
+one line longer. That is also why the syntax is this one rather than `:::note`
+or `!!! note`, which leave visible wreckage - the second of them an indented
+code block - anywhere they are not implemented.
+
+**The label is Grimoire's word unless you write your own.** It follows
+[`book.language`](#the-interface-language) like the rest of the interface, so a
+German book says *Hinweis* and *Warnung* without the author writing either. A
+marker can carry a title instead:
+
+```markdown
+> [!WARNING] Mind the gap
+> Then the body, as usual.
+```
+
+A title is the author speaking rather than the engine, so it is printed as
+written - not folded into the small capitals a standing label gets - and it is
+indexed with the body, the way a heading is. It is plain text: markup in a title
+is shown rather than rendered.
+
+The colours are not per theme. Five hues - blue, green, purple, amber, red -
+sit on all ten, as a wash of low-alpha colour over whatever the palette put
+behind them, with the same hue on the rule down the left edge and on the label.
+A book that wants others redefines the ten `--gr-adm-*` custom properties, the
+way it would any other colour a theme does not own - see
+[Themes](themes.md#how-a-theme-is-built).
+
+In the printable book a callout is the label in bold at the head of its
+quotation, which is what one looks like in print. It wears the blockquote tint
+and rule from the theme, like every other quotation there, and it is labelled in
+the same language as the site - within what the printable build can draw. The
+standard-14 PDF fonts cover Latin-1 and no more, so a language that needs more
+than that prints question marks in the label exactly as it already does in the
+body text around it.
+
+`> [!NOTE]:` at the head of a paragraph, or `[!NOTES]`, or a marker in bold, are
+all prose: to change the shape of a quotation the marker has to open it, spelled
+exactly, with nothing after it on that line but a title.
+
+One thing to know, and it is not about callouts: a quotation indented under a
+list item is **not inside the item**, callout or not. The parser closes the list
+first, so
+
+```markdown
+- item
+  > [!NOTE]
+  > this is a sibling of the list, not part of the item
+```
+
+renders the panel after the list rather than within it.
+
 ## `[highlight]` and `[highlightjs]`
 
 Highlighting comes in two layers, and they are two tables because they have very

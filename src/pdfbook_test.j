@@ -353,6 +353,38 @@ func testPrepareSanitisesFirst() {
         "-> onward");
 }
 
+# --- callouts --------------------------------------------------------
+
+# The marker is the parser's to read, so this pass leaves it alone: it used to
+# rewrite the line into a bold label, which is what `markdown.j` does for itself
+# now.
+func testPrepareLeavesTheMarkerToTheParser() {
+    def out as string init prepare("> [!NOTE]\n> mind the gap\n", 0, "");
+    testing.assertContains($out, "> [!NOTE]");
+    testing.assertContains($out, "> mind the gap");
+}
+
+# The layout draws the label, and the words are Grimoire's, so the book's
+# language reaches the layout as a table. Without it a German book would print
+# "Note" over a panel whose page says "Hinweis".
+func testPdfOptionsCarryTheTranslatedLabels() {
+    locale.install("de");
+    def c as config.Config init config.defaults();
+    def labels as map of string to string init pdfOptions($c).admonitionLabels;
+    testing.assertEqual($labels["note"], "Hinweis");
+    testing.assertEqual($labels["caution"], "Achtung");
+    locale.install("en");
+    testing.assertEqual(pdfOptions($c).admonitionLabels["note"], "Note");
+}
+
+func testEveryKindReachesTheLayout() {
+    locale.install("en");
+    def labels as map of string to string init pdfOptions(config.defaults()).admonitionLabels;
+    for (def kind in ["note", "tip", "important", "warning", "caution"]) {
+        testing.assertTrue(maps.has($labels, $kind));
+    }
+}
+
 # --- hasTitle --------------------------------------------------------
 
 func testHasTitleFindsALevelOne() {

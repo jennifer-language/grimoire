@@ -9,7 +9,7 @@
  * fallback, and `install` being enough to make every worker translate.
  *
  * The second is the catalogs themselves, and it is the reason this file earns
- * its keep. Eleven parallel maps of twenty-two keys are exactly the shape that
+ * its keep. Eleven parallel maps of twenty-seven keys are exactly the shape that
  * rots quietly - a key added to English and forgotten in Polish shows up as a
  * raw key name on a Polish reader's page and nowhere else. `testEveryCatalog...`
  * below compares all eleven against English on every run.
@@ -148,6 +148,38 @@ func testEllipsesAreThreePeriods() {
             }
         }
     }
+}
+
+# --- admonition labels -----------------------------------------------
+
+# The parser's five kinds each need a word, in every language, or a callout in a
+# Polish book is labelled `admonitionWarning`.
+func testEveryKindIsLabelledInEveryLanguage() {
+    for (def lang in names()) {
+        install($lang);
+        for (def kind in maps.keys(ADMONITIONS)) {
+            def label as string init admonitionLabel($kind);
+            testing.assertNotEqual($label, "");
+            testing.assertFalse(strings.startsWith($label, "admonition"));
+        }
+    }
+    install("en");
+}
+
+func testTheLabelTableCoversTheSameFiveKinds() {
+    install("en");
+    def table as map of string to string init admonitionLabels();
+    testing.assertEqual(len(maps.keys($table)), 5);
+    testing.assertEqual($table["note"], "Note");
+    install("de");
+    testing.assertEqual(admonitionLabels()["warning"], "Warnung");
+    install("en");
+}
+
+# A guard rather than a path: the parser only produces the five.
+func testAnUnknownKindIsCalledByItsOwnName() {
+    install("en");
+    testing.assertEqual(admonitionLabel("nope"), "nope");
 }
 
 # --- install and tr --------------------------------------------------
