@@ -709,10 +709,10 @@ func testWriteFileReturnsBytesNotRunes() {
     def root as string init fs.makeTempDir(os.tempDir(), "grimoire-bytes-");
     def target as string init path.join($root, "page.html");
     testing.assertEqual(writeFile($target, "abc"), 3);
-    # Three umlauts, written as escapes so this file stays ASCII: three
-    # characters, six bytes. `len` would say three, and the build summary would
-    # under-report every page of a book that is not written in English.
-    def umlauts as string init "\u00e4\u00f6\u00fc";
+    # Three umlauts: three characters, six bytes. `len` would say three, and the
+    # build summary would under-report every page of a book that is not written
+    # in English.
+    def umlauts as string init "äöü";
     testing.assertEqual(len($umlauts), 3);
     testing.assertEqual(writeFile($target, $umlauts), 6);
     testing.assertEqual(len(fs.readBytes($target)), 6);

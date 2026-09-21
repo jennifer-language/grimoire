@@ -6,23 +6,6 @@ The reference book here is the Jennifer language documentation: 155 chapters,
 an 8-core, 16-thread Ryzen 7 5800X running Arch Linux - against Jennifer
 `0.24.0-dev+15`. Each figure is the fastest of three runs.
 
-The interpreter version belongs next to the machine, because the `markdown` and
-`pdf` modules are Jennifer source and the language underneath them is moving
-fast. Two upgrades in a day took the site build here from 31.4 s to 21.5 s
-without a line changing in Grimoire. Re-run the benchmark after an upgrade
-rather than trusting a number across one.
-
-The larger of the two is worth naming, because it changes the advice as well as
-the numbers. `0.24.0-dev+15` added a **read-only parameter borrow**: a parameter
-a function never writes is now passed rather than copied, in any module and in a
-script that declares no mutable top-level `def`. Jennifer's parameters are
-values, so before this a helper that only read a large list or map still paid a
-deep copy of it on every call, and the standard way to make a Jennifer program
-fast was to arrange not to hand large values to helpers. That is now a smaller
-concern than it was - see `CLAUDE.md` for what survives it.
-
-Two things shape the numbers.
-
 ## The site scales to about 4.5x, not to the core count
 
 | Jobs | Wall clock | Speedup |

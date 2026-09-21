@@ -19,8 +19,9 @@
  * book tagged its chapters `und, die, das, ist, der` because the stop list was
  * English, and no book in any accented language had whole words to tag at all,
  * because the term pattern was `[a-z0-9]`. Both are named after what went wrong.
- * This file is ASCII like the rest of the repository, so the words that need an
- * umlaut are spelled with escapes and the comment above them says which.
+ * The fixtures below say what they mean: `scripts/check-style.sh` bans
+ * typographic punctuation rather than letters, so a German word can be written
+ * as a German word.
  * @module keywords_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -86,14 +87,13 @@ func testScoreableRejectsBareNumbers() {
 }
 
 # Everything below the CJK boundary separates its words, so a Cyrillic or Greek
-# term is a term - the two here are Russian `dannye` and Greek `logos`. At or
-# above it a run of letters is a clause rather than a word, and splitting it
-# needs a segmenter Grimoire does not have; the two rejected here are Japanese.
+# term is a term. At or above it a run of letters is a clause rather than a
+# word, and splitting it needs a segmenter Grimoire does not have.
 func testScoreableSkipsTheUnsegmentedScripts() {
-    testing.assertTrue(scoreable("\u0434\u0430\u043d\u043d\u044b\u0435"));
-    testing.assertTrue(scoreable("\u03bb\u03cc\u03b3\u03bf\u03c2"));
-    testing.assertFalse(scoreable("\u65e5\u672c\u8a9e"));
-    testing.assertFalse(scoreable("\u3059\u3054\u3044\u3067\u3059"));
+    testing.assertTrue(scoreable("данные"));
+    testing.assertTrue(scoreable("λόγος"));
+    testing.assertFalse(scoreable("日本語"));
+    testing.assertFalse(scoreable("すごいです"));
 }
 
 # --- terms -----------------------------------------------------------
@@ -119,25 +119,23 @@ func testTermsLowercases() {
 }
 
 # `[a-z]` does not match an umlaut, so a word carrying one used to arrive as two
-# fragments. The escape spells the German for compensation, `Verg` + u-umlaut +
-# `tung`: nine runes, one term, and not the `verg` and `tung` it scored as
+# fragments: nine runes, one term, and not the `verg` and `tung` it scored as
 # before.
 func testTermsKeepAnAccentedWordWhole() {
-    def word as string init "Verg\u00fctung";
+    def word as string init "Vergütung";
     testing.assertEqual(len($word), 9);
     testing.assertTrue(lists.contains(terms($word), strings.lower($word)));
     testing.assertFalse(lists.contains(terms($word), "verg"));
     testing.assertFalse(lists.contains(terms($word), "tung"));
 }
 
-# The scripts that separate their words all pass through the same pattern. These
-# are Russian `dannye`, Greek `logos`, and French `cafe` with its accent.
+# The scripts that separate their words all pass through the same pattern.
 func testTermsReadTheOtherAlphabets() {
-    def ru as string init "\u0434\u0430\u043d\u043d\u044b\u0435";
-    def gr as string init "\u03bb\u03cc\u03b3\u03bf\u03c2";
+    def ru as string init "данные";
+    def gr as string init "λόγος";
     def sample as string init $ru + " " + $gr + " caf\u00e9";
     testing.assertEqual(len(terms($sample)), 3);
-    testing.assertTrue(lists.contains(terms($sample), "caf\u00e9"));
+    testing.assertTrue(lists.contains(terms($sample), "café"));
 }
 
 # --- stopSet ---------------------------------------------------------
@@ -325,9 +323,9 @@ func testTheSamePageWithoutTheLanguageKeepsThem() {
 
 # A Japanese page keeps the keywords it has always had - its title, and the
 # identifiers in its code spans - rather than gaining a meta tag full of clauses.
-# The body is `nihongo wa sugoi` with no spaces in it, as the script is written.
+# The body is written the way the script is: no spaces between its words.
 func testExtractSkipsUnsegmentedProse() {
-    def r as content.Rendered init plain("grimoire", "\u65e5\u672c\u8a9e\u306f\u3059\u3054\u3044");
+    def r as content.Rendered init plain("grimoire", "日本語はすごい");
     def out as list of string init extract($r, 10, "ja", []);
     testing.assertEqual(len($out), 1);
     testing.assertEqual($out[0], "grimoire");

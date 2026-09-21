@@ -14,11 +14,12 @@
  * raw key name on a Polish reader's page and nowhere else. `testEveryCatalog...`
  * below compares all eleven against English on every run.
  *
- * `src/locale.j` is also the one file the repository's ASCII check excludes, so
- * that a Russian translation can be Cyrillic. Excluded from the grep is not the
- * same as unchecked: the typographic characters the rule is actually about are
- * still banned there, and `testNoCatalogUsesTypographicPunctuation` is what
- * enforces it now that the one-liner cannot.
+ * `src/locale.j` holds letters no other file does, and that used to need an
+ * exception: the repository's check banned every non-ASCII character, so this
+ * file was excluded from it and re-checked here instead.
+ * `scripts/check-style.sh` bans the characters the rule is about rather than
+ * every character it has not seen, so letters need no exception and this file
+ * needs no stand-in for the check.
  * @module locale_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -27,7 +28,6 @@ use testing;
 use maps;
 use lists;
 use strings;
-use convert;
 
 # Every catalog, in the order `install` loads them. Kept beside `LANGUAGES` in
 # spirit: a language added there and forgotten here shows up as a length
@@ -122,22 +122,6 @@ func testThePlaceholderSurvivesTranslation() {
 
 # --- the punctuation rule the ASCII grep cannot reach ----------------
 
-# The codepoints `CLAUDE.md` bans everywhere: em and en dash, the curly quotes,
-# the typographic ellipsis, and the non-breaking space. Letters are fine here -
-# Russian is Cyrillic or it is not a translation - but these are not letters.
-def const BANNED as list of int init [8212, 8211, 8216, 8217, 8220, 8221, 8230, 160];
-
-func testNoCatalogUsesTypographicPunctuation() {
-    for (def catalog in catalogs()) {
-        for (def key in maps.keys($catalog)) {
-            for (def ch in strings.chars($catalog[$key])) {
-                testing.assertFalse(lists.contains(BANNED, convert.toCodepoint($ch)));
-            }
-        }
-    }
-}
-
-# Three periods, here as everywhere else in the repository.
 func testEllipsesAreThreePeriods() {
     for (def catalog in catalogs()) {
         for (def key in maps.keys($catalog)) {

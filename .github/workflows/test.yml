@@ -74,46 +74,21 @@ jobs:
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
             lint bin/grimoire src/*.j src/themes/*.j scripts/*.j
 
-      # The repository writes ASCII punctuation everywhere, for two reasons: a
-      # typographic character is invisible in a diff, and the printable build
-      # encodes WinAnsi so every one of them is a transliteration away from the
-      # page. `src/pdfbook.j` holds the transliteration table, `src/locale.j`
-      # holds eleven languages, and `src/stopwords.j` holds the keyword stop
-      # lists for nine, so all three are exempt from the grep - the two language
-      # files are checked by `src/locale_test.j` and `src/stopwords_test.j`
-      # instead, which ban the punctuation while allowing the letters.
-      #
-      # Two lines are expected: the example in `docs/internals.md` and the
-      # `authorsLabel` in `grimoire.toml`, both of which are the character as
-      # content rather than as punctuation.
-      # The count is checked as well as the files, so that a *second* such
-      # character sneaking into one of the two sanctioned files is caught too.
-      - name: Check for non-ASCII punctuation
-        run: |
-          set -eu
-          found=$(grep -rnP '[^\x00-\x7F]' \
-            --include='*.j' --include='*.md' --include='*.toml' \
-            --include='*.sh' --include='*.yml' . \
-            | grep -Ev 'src/(pdfbook|locale|stopwords)\.j' || true)
-          unexpected=$(printf '%s\n' "$found" \
-            | grep -Ev '^\./(docs/internals\.md|grimoire\.toml):' | grep -c . || true)
-          total=$(printf '%s\n' "$found" | grep -c . || true)
-          if [ "$unexpected" -ne 0 ] || [ "$total" -ne 2 ]; then
-            echo "expected exactly the two sanctioned lines, got $total:"
-            echo "$found"
-            exit 1
-          fi
-          echo "$found"
+      # Two checks, because the repository has two rules that used to be one
+      # grep. `check-style.sh` bans the typographic characters - dashes, curly
+      # quotes, ellipsis, arrows, emoji - everywhere, and says nothing about
+      # letters, which are never what that rule is about. `check-print.j` asks
+      # the other question: would anything in the printable book reach the page
+      # as `?`, because the standard-14 fonts encode WinAnsi and no more.
+      - name: Check for typographic characters
+        run: scripts/check-style.sh
 
-      # The deck specification decides the layout, and the layout is the kind of
-      # thing that is correct until somebody tidies it. `src/` is the tree a
-      # consumer vendors, so it holds modules and nothing else, and the entry
-      # module is named after the deck.
-      #
-      # There is no shorter alias at the repository root to check for. One lived
-      # there briefly and could not be kept: the filesystem this project is
-      # developed on cannot store a symlink, so every commit made there dropped
-      # it. `bin/grimoire` is the only path, and everything types it.
+      - name: Check what the printable book can draw
+        run: |
+          docker run --rm -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            run scripts/check-print.j
+
       - name: Check the deck layout
         run: |
           set -u

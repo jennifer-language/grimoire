@@ -36,6 +36,8 @@ packaging/
   OVERVIEW.md       the few lines a release page opens with
   arch/             a PKGBUILD, and notes on building it
 scripts/
+  check-style.sh    no typographic characters, anywhere
+  check-print.j     what the printable book would lose to WinAnsi
   test.sh           run every unit test
   screenshots.sh    regenerate the theme gallery
   theme-css.j       write one theme's stylesheet to a path
@@ -238,8 +240,10 @@ continuation line, and an indented continuation that loses its indent stops
 belonging to its list item and becomes a stranded paragraph between the items.
 The layout reflows paragraphs itself, so there is nothing to gain by trying.
 
-Characters the standard-14 fonts cannot encode are transliterated here (`→` to
-`->`, box drawing to `-` and `|`) before the layout sees them. The module would
+Characters the standard-14 fonts cannot encode are transliterated here - a
+rightwards arrow (U+2192) to `->`, box drawing to `-` and `|` - before the
+layout sees them. The character is named rather than shown, so this page obeys
+the punctuation rule it is describing. The module would
 substitute a single `?` for each, which is correct but says less: `->` says what
 the arrow said. So Grimoire spends a transliteration table and leaves
 `unencodable` as the last resort for the rest.
@@ -386,9 +390,7 @@ What the tests are for, beyond the obvious:
 - **The catalogs.** Eleven parallel maps of twenty-seven keys rot quietly; a key
   added to English and forgotten in Polish shows up as a raw key name on a Polish
   reader's page and nowhere else. `locale_test.j` compares all eleven on every
-  run, and enforces the punctuation rule that the ASCII grep cannot, since it
-  excludes that file by name. `stopwords_test.j` does the same for the other
-  file the grep excludes, and checks the shape every entry has to have to work at
+  run. `stopwords_test.j` checks the shape every entry has to have to work at
   all: lowercase, no spaces, no apostrophes, since the scoring lowercases before
   it looks and the term pattern breaks on both.
 - **The runtime.** `assets.j` holds JavaScript in a raw Jennifer string, which

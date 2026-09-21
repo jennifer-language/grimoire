@@ -19,10 +19,9 @@
  * - and English has to reach every book, or a German page loses `the` from its
  *   code spans.
  *
- * `src/stopwords.j` is the second file the repository's ASCII check excludes, so
- * `testNoCatalogUsesTypographicPunctuation` stands in for the grep the same way
- * `src/locale_test.j` does for the interface strings: letters are the point,
- * typographic punctuation is still banned.
+ * The lists are letters and nothing else, which the repository's punctuation
+ * check allows and its print check never looks at - a stop word is consulted
+ * rather than printed. Neither needs an exception for this file.
  * @module stopwords_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -30,7 +29,6 @@
 use testing;
 use lists;
 use strings;
-use convert;
 use maps;
 
 # Every catalog, in the order `LANGUAGES` names them. A language added there and
@@ -114,24 +112,6 @@ func testNoCatalogRepeatsAWord() {
     }
 }
 
-# The codepoints `CLAUDE.md` bans everywhere: em and en dash, the curly quotes,
-# the typographic ellipsis, and the non-breaking space. Letters are fine here -
-# a Russian stop word is Cyrillic or it is not one - but these are not letters.
-def const BANNED as list of int init [8212, 8211, 8216, 8217, 8220, 8221, 8230, 160];
-
-func testNoCatalogUsesTypographicPunctuation() {
-    for (def catalog in catalogs()) {
-        for (def word in $catalog) {
-            for (def ch in strings.chars($word)) {
-                testing.assertFalse(lists.contains(BANNED, convert.toCodepoint($ch)));
-            }
-        }
-    }
-}
-
-# A list of nothing but one- and two-letter words would pass every test above
-# and stop nothing, because the scoring drops a short term before it consults
-# the list at all. Each of these carries real weight above the floor.
 func testEveryCatalogCarriesWordsAboveTheLengthFloor() {
     for (def catalog in catalogs()) {
         def long as int init 0;

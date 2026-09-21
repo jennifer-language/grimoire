@@ -199,8 +199,7 @@ func testLiveReloadIsASingleLine() {
 # --- every emitted asset is ASCII ------------------------------------
 
 # These land in files that declare no encoding, and the repository rule is ASCII
-# punctuation everywhere. The grep in `CLAUDE.md` reads the `.j` source, which
-# catches this too - but only while the strings stay literal.
+# punctuation everywhere.
 func testEveryEmittedAssetIsAscii() {
     def sources as list of string init [runtime(), boot("auto"), liveReload("/x", 500)];
     for (def js in $sources) {
