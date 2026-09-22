@@ -531,10 +531,10 @@ func testAMissingSourceDirectoryFailsCleanly() {
 
 # --- buildStatus -----------------------------------------------------
 #
-# The status a build ends with, decided from the report alone. It used to be
-# worked out at the bottom of `runBuild`, below the summary that `--quiet`
-# returns early from - so a book with a missing chapter exited 0 as soon as the
-# flag a CI job reaches for was added, which is the one case the status is for.
+# The status a build ends with, decided from the report alone and before
+# `--quiet` returns. Deciding it below the summary instead would exit 0 for a
+# quiet build with a chapter missing, which is the one case the status is for and
+# `--quiet` is the flag a CI job reaches for.
 
 func reportWith(missing as list of string) {
     return build.Report{

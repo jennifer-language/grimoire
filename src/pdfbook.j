@@ -55,6 +55,15 @@ def const LETTER_HEIGHT as int init 792;
 # let one arrow abort a whole book, transliterate what has an obvious ASCII
 # reading and replace the rest with a question mark.
 #
+# WinAnsi also leaves out most of Europe. It covers the French, German and
+# Spanish letters and stops there, which leaves Polish, Czech, Hungarian,
+# Turkish, Croatian, Romanian, Latvian and Lithuanian with no alphabet to print
+# in. Latin Extended-A holds those, and every character in it is a Latin letter
+# with a diacritic, so the reading is the letter without it: `Zwykły tekst`
+# prints as `Zwykly tekst`. That is not the Polish the author wrote, but it is
+# their book rather than a page of question marks, and it is what a passport does
+# with the same name.
+#
 # The pass is layered so the common case costs one call: try the whole document,
 # then fall back to the offending line, then to the offending rune. Practically
 # every line is clean, so the per-rune loop - which would be far too slow over
@@ -109,7 +118,6 @@ def const TRANSLITERATIONS as map of string to string init {
     "◀": "<",
     "●": "*",
     "■": "*",
-    "…": "...",
     "␣": "_",
     "α": "alpha",
     "β": "beta",
@@ -120,7 +128,137 @@ def const TRANSLITERATIONS as map of string to string init {
     "π": "pi",
     "σ": "sigma",
     "φ": "phi",
-    "ω": "omega"
+    "ω": "omega",
+    # Latin Extended-A, less the seven letters WinAnsi already draws, plus the
+    # two Romanian pairs from Extended-B that a cedilla is often mistaken for.
+    # The reading is the base letter: the diacritic is what the font cannot
+    # carry, and dropping it leaves a word a reader still recognises. The four
+    # that are not a letter plus a mark say so where they sit.
+    "Ā": "A",
+    "ā": "a",
+    "Ă": "A",
+    "ă": "a",
+    "Ą": "A",
+    "ą": "a",
+    "Ć": "C",
+    "ć": "c",
+    "Ĉ": "C",
+    "ĉ": "c",
+    "Ċ": "C",
+    "ċ": "c",
+    "Č": "C",
+    "č": "c",
+    "Ď": "D",
+    "ď": "d",
+    "Đ": "D", # stroke, not a mark: Croatian and Vietnamese
+    "đ": "d",
+    "Ē": "E",
+    "ē": "e",
+    "Ĕ": "E",
+    "ĕ": "e",
+    "Ė": "E",
+    "ė": "e",
+    "Ę": "E",
+    "ę": "e",
+    "Ě": "E",
+    "ě": "e",
+    "Ĝ": "G",
+    "ĝ": "g",
+    "Ğ": "G",
+    "ğ": "g",
+    "Ġ": "G",
+    "ġ": "g",
+    "Ģ": "G",
+    "ģ": "g",
+    "Ĥ": "H",
+    "ĥ": "h",
+    "Ħ": "H",
+    "ħ": "h",
+    "Ĩ": "I",
+    "ĩ": "i",
+    "Ī": "I",
+    "ī": "i",
+    "Ĭ": "I",
+    "ĭ": "i",
+    "Į": "I",
+    "į": "i",
+    "İ": "I",
+    "ı": "i",
+    "Ĳ": "IJ", # a ligature, so two letters
+    "ĳ": "ij",
+    "Ĵ": "J",
+    "ĵ": "j",
+    "Ķ": "K",
+    "ķ": "k",
+    "ĸ": "k",
+    "Ĺ": "L",
+    "ĺ": "l",
+    "Ļ": "L",
+    "ļ": "l",
+    "Ľ": "L",
+    "ľ": "l",
+    "Ŀ": "L",
+    "ŀ": "l",
+    "Ł": "L",
+    "ł": "l",
+    "Ń": "N",
+    "ń": "n",
+    "Ņ": "N",
+    "ņ": "n",
+    "Ň": "N",
+    "ň": "n",
+    "ŉ": "'n", # the apostrophe is part of the letter
+    "Ŋ": "Ng", # eng, a letter of its own in Sami
+    "ŋ": "ng",
+    "Ō": "O",
+    "ō": "o",
+    "Ŏ": "O",
+    "ŏ": "o",
+    "Ő": "O",
+    "ő": "o",
+    "Ŕ": "R",
+    "ŕ": "r",
+    "Ŗ": "R",
+    "ŗ": "r",
+    "Ř": "R",
+    "ř": "r",
+    "Ś": "S",
+    "ś": "s",
+    "Ŝ": "S",
+    "ŝ": "s",
+    "Ş": "S",
+    "ş": "s",
+    "Ţ": "T",
+    "ţ": "t",
+    "Ť": "T",
+    "ť": "t",
+    "Ŧ": "T",
+    "ŧ": "t",
+    "Ũ": "U",
+    "ũ": "u",
+    "Ū": "U",
+    "ū": "u",
+    "Ŭ": "U",
+    "ŭ": "u",
+    "Ů": "U",
+    "ů": "u",
+    "Ű": "U",
+    "ű": "u",
+    "Ų": "U",
+    "ų": "u",
+    "Ŵ": "W",
+    "ŵ": "w",
+    "Ŷ": "Y",
+    "ŷ": "y",
+    "Ź": "Z",
+    "ź": "z",
+    "Ż": "Z",
+    "ż": "z",
+    "ſ": "s",
+    "Ș": "S",
+    "ș": "s",
+    "Ț": "T",
+    "ț": "t"
 };
 
 # encodable reports whether the PDF font encoding can carry the whole string.
@@ -307,13 +445,12 @@ func linksIn(part as string) {
 }
 
 # printLinks rewrites the links on a line while leaving its images whole. Both
-# link patterns would otherwise match the `[alt](url)` inside an image - an image
-# target is never a `.md` file, so it falls through to the general pattern and
-# collects its own path, which is how a picture used to print as
-# `alt (screenshots/x.png)`. Stepping over the image spans is what keeps them out
-# of it: RE2 has no lookbehind, so there is no pattern for "a `[` with no `!`
-# before it", and a prefix like `(^|[^!])` would swallow the character that
-# separates two adjacent links.
+# link patterns match the `[alt](url)` inside an image otherwise: an image target
+# is never a `.md` file, so it falls through to the general pattern and collects
+# its own path, printing `alt (screenshots/x.png)`. Stepping over the image spans
+# is what keeps them out of it. RE2 has no lookbehind, so there is no pattern for
+# "a `[` with no `!` before it", and a prefix like `(^|[^!])` would swallow the
+# character that separates two adjacent links.
 func printLinks(line as string) {
     if (not strings.contains($line, "](")) {
         return $line;
@@ -499,14 +636,12 @@ func excluded(c as config.Config, src as string) {
  * tree for less: 2.25x less before `looksLikeTable` was fixed, 1.14x less on
  * `0.24.0-dev+13`.
  *
- * The read-only parameter borrow in `0.24.0-dev+15` removed that copy, and the
- * Jennifer team confirmed this collector is covered by it. So the pieces are
- * joined here and `render` makes one `markdown.parse` call, which is what the
- * code wanted to say all along.
+ * The read-only parameter borrow in `0.24.0-dev+15` removes that copy, and the
+ * Jennifer team confirmed this collector is covered by it, so the pieces are
+ * joined here and `render` makes one `markdown.parse` call.
  *
- * Each chapter still opens with a blank line. That was what stopped one piece
- * running on into the next while they were parsed apart, and it is what keeps
- * the joins clean now that they are not.
+ * Each chapter opens with a blank line, which keeps the joins clean: without it
+ * the last line of one chapter runs into the first line of the next.
  *
  * `[pdf] exclude` drops chapters here rather than earlier, so the site keeps
  * them. A part whose chapters are all excluded is dropped with them - its
@@ -530,7 +665,7 @@ func excluded(c as config.Config, src as string) {
  *
  * A chapter **under a part** is demoted one level, so the part heading can take
  * the top of the outline and the PDF bookmarks get the same part / chapter /
- * section shape the sidebar has. A demoted heading no longer breaks the page, so
+ * section shape the sidebar has. A demoted heading does not break the page, so
  * the break is asked for explicitly with a `<!-- pagebreak -->` directive. The
  * exception is the chapter that opens a part: the part heading is itself a
  * level-one heading and has just broken the page, and a second break there would
@@ -694,7 +829,17 @@ func options(c as config.Config) {
     # What the layout calls a callout. The markers are the parser's to recognise
     # and the words are Grimoire's, so the printable book calls one what the site
     # calls it, in the book's own language.
-    $opts.admonitionLabels = locale.admonitionLabels();
+    #
+    # Sanitised here, and this is the one string that needs saying: every other
+    # word on the page went through `prepare`, but a label is handed to the
+    # layout as an option and never passes that way. Left raw, the module's own
+    # fallback would substitute one `?` per character, so a Polish book would
+    # print a transliterated sentence under a label full of question marks.
+    def labels as map of string to string init locale.admonitionLabels();
+    for (def kind in maps.keys($labels)) {
+        $labels[$kind] = sanitize($labels[$kind]);
+    }
+    $opts.admonitionLabels = $labels;
     # The module substitutes this for anything the standard-14 fonts cannot
     # encode. Grimoire transliterates the characters worth keeping (an arrow, a
     # box-drawing rule) before the text ever gets here, so this is the last
@@ -889,9 +1034,9 @@ func pictures(c as config.Config, md as string) {
 /**
  * Render the book to PDF bytes.
  *
- * One `markdown.parse` over the whole assembled book - see `combine` for why
- * that used to be one call per chapter. The parse is about a third of this
- * build, and the layout another third.
+ * One `markdown.parse` over the whole assembled book - `combine` says why it is
+ * assembled first. The parse is about a third of this build, the layout another
+ * third.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the book outline
  * @return {bytes} the PDF document

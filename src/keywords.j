@@ -6,13 +6,12 @@
  * Keyword extraction for the `keywords` meta tag: what a page is about, in ten
  * words, worked out from the page itself.
  *
- * The scoring is structural rather than statistical. A classic TF-IDF pass would
- * need corpus-wide document frequencies, and chapters are rendered in parallel
- * and written as they finish - there is no point in the build where one worker
- * knows about the others' text. More to the point, a documentation page already
+ * The scoring is structural rather than statistical. TF-IDF needs corpus-wide
+ * document frequencies, and chapters render in parallel and are written as they
+ * finish, so no worker knows about the others' text. A documentation page also
  * says what it is about in places prose statistics cannot see: its title, its
- * headings, and the identifiers it puts in code spans. Weighting those beats
- * counting words, and it needs one pass over one page.
+ * headings, the identifiers in its code spans. Weighting those takes one pass
+ * over one page.
  *
  * A term scores the sum of its weighted occurrences:
  *
@@ -29,10 +28,9 @@
  * whose subject is named twice and used everywhere.
  *
  * What the weights cannot do is recognise a word that appears everywhere in the
- * *language* rather than everywhere in the page. That is `src/stopwords.j`, and
- * it is per language: a German book was tagging its chapters `und, die, das,
- * ist, der` until there was a German list to consult. The book's `language`
- * decides which list is added to the English one, which every book gets.
+ * *language* rather than everywhere in the page - `und, die, das, ist, der` on
+ * every chapter of a German book. That is `src/stopwords.j`: the book's
+ * `language` decides which list joins the English one, which every book gets.
  * @module keywords
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only

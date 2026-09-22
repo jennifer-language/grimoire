@@ -7,18 +7,13 @@
 # an ASCII reading - arrows, box drawing, check marks, emoji. In source, in
 # comments, in docblocks, in Markdown, in commit messages, anywhere.
 #
-# What it does **not** check is letters. That is the whole difference between
-# this and the `grep -P '[^\x00-\x7F]'` it replaces, and it is the point: an
-# umlaut in a German test fixture, a Cyrillic stop word, a Polish translation
-# are all the character as *data*, and none of them is what the rule is about.
-# The rule is about characters that arrive invisibly - a curly quote is
-# indistinguishable from an apostrophe in most editors and in every diff - and
-# those are exactly the ones named below.
-#
-# The old check banned the superset, so every file that legitimately held
-# letters needed an exception in three places, and the exception then needed a
-# test of its own to re-ban the punctuation the grep could no longer see. Two
-# such files had grown; the third would have been next.
+# Letters are not checked. An umlaut in a German test fixture, a Cyrillic stop
+# word, a Polish translation: each is the character as data, and none of them is
+# what the rule is about. The rule is about characters that arrive invisibly - a
+# curly quote is indistinguishable from an apostrophe in most editors and in
+# every diff - and those are the ones named below. Banning every non-ASCII
+# character instead costs an exception, in three places, for each file that
+# legitimately holds letters.
 #
 #   scripts/check-style.sh
 #

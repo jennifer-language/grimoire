@@ -5,11 +5,10 @@
 /**
  * The words Grimoire itself puts on a page, in English and ten other languages.
  *
- * A book's own text is the author's; these are the few strings the engine adds
- * around it - "Search", "On this page", the colour-mode buttons, the keyboard
- * hints in the search dialog, the copy-code button, the label on an
- * admonition. There are twenty-seven of them, and until now they were English
- * wherever the book was not.
+ * A book's own text is the author's; these are the twenty-seven strings the
+ * engine adds around it - "Search", "On this page", the colour-mode buttons, the
+ * keyboard hints in the search dialog, the copy-code button, the label on an
+ * admonition.
  *
  * `intl` holds the catalogs and the current locale as library state, and that
  * state is **per module**: a `use intl` in two files is two catalogs, and the one

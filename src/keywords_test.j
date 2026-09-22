@@ -15,13 +15,10 @@
  * alphabetically so the same page produces the same tag on every build. That
  * last one is part of the byte-identical-output promise, not a nicety.
  *
- * Two of the tests below are a bug report in the shape of an assertion. A German
- * book tagged its chapters `und, die, das, ist, der` because the stop list was
- * English, and no book in any accented language had whole words to tag at all,
- * because the term pattern was `[a-z0-9]`. Both are named after what went wrong.
- * The fixtures below say what they mean: `scripts/check-style.sh` bans
- * typographic punctuation rather than letters, so a German word can be written
- * as a German word.
+ * Two of them cover a book that is not written in English: the stop list has to
+ * be the book's language, and the term pattern has to match a letter that
+ * carries a diacritic. Get either wrong and a German page is tagged `und, die,
+ * das, ist, der`, or tagged with fragments of its own words.
  * @module keywords_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -118,9 +115,8 @@ func testTermsLowercases() {
     testing.assertFalse(lists.contains(terms("Spawn And Task"), "Spawn"));
 }
 
-# `[a-z]` does not match an umlaut, so a word carrying one used to arrive as two
-# fragments: nine runes, one term, and not the `verg` and `tung` it scored as
-# before.
+# `[a-z]` does not match an umlaut, and a pattern that stops at one splits the
+# word around it. Nine runes, one term - not `verg` and `tung`.
 func testTermsKeepAnAccentedWordWhole() {
     def word as string init "Vergütung";
     testing.assertEqual(len($word), 9);
@@ -292,8 +288,8 @@ func testExtractHonoursTheLimit() {
     testing.assertEqual(len(extract($r, 0, "en", [])), 0);
 }
 
-# The report this came from: every keyword in the tag was a German function word
-# and the page's subject was nowhere in it.
+# Without the German list, every keyword in this tag is a function word and the
+# page's subject appears in none of them.
 func testExtractOfAGermanPageDropsTheGermanFunctionWords() {
     def r as content.Rendered init plain(
         "Steuerberatung",
@@ -307,10 +303,9 @@ func testExtractOfAGermanPageDropsTheGermanFunctionWords() {
     testing.assertTrue(lists.contains($out, "guthaben"));
 }
 
-# The same page in a book that never said what language it is in keeps them,
-# which is what makes the list - rather than the length floor - the thing doing
-# the work. Three letters is a word in every language; `und` is not a short word,
-# it is a common one.
+# The same page in a book that declares no language keeps them, which is what
+# makes the list rather than the length floor the thing doing the work: `und` is
+# not a short word, it is a common one.
 func testTheSamePageWithoutTheLanguageKeepsThem() {
     def r as content.Rendered init plain(
         "Steuerberatung",
@@ -321,9 +316,9 @@ func testTheSamePageWithoutTheLanguageKeepsThem() {
     }
 }
 
-# A Japanese page keeps the keywords it has always had - its title, and the
-# identifiers in its code spans - rather than gaining a meta tag full of clauses.
-# The body is written the way the script is: no spaces between its words.
+# A Japanese page is tagged from its title and the identifiers in its code
+# spans. The body is written the way the script is, with no spaces between its
+# words, so a run of it is a clause rather than a term.
 func testExtractSkipsUnsegmentedProse() {
     def r as content.Rendered init plain("grimoire", "日本語はすごい");
     def out as list of string init extract($r, 10, "ja", []);

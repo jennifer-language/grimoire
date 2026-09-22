@@ -486,78 +486,6 @@ That is deliberate - the footer is your own configuration, not untrusted input.
 Everything else that renders text, including the book and chapter titles, goes
 through the Markdown renderer and is escaped.
 
-## Admonitions
-
-A blockquote that opens with an alert marker becomes a coloured callout:
-
-```markdown
-> [!NOTE]
-> Useful to know, and not in the way of the sentence you were reading.
-```
-
-> [!NOTE]
-> Useful to know, and not in the way of the sentence you were reading.
-
-The block above is the source; the panel under it is this page rendering it.
-
-Five kinds, GitHub's: `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`,
-`[!CAUTION]`. The marker is not case-sensitive, and everything else in the
-quotation - lists, code blocks, several paragraphs - belongs to the callout.
-
-There is no key for this. It is the syntax GitHub, Obsidian, and a growing pile
-of other tools already read, so a chapter written for one of those renders here
-without being touched, and a chapter written here stays legible everywhere else:
-a renderer that has never heard of alerts shows the quotation the author meant,
-one line longer. That is also why the syntax is this one rather than `:::note`
-or `!!! note`, which leave visible wreckage - the second of them an indented
-code block - anywhere they are not implemented.
-
-**The label is Grimoire's word unless you write your own.** It follows
-[`book.language`](#the-interface-language) like the rest of the interface, so a
-German book says *Hinweis* and *Warnung* without the author writing either. A
-marker can carry a title instead:
-
-```markdown
-> [!WARNING] Mind the gap
-> Then the body, as usual.
-```
-
-A title is the author speaking rather than the engine, so it is printed as
-written - not folded into the small capitals a standing label gets - and it is
-indexed with the body, the way a heading is. It is plain text: markup in a title
-is shown rather than rendered.
-
-The colours are not per theme. Five hues - blue, green, purple, amber, red -
-sit on all ten, as a wash of low-alpha colour over whatever the palette put
-behind them, with the same hue on the rule down the left edge and on the label.
-A book that wants others redefines the ten `--gr-adm-*` custom properties, the
-way it would any other colour a theme does not own - see
-[Themes](themes.md#how-a-theme-is-built).
-
-In the printable book a callout is the label in bold at the head of its
-quotation, which is what one looks like in print. It wears the blockquote tint
-and rule from the theme, like every other quotation there, and it is labelled in
-the same language as the site - within what the printable build can draw. The
-standard-14 PDF fonts cover Latin-1 and no more, so a language that needs more
-than that prints question marks in the label exactly as it already does in the
-body text around it.
-
-`> [!NOTE]:` at the head of a paragraph, or `[!NOTES]`, or a marker in bold, are
-all prose: to change the shape of a quotation the marker has to open it, spelled
-exactly, with nothing after it on that line but a title.
-
-One thing to know, and it is not about callouts: a quotation indented under a
-list item is **not inside the item**, callout or not. The parser closes the list
-first, so
-
-```markdown
-- item
-  > [!NOTE]
-  > this is a sibling of the list, not part of the item
-```
-
-renders the panel after the list rather than within it.
-
 ## `[highlight]` and `[highlightjs]`
 
 Highlighting comes in two layers, and they are two tables because they have very
@@ -625,35 +553,32 @@ single build without touching the file.
 | --- | ---- | ------- | ------- |
 | `enabled` | bool | `true` | write the two files a program reads rather than a reader |
 
-A built book is for people, and increasingly also for something reading on their
-behalf. Two files make it legible to one, both written at build time and served
-as static files:
+Two files, written at build time and served as static files, make a published
+book readable by a program:
 
 | | |
 | - | - |
 | `llms.txt` | at the site root, following the [llms.txt convention](https://llmstxt.org): the title, the description as a summary, and every chapter as a link, grouped by the parts of `SUMMARY.md` |
 | `assets/search-index.json` | the search index as JSON - the book's own metadata, then one named object per indexed section: `path`, `title`, `heading`, `anchor`, `body` |
 
-`llms.txt` is the entry point and links to the index, so nothing has to guess a
-path. Paths in both are relative to the site root, because a book does not know
-where it is published; a fetcher resolves them against the URL it read the file
+`llms.txt` is the entry point and links to the index, so no path has to be
+guessed. Paths in both are relative to the site root: a book does not know where
+it is published, and a fetcher resolves them against the URL it read the file
 from.
 
-The index is the same data the browser search already ships, in a second dress.
+The index carries the same records as the browser search in a different shape.
 `assets/search-index.js` assigns a global and packs each record as a positional
-array, which is right for code that was shipped alongside it and wrong for
-anything else; the JSON names its fields. Turning `[search]` off does not turn
-this off - the records are still collected, because `[agents]` is a reason to
-have them.
+array, which suits the code shipped beside it; the JSON names its fields for
+readers that have never seen Grimoire. `[search] enabled = false` does not
+suppress it - the records are collected for either consumer.
 
-What this deliberately is **not** is a service. There is no daemon, no protocol,
-and no capability: a book on a static host is machine-readable the moment it is
-deployed, and stays that way with nothing running anywhere. On a checkout none of
-it is worth having - the Markdown is right there and `grep` beats any index - so
-the audience is the published book, where there is no `grep` and the alternative
-is fetching every page to re-derive what the build already knew.
+There is no daemon, no protocol and no capability here. A book on a static host
+is machine-readable the moment it is deployed. On a checkout the files are worth
+little, since the Markdown is right there and `grep` beats any index; the
+audience is the published book, where the alternative is fetching every page to
+re-derive what the build already knew.
 
-Drafts are left out, and so is any chapter whose source is missing: a link in
+Drafts are left out, and so is any chapter whose source is missing. A link in
 `llms.txt` is meant to be followed, so a dead one is worse than a short list.
 
 ## `[pdf]`

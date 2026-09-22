@@ -171,11 +171,10 @@ func hashRun(trimmed as string) {
     return $count;
 }
 
-# isHeading reports whether a trimmed line is a heading. The run of hashes has to
-# be one to six long and followed by a space or by nothing, which is what Markdown
-# asks for and what this file used to skip: a bare `#` test opened a part named
-# "tag" for a line reading `#tag`. A line that fails here is not an outline entry
-# either, so it is passed over like any other prose in the file.
+# isHeading reports whether a trimmed line is a heading: one to six hashes
+# followed by a space or by nothing, as Markdown asks. Testing for a leading `#`
+# alone would read `#tag` as a part named "tag". A line that fails here is not an
+# outline entry either, so it is passed over like any other prose in the file.
 func isHeading(trimmed as string, hashes as int) {
     if ($hashes < 1 or $hashes > 6) {
         return false;

@@ -341,11 +341,10 @@ func humanBytes(n as int) {
 # buildStatus is the exit status a finished build has earned: non-zero when the
 # outline named a chapter with no file behind it.
 #
-# It reads the report and nothing else, which is the point. The status used to be
-# decided at the bottom of `runBuild`, below the summary - so `--quiet` returned
-# from above it and reported success for a book with chapters missing, which is
-# the one condition the status exists to signal and `--quiet` is the flag a CI
-# job reaches for.
+# It reads the report and nothing else, and it is called before `--quiet`
+# returns. Deciding the status below the summary instead would report success to
+# a quiet build with chapters missing - the one condition the status exists to
+# signal, and `--quiet` is the flag a CI job reaches for.
 func buildStatus(report as build.Report) {
     if (len($report.missing) > 0) {
         return 1;

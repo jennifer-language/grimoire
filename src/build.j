@@ -390,6 +390,12 @@ func resolveBrand(c as config.Config) {
 }
 
 # stripScripts removes every `<script>...</script>` from inlined markup.
+#
+# The closing tag is found in two steps rather than as the literal `</script>`:
+# `</script >` is a legal end tag, and so is one with a newline before the
+# bracket. Matching the tight spelling alone leaves the opener unclosed, and an
+# unclosed opener takes the branch below that keeps everything *before* it - so
+# the logo would lose its artwork and keep nothing.
 func stripScripts(markup as string) {
     def out as string init $markup;
     def guard as int init 0;
@@ -399,12 +405,19 @@ func stripScripts(markup as string) {
             return $out;
         }
         def rest as string init strings.substring($out, $start, len($out));
-        def close as int init strings.indexOf(strings.lower($rest), "</script>");
+        def close as int init strings.indexOf(strings.lower($rest), "</script");
         if ($close < 0) {
             return strings.substring($out, 0, $start);
         }
+        def tail as string init strings.substring($rest, $close, len($rest));
+        def bracket as int init strings.indexOf($tail, ">");
+        # An end tag that never closes its bracket is not an end tag; the rest of
+        # the markup is script, and none of it belongs on the page.
+        if ($bracket < 0) {
+            return strings.substring($out, 0, $start);
+        }
         $out = strings.substring($out, 0, $start) +
-            strings.substring($rest, $close + len("</script>"), len($rest));
+            strings.substring($tail, $bracket + 1, len($tail));
         $guard = $guard + 1;
     }
     return $out;

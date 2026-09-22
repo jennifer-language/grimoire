@@ -537,6 +537,25 @@ func testStripScriptsRemovesAScript() {
         "<svg><circle/></svg>");
 }
 
+# `</script >` is a legal end tag, and so is one with a newline before the
+# bracket. Matched only in its tight spelling, the opener reads as unclosed - and
+# an unclosed opener keeps what came *before* it, so the logo lost its artwork
+# and kept nothing. The script goes and the drawing stays.
+func testStripScriptsClosesOnASpacedOutEndTag() {
+    testing.assertEqual(
+        stripScripts("<svg><script>alert(1)</script ><circle/></svg>"),
+        "<svg><circle/></svg>");
+    testing.assertEqual(
+        stripScripts("<svg><script>alert(1)</script\n><circle/></svg>"),
+        "<svg><circle/></svg>");
+}
+
+# An end tag with no bracket at all never ends: everything after the opener is
+# script, and none of it belongs on the page.
+func testStripScriptsDropsAnUnclosedEndTag() {
+    testing.assertEqual(stripScripts("<svg><circle/><script>x</script"), "<svg><circle/>");
+}
+
 func testStripScriptsIsCaseInsensitive() {
     testing.assertFalse(strings.contains(
         strings.lower(stripScripts("<svg><SCRIPT>x</SCRIPT></svg>")),

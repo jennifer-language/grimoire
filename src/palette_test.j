@@ -323,10 +323,9 @@ func testStylesheetCoversAllThreeWaysAModeCanBeChosen() {
     testing.assertContains($css, ':root[data-theme="light"]');
 }
 
-# A reader whose system is dark and who never touched the selector gets the
+# A reader whose system is dark and who never touches the selector gets the
 # `@media` block and nothing else, so every palette that is not per-theme has to
-# be in it. The syntax colours were missing from it for a while, which left light
-# token colours on a dark page.
+# be in it. One missing there is light token colours on a dark page.
 func testEveryModeBlockCarriesEveryPalette() {
     def blocks as list of string init strings.split(stylesheet(sampleTheme()), '}');
     def dark as int init 0;

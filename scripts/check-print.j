@@ -10,17 +10,15 @@
  * it reaches the page as whatever `TRANSLITERATIONS` in `src/pdfbook.j` says, or
  * as `?` if it says nothing. This walks everything that ends up in
  * `grimoire.pdf` - every chapter, the configured strings around them, and the
- * interface labels the layout now draws - and reports each character that would
+ * admonition labels the layout draws - and reports each character that would
  * print as a question mark.
  *
- * It is the other half of `scripts/check-style.sh`, and the half that has a
- * reason to care about letters. The punctuation check deliberately allows them:
- * an umlaut in a test fixture is data, and the site renders it perfectly. This
- * one asks a narrower question about a smaller set of files - will the *printed*
- * book show it - and answers it with the module's own table rather than with a
- * guess about which alphabets are safe. An `a` with an umlaut passes here, which
- * the old blanket grep never allowed; a Cyrillic word does not, which the old
- * grep caught only by banning every letter it had never seen.
+ * It is the other half of `scripts/check-style.sh`, and the half with a reason
+ * to care about letters. That one asks whether a character belongs in the source
+ * at all; this one asks whether the *printed* book can show it, and answers with
+ * the module's own table rather than a guess about which alphabets are safe. An
+ * `a` with an umlaut passes, because the fonts draw it. A Cyrillic word does
+ * not.
  *
  *   jennifer run scripts/check-print.j [grimoire.toml]
  *

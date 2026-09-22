@@ -7,6 +7,7 @@
 - [Installation](installation.md)
 - [Commands](commands.md)
 - [Configuration](configuration.md)
+- [Markdown](markdown.md)
 - [Themes](themes.md)
 
 # Reference

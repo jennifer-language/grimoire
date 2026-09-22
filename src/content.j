@@ -286,10 +286,10 @@ func renderCode(n as markdown.Node, highlighting as bool) {
 # renderAdmonition draws a callout: the label, then the blocks the parser put
 # inside it.
 #
-# The label is Grimoire's word unless the author supplied one. A marker can carry
-# a title - `> [!NOTE] Mind the gap` - and a title is the author speaking, so it
-# is used as written and is not uppercased the way the standing labels are.
-# Without one, the kind's name arrives in the book's language from the catalogs.
+# The label is the kind's name from the catalogs, in the book's language - unless
+# the marker carried a title (`> [!NOTE] Mind the gap`). A title is the author's
+# text, so it is used as written and marked so the sheet does not set it in the
+# small capitals a standing label gets.
 func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool) {
     def kind as string init markdown.attr($n, "kind");
     def title as string init markdown.attr($n, "title");
@@ -311,16 +311,14 @@ func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool)
 }
 
 # titlesIn collects the title of every callout at or below a node, in document
-# order.
+# order. A title is an attribute rather than a child, so `markdown.text` walks
+# past it, and words printed on the page would be unfindable by the search that
+# indexes that page.
 #
-# A title is an attribute rather than a child, so `markdown.text` walks straight
-# past it: without this, words printed on the page would be unfindable by the
-# search that indexes that page.
-#
-# The descent stops at anything that cannot hold a block. A paragraph's children
-# are inline, a table cell holds no blocks, and a code block is text - so this
-# visits the handful of container nodes and nothing else, which is strictly less
-# of the tree than the `markdown.text` beside it already walks.
+# The descent stops at anything that cannot hold a block: a paragraph's children
+# are inline, a table cell holds no blocks, a code block is text. It visits the
+# container nodes and nothing else, which is less of the tree than the
+# `markdown.text` beside it walks.
 func titlesIn(n as markdown.Node) {
     def kind as string init markdown.typeOf($n);
     def parts as list of string;
@@ -342,13 +340,12 @@ func titlesIn(n as markdown.Node) {
 }
 
 # indexText is the text a block contributes to the search index: its own, plus
-# the titles of any callouts in it. The parser keeps a callout's marker out of
-# its text already - the marker is machinery - but a title is the author's own
-# words and belongs in the index the way a heading does.
+# the titles of any callouts in it. The parser keeps the marker out of the text
+# - that is machinery - while a title is the author's words and belongs in the
+# index the way a heading does.
 #
-# The titles lead. A record is a bag of words to the scorer, and the body is
-# truncated to `searchBodyChars`, so a title that went in at its own position
-# could be cut off the end of a long section it was announcing.
+# The titles lead, because the body is truncated to `searchBodyChars` and a title
+# at its own position could be cut off the end of the section it announces.
 func indexText(n as markdown.Node) {
     def titles as string init titlesIn($n);
     if ($titles == "") {

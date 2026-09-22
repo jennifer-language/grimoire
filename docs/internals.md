@@ -87,8 +87,7 @@ is what decides three things about the layout above:
   module, and it has no business in the directory that gets installed into
   somebody else's project.
 - **The entry module is named after the deck.** `@jennifer/grimoire` needs
-  `src/grimoire.j`, which is what the CLI module used to call itself `main.j`
-  for.
+  `src/grimoire.j`, so that is what the CLI module is called.
 - **`capabilities` declares what the code actually reaches for.** `net` for
   `serve`, which binds a port through `httpd`; `exec` for the one `os.run` that
   asks git for the PDF footer's version stamp. Neither is needed to build a book,
@@ -172,9 +171,9 @@ That last part takes two mechanisms, because chapters are not all at the same
 level. A chapter outside the parts keeps its level-one heading, and the layout
 breaks the page at every level-one heading - which is also what gives the cover a
 page to itself. A chapter **under a part** is demoted one level so the part
-heading can own the top of the outline, and a demoted heading no longer breaks
-anything; those chapters ask for the break explicitly with a `<!-- pagebreak -->`
-directive, which the module parses into a `page_break` node. The chapter that
+heading can own the top of the outline, and a demoted heading breaks nothing; those chapters ask for the break explicitly with a `<!-- pagebreak -->`
+directive, which the module parses into a `page_break` node - the authoring side
+of it is in [Markdown](markdown.md#page-breaks). The chapter that
 opens a part is the exception: the part heading has just broken the page, and a
 second break would leave the part title alone on a sheet.
 
@@ -182,11 +181,11 @@ Writing the directive as an HTML comment is deliberate - the same combined sourc
 still renders as HTML, where a browser shows nothing at all.
 
 A part runs from its heading to the next **separator**. That is the only mark a
-`SUMMARY.md` has for saying the parts are over, and without it an appendix listed
-after them was demoted as though it sat inside the last one - printed as a
-subsection of a part it has nothing to do with. A `---` between the parts and the
-suffix chapters ends the part and puts those chapters back at level one, where
-the sidebar has always shown them:
+`SUMMARY.md` has for saying the parts are over. Without one, an appendix listed
+after the parts is demoted as though it sat inside the last of them, and prints
+as a subsection of a part it has nothing to do with. A `---` between the parts
+and the suffix chapters ends the part and puts those chapters back at level one,
+where the sidebar shows them:
 
 ```markdown
 # Part One
@@ -240,13 +239,25 @@ continuation line, and an indented continuation that loses its indent stops
 belonging to its list item and becomes a stranded paragraph between the items.
 The layout reflows paragraphs itself, so there is nothing to gain by trying.
 
-Characters the standard-14 fonts cannot encode are transliterated here - a
-rightwards arrow (U+2192) to `->`, box drawing to `-` and `|` - before the
-layout sees them. The character is named rather than shown, so this page obeys
-the punctuation rule it is describing. The module would
-substitute a single `?` for each, which is correct but says less: `->` says what
-the arrow said. So Grimoire spends a transliteration table and leaves
-`unencodable` as the last resort for the rest.
+Characters the standard-14 fonts cannot encode are transliterated before the
+layout sees them: a rightwards arrow (U+2192) to `->`, box drawing to `-` and
+`|`. The character is named rather than shown here, so this page obeys the
+punctuation rule it describes. `unencodable` is the last resort for whatever the
+table has no reading for, and a `?` says less than `->` does.
+
+Most of the table is letters rather than symbols. WinAnsi covers the French,
+German and Spanish alphabets and stops there, which leaves Polish, Czech,
+Hungarian, Turkish, Croatian, Romanian, Latvian and Lithuanian - eight of them
+in a tool whose interface speaks eleven languages. Latin Extended-A holds those
+alphabets, and every character in it is a Latin letter with a diacritic, so the
+reading is the letter without it: `Zwykły tekst` prints as `Zwykly tekst`, which
+is what a passport does with the same name. A letter WinAnsi does carry is left
+alone, so most of a Czech sentence survives as written.
+
+A non-Latin alphabet has no letter to fall back to, so Cyrillic, Greek prose and
+the CJK scripts print as question marks. Romanising one is a different job from
+dropping a diacritic. `scripts/check-print.j` reports which characters a given
+book would lose.
 
 ## What the layout does, and what it does not
 
@@ -407,15 +418,15 @@ Not built, but the shape is there for them: a link checker over the resolved
 outline (the build already knows every output path and anchor), and
 multi-language books.
 
-An MCP server is a third, and `agents.j` is the half of it worth having first. A
-`grimoire mcp` subcommand over stdio - the transport the protocol leads with, so
-a subprocess the agent spawns rather than a daemon with a port and a lifetime -
-would be a *reader* of a built site: `outline`, `page`, `search`, and the anchor
-for a heading, answered from `llms.txt` and `assets/search-index.json` rather
-than by rendering anything. The system `mcp` module has the server side of it.
-Two things to know before starting. A tool handler is a bare top-level `func`
-taking only its JSON arguments, so it cannot close over the book and would
-re-read the site per call - which suits the stateless profile that module
-targets. And the honest test is whether it beats `grep -rn docs/`: on a checkout
-it does not, which is why the static files come first and cover the case where
-there is no checkout to grep.
+An MCP server is a third. `grimoire mcp` over stdio - the transport the protocol
+leads with, so a subprocess the agent spawns rather than a daemon with a port -
+reads a built site and answers `outline`, `page`, `search`, and the anchor for a
+heading from `llms.txt` and `assets/search-index.json`. Nothing renders. The
+system `mcp` module supplies the server side.
+
+Two constraints shape it. A tool handler is a bare top-level `func` taking only
+its JSON arguments, so it cannot close over the book and re-reads the site per
+call, which matches the stateless profile that module targets. And the test to
+apply is whether it beats `grep -rn docs/`: on a checkout it does not, which is
+what `agents.j` and its static files are for - the reader with no checkout to
+grep.

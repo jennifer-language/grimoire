@@ -66,11 +66,10 @@ default.
 - **A preview that reloads itself.** `serve --watch` rebuilds on save and
   reloads the open page, with the script that does it spliced into the response
   rather than written to disk - the published files never carry it.
-- **[Admonitions](configuration.md#admonitions)** in the syntax GitHub and
-  Obsidian already read - `> [!WARNING]` and four others, with an optional title
-  of your own - labelled in the book's language, and coloured the same way in
-  all ten themes. A renderer that has never heard of them still shows the
-  quotation.
+- **[Admonitions](markdown.md#admonitions)** in GitHub's syntax: `> [!WARNING]`
+  and four others, with an optional title, labelled in the book's language and
+  coloured the same way in all ten themes. A renderer that does not know the
+  syntax shows a plain quotation.
 - **[Eleven interface languages](configuration.md#the-interface-language).** The
   twenty-odd words Grimoire adds around your text - "Search", "On this page",
   "Previous" - follow the book's `language`, with English wherever no
@@ -107,6 +106,7 @@ default.
 | [Installation](installation.md) | from a checkout, or from a container with Docker or Podman |
 | [Commands](commands.md) | every subcommand and flag |
 | [Configuration](configuration.md) | `grimoire.toml`, key by key |
+| [Markdown](markdown.md) | what Grimoire reads on top of CommonMark |
 | [Themes](themes.md) | the ten themes, with screenshots, and how to write one |
 | [Internals](internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](performance.md) | where the time goes, and why it scales the way it does |

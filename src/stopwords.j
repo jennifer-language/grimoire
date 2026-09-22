@@ -30,12 +30,10 @@
  * them: separating a clause into words needs a segmenter, and `keywords.j` skips
  * those scripts instead of pretending a clause is a term.
  *
- * **This is the second file in the repository that is not ASCII**, for the same
- * reason as the first: a Russian stop word is Cyrillic or it is not a Russian
- * word, and German needs its umlauts. Everything the rule is actually about
- * still holds - no em dashes, no curly quotes, no typographic ellipsis - and
- * `src/stopwords_test.j` enforces that now that the repository's one-line grep
- * cannot. What these files may contain is letters.
+ * The lists are letters, which the repository's punctuation rule allows: a
+ * Russian stop word is Cyrillic or it is not a Russian word, and German needs
+ * its umlauts. The rest of that rule holds here as everywhere - no em dashes, no
+ * curly quotes, no typographic ellipsis.
  *
  * Every list is sorted by codepoint, which is what `lists.sort` gives and what
  * `src/stopwords_test.j` checks: an addition lands in one place rather than

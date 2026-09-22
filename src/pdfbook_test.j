@@ -75,10 +75,9 @@ func testSanitizeTransliteratesRatherThanDropping() {
 
 # Only what the codec cannot carry is rewritten, and WinAnsi carries more than
 # the repository's own punctuation rule allows: an ellipsis, the curly quotes,
-# both dashes and a bullet all encode, so they reach the page as themselves. The
-# readings `TRANSLITERATIONS` holds for those are unreachable - harmless, but not
-# doing anything either. A book's own content is where they turn up, and it is
-# right that they print as written.
+# both dashes and a bullet all encode, so they reach the page as themselves. A
+# book's own content is where those turn up, and it is right that they print as
+# written - which is also why the table holds no reading for any of them.
 func testSanitizeLeavesWinAnsiPunctuationAsItIs() {
     for (def cp in [0x2026, 0x2018, 0x2019, 0x201C, 0x201D, 0x2013, 0x2014, 0x2022]) {
         def ch as string init convert.fromCodepoint($cp);
@@ -95,6 +94,66 @@ func testSanitizeKeepsLineStructure() {
 func testSanitizeKeepsTheEncodableCharactersAroundIt() {
     def arrow as string init convert.fromCodepoint(0x2192);
     testing.assertEqual(sanitize("a" + $arrow + "b"), "a->b");
+}
+
+# WinAnsi has the French and German and Spanish letters and stops, so before
+# these readings existed a Polish book printed as `Zwyk?y tekst` and a Czech,
+# Hungarian, Turkish, Romanian or Baltic one the same way. The reading is the
+# letter without its diacritic: not the word the author wrote, but their book
+# rather than a page of question marks.
+func testSanitizeReadsTheEuropeanAlphabets() {
+    for (def sample in [
+        "Zwykły tekst z zachętą",
+        "Příliš žluťoučký kůň úpěl",
+        "Árvíztűrő tükörfúrógép",
+        "Pijamalı hasta yağız şoföre",
+        "Țara și București",
+        "Ēdiet vēl šīs mīkstās karameles",
+        "Įlinkdama fechtuotojo špaga",
+        "Đurđevak i ćevapi"
+    ]) {
+        testing.assertFalse(strings.contains(sanitize($sample), "?"));
+    }
+    testing.assertEqual(sanitize("Zwykły tekst z zachętą"), "Zwykly tekst z zacheta");
+    testing.assertEqual(sanitize("Țara și București"), "Tara si Bucuresti");
+    # What WinAnsi already draws stays as the author wrote it: only the two
+    # Hungarian letters it lacks are reduced.
+    testing.assertEqual(sanitize("Árvíztűrő tükörfúrógép"), "Árvízturo tükörfúrógép");
+}
+
+# Four entries are not a letter plus a mark, so the reading is not simply the
+# letter under it.
+func testTheReadingsThatAreNotJustADroppedMark() {
+    testing.assertEqual(sanitize("Đurđevak"), "Durdevak");
+    testing.assertEqual(sanitize(convert.fromCodepoint(0x0132)), "IJ");
+    testing.assertEqual(sanitize(convert.fromCodepoint(0x0149)), "'n");
+    testing.assertEqual(sanitize(convert.fromCodepoint(0x014B)), "ng");
+}
+
+# A reading that is not ASCII would be a character the fonts cannot draw
+# standing in for a character the fonts cannot draw.
+func testEveryReadingIsAscii() {
+    for (def key in maps.keys(TRANSLITERATIONS)) {
+        def reading as string init TRANSLITERATIONS[$key];
+        testing.assertNotEqual($reading, "");
+        for (def ch in strings.chars($reading)) {
+            testing.assertTrue(convert.toCodepoint($ch) < 128);
+        }
+    }
+}
+
+# An entry for a character WinAnsi draws is never consulted, and reading the
+# table would suggest otherwise. `sanitize` asks `encodable` first.
+func testTheTableHoldsNothingTheFontsCanDraw() {
+    for (def key in maps.keys(TRANSLITERATIONS)) {
+        testing.assertFalse(encodable($key));
+    }
+}
+
+# The boundary, stated: an alphabet that is not Latin has no letter to fall back
+# to, so it is still question marks. Romanising one is a different job.
+func testANonLatinAlphabetIsStillLost() {
+    testing.assertEqual(sanitize("Примечание"), "??????????");
 }
 
 # Every string on the cover page goes through this, so a title carrying a
@@ -176,9 +235,9 @@ func testPrintLineDropsATitle() {
         "see x (https://example.com)");
 }
 
-# An image is left exactly as written now that the layout can draw one. Both link
-# patterns would otherwise match the `[alt](url)` inside it - an image target is
-# never a `.md` file, so it fell through to the general pattern and printed
+# An image is left exactly as written, for the layout to draw. Both link patterns
+# match the `[alt](url)` inside it otherwise - an image target is never a `.md`
+# file, so it falls through to the general pattern and prints
 # `alt (diagram.png)`, a file path in the middle of the prose.
 func testPrintLineLeavesAnImageWhole() {
     testing.assertEqual(printLine("![alt](diagram.png)", ""), "![alt](diagram.png)");
@@ -377,6 +436,21 @@ func testPdfOptionsCarryTheTranslatedLabels() {
     testing.assertEqual(pdfOptions($c).admonitionLabels["note"], "Note");
 }
 
+# Every other word on the page went through `prepare`; a label is handed to the
+# layout as an option and never passes that way. Left raw it would be one `?`
+# per character, so a Polish book would print a transliterated sentence under a
+# label full of question marks.
+func testTheLabelsAreTransliteratedLikeEverythingElse() {
+    locale.install("pl");
+    def labels as map of string to string init pdfOptions(config.defaults()).admonitionLabels;
+    # Only what WinAnsi lacks is reduced: the `z` with a dot goes, the `o` with
+    # an acute stays, because the fonts can draw that one.
+    testing.assertEqual($labels["warning"], "Ostrzezenie");
+    testing.assertEqual($labels["tip"], "Wskazówka");
+    locale.install("en");
+    testing.assertEqual(pdfOptions(config.defaults()).admonitionLabels["note"], "Note");
+}
+
 func testEveryKindReachesTheLayout() {
     locale.install("en");
     def labels as map of string to string init pdfOptions(config.defaults()).admonitionLabels;
@@ -555,11 +629,10 @@ func testPdfOptionsMarkAnUnencodableCharacter() {
 
 # --- combine: where a part ends --------------------------------------
 #
-# A part heading used to be a one-way door: the state that demotes a chapter was
-# set at the first part and never cleared, so an appendix listed after the parts
-# was demoted and page-broken as though it sat inside the last one - the shape
-# the module's own docblock says a suffix chapter keeps. A separator ends the
-# part, which is the only mark a `SUMMARY.md` has for saying so.
+# A separator ends a part, and it is the only mark a `SUMMARY.md` has for saying
+# so. Without one the state that demotes a chapter stays set from the first part
+# onwards, and an appendix listed after the parts is demoted and page-broken as
+# though it sat inside the last of them.
 
 func chapters() {
     def root as string init fs.makeTempDir(os.tempDir(), "grimoire-parts-");

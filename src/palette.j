@@ -1217,9 +1217,8 @@ export func stylesheet(t as Theme) {
     $out[] = '}';
     $out[] = "";
     # The system-dark block carries the palettes that are not per-theme as well
-    # as the theme's own. It used to carry only the theme's, which left a reader
-    # whose system is dark - and who never touched the selector, which is most of
-    # them - reading light syntax colours on a dark page.
+    # as the theme's own. A reader whose system is dark and who never touches the
+    # selector - which is most of them - sees this block and no other.
     $out[] = '@media (prefers-color-scheme: dark) {';
     $out[] = '    :root:not([data-theme="light"]) {';
     $out[] = vars($t.dark, "        ");

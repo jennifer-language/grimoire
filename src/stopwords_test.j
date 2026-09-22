@@ -19,9 +19,9 @@
  * - and English has to reach every book, or a German page loses `the` from its
  *   code spans.
  *
- * The lists are letters and nothing else, which the repository's punctuation
- * check allows and its print check never looks at - a stop word is consulted
- * rather than printed. Neither needs an exception for this file.
+ * The lists are letters and nothing else. `scripts/check-style.sh` allows those,
+ * and `scripts/check-print.j` never looks here - a stop word is consulted rather
+ * than printed.
  * @module stopwords_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -182,9 +182,8 @@ func testTheTagIsReadCaseInsensitively() {
     testing.assertTrue(has("DE-at"));
 }
 
-# An unknown language is not an error: the book keeps the English list, which is
-# what it had before this module existed, and `keywordStopwords` is where its
-# author fills the gap.
+# An unknown language is not an error. The book keeps the English list, and
+# `keywordStopwords` is where its author fills the gap.
 func testAnUnknownLanguageKeepsEnglish() {
     testing.assertFalse(has("xx"));
     testing.assertFalse(has(""));

@@ -14,12 +14,9 @@
  * raw key name on a Polish reader's page and nowhere else. `testEveryCatalog...`
  * below compares all eleven against English on every run.
  *
- * `src/locale.j` holds letters no other file does, and that used to need an
- * exception: the repository's check banned every non-ASCII character, so this
- * file was excluded from it and re-checked here instead.
- * `scripts/check-style.sh` bans the characters the rule is about rather than
- * every character it has not seen, so letters need no exception and this file
- * needs no stand-in for the check.
+ * The catalogs hold letters no other file does, and need no exception for it:
+ * `scripts/check-style.sh` bans typographic punctuation rather than every
+ * character it has not seen.
  * @module locale_test
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only

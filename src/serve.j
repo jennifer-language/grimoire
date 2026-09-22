@@ -91,15 +91,29 @@ func pageFile(root as string, urlPath as string) {
     return $file;
 }
 
-# inject splices the reload script in before the closing body tag. Grimoire wrote
-# the page being spliced, three modules away, and that page carries exactly one
-# `</body>`, on its own line near the end.
+# The closing tag the reload script is spliced in front of.
+def const BODY_CLOSE as string init "</body>";
+
+# inject splices the reload script in before the closing body tag - the **last**
+# one, which is the tag `layout.j` writes.
+#
+# The first one is not always that tag. A code span cannot produce a second: the
+# renderer escapes it, so `</body>` in one reaches the page as `&lt;/body&gt;`.
+# A **raw HTML block** can, and `html.rawHtml` is on by default - so a chapter
+# that shows a whole HTML document, a template or an example page, carries a
+# literal closing tag in the middle of the prose. Splicing there would drop a
+# script into the text a reader is looking at.
+#
+# `strings` has no `lastIndexOf`, so the split does the work: the text after the
+# final occurrence is the last element, and its length says where that
+# occurrence began.
 func inject(page as string) {
     def script as string init "<script>" + assets.liveReload(RELOAD_PATH, POLL_MS) + "</script>";
-    def at as int init strings.indexOf($page, "</body>");
-    if ($at < 0) {
+    def parts as list of string init strings.split($page, BODY_CLOSE);
+    if (len($parts) < 2) {
         return $page + $script;
     }
+    def at as int init len($page) - len($parts[len($parts) - 1]) - len(BODY_CLOSE);
     return strings.substring($page, 0, $at) + $script +
         strings.substring($page, $at, len($page));
 }

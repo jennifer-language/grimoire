@@ -6,26 +6,23 @@
  * The two files a built book offers a program rather than a reader: `llms.txt`
  * at the site root, and the search index as JSON beside its JavaScript twin.
  *
- * The audience is an agent that has the *published* book and not its sources. On
- * a checkout there is nothing here worth having - the Markdown is right there,
- * and `grep` beats any index. Over HTTP there is no `grep`, and the alternative
- * to these two files is fetching every page and re-deriving what the build
- * already knows: which chapters exist, in what order, under which part, and what
- * text sits under each heading.
+ * The audience is a program holding the *published* book and not its sources.
+ * On a checkout these are worth little: the Markdown is right there and `grep`
+ * beats any index. Over HTTP the alternative is fetching every page to
+ * re-derive what the build already knows - which chapters exist, in what order,
+ * under which part, and what text sits under each heading.
  *
- * Both are written at build time and served as static files. That is the whole
- * design: no daemon, no protocol, no capability, nothing to keep running, and it
- * works on the static hosts these books are published to. A book on GitHub Pages
- * is readable by a program the moment it is deployed.
+ * Both are written at build time and served as static files: no daemon, no
+ * protocol, no capability, nothing to keep running. A book on GitHub Pages is
+ * readable by a program the moment it is deployed.
  *
  * `llms.txt` follows the convention at <https://llmstxt.org>: an H1 with the
  * book title, an optional blockquote summary, free-form details, then `##`
  * sections of link lists. The outline supplies the sections - a part heading in
  * `SUMMARY.md` becomes an `##`, and chapters outside any part fall under a
- * default one - so the file has the shape a reader would recognise from the
- * sidebar. Paths are relative to the site root, because a book does not know
- * where it is published; a fetcher resolves them against the URL it read the
- * file from.
+ * default one - so the file has the shape the sidebar has. Paths are relative
+ * to the site root: a book does not know where it is published, and a fetcher
+ * resolves them against the URL it read the file from.
  * @module agents
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -40,10 +37,9 @@ import "./summary.j" as summary;
 import "./util.j" as util;
 import "./version.j" as version;
 
-# Where the JSON index lands. It sits beside `search-index.js` rather than at the
-# site root because it is the same data: one file for the browser, one for a
-# program. `llms.txt` is the discoverable entry point and links to it, so nothing
-# has to guess this path.
+# Where the JSON index lands: beside `search-index.js`, because it is the same
+# data in a second shape. `llms.txt` is the entry point and links to it, so
+# nothing has to guess this path.
 def const INDEX_FILE as string init "assets/search-index.json";
 
 # The site-root file name, fixed by the convention.

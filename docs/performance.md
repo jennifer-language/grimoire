@@ -59,8 +59,8 @@ Where a `grimoire pdf` of this book goes:
 | writing the file | 0.2 s | the `pdf` module |
 
 Six sevenths of it is inside the modules, and single-threaded. The parse and the
-layout are now the same size to within a rounding error; writing the file used to
-be 3.6 s and is no longer worth naming.
+layout are the same size to within a rounding error; writing the file does not
+register beside them.
 
 Grimoire starts the PDF at the same time as the chapter render, so `--pdf` costs
 roughly `max(site, pdf)` rather than their sum - 37.9 s against a 35.7 s PDF and

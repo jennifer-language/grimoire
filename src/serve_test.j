@@ -146,6 +146,22 @@ func testInjectKeepsThePageIntact() {
     testing.assertContains($out, "</html>");
 }
 
+# A chapter that shows a whole HTML document does it in a raw HTML block, which
+# `html.rawHtml` passes through verbatim - so the page carries a literal closing
+# tag in the middle of the prose, and the tag that ends the page is the last one
+# rather than the first. Splicing at the first would drop the script into the
+# text a reader is looking at. A code span cannot cause this: the renderer
+# escapes it.
+func testInjectUsesTheLastClosingBody() {
+    def block as string init "<pre>&lt;html&gt;<b>...</b></body></html></pre>";
+    def page as string init "<html><body>" + $block + "<p>after</p></body></html>";
+    def out as string init inject($page);
+    testing.assertTrue(strings.indexOf($out, "<script>") > strings.indexOf($out, "after"));
+    testing.assertTrue(strings.endsWith($out, "</body></html>"));
+    # What the author wrote is still where they wrote it.
+    testing.assertContains($out, $block);
+}
+
 # Grimoire wrote the page being spliced, three modules away, so a page with no
 # closing tag is not a case that arises - but appending is a better answer than
 # losing the script.
