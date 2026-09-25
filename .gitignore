@@ -4,3 +4,9 @@ site/
 # Dogfood corpus: the official Jennifer documentation, used during development
 # to have something real to render. Not part of Grimoire, never committed.
 sample-docs/
+
+# The plugin collection is fetched into the container build context, not
+# committed: it is another repository, pinned by `PLUGINS_REF` in
+# `.github/workflows/docker.yml`.
+plugins-src/*
+!plugins-src/README.md

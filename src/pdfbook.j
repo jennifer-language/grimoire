@@ -702,7 +702,7 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
         if ($e.kind != summary.pageKind()) {
             continue;
         }
-        def file as string init path.join($c.srcDir, $e.src);
+        def file as string init path.join(config.contentDir($c), $e.src);
         if (not fs.isFile($file)) {
             continue;
         }

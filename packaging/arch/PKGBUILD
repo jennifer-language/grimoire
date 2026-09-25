@@ -21,7 +21,7 @@ check() {
 
 	# Catches the case this package is most likely to get wrong: an interpreter
 	# too old to parse the sources it has just been paired with.
-	jennifer lint bin/grimoire src/*.j src/themes/*.j
+	jennifer lint bin/grimoire src/*.j src/themes/*.j plugins/*
 
 	# The repository is its own book, so a real build is available here for
 	# free. Nothing is fetched - `[highlightjs]` is off, and the built-in
@@ -48,6 +48,20 @@ package() {
 
 	install -dm755 "$pkgdir/usr/bin"
 	ln -s "/usr/lib/$pkgname/bin/grimoire" "$pkgdir/usr/bin/$pkgname"
+
+	# The plugins that ship go beside the launcher rather than into /usr/bin.
+	# Grimoire looks in its own `plugins/` directory before PATH, so a bare
+	# `[preprocessor.include]` still finds one - and `grimoire` stays the only
+	# command here, which keeps `grimoire<TAB>` a completed word rather than an
+	# ambiguous prefix shared with every plugin.
+	#
+	# The launchers are programs and the rest are modules, so the two get the
+	# modes they are: a module with the execute bit set is a file that lies
+	# about what it is. The test overlays travel with them, as `src/`'s do.
+	find plugins -type f -name 'grimoire-*' \
+		-exec install -Dm755 '{}' "$pkgdir/usr/lib/$pkgname/{}" ';'
+	find plugins -type f -name '*.j' \
+		-exec install -Dm644 '{}' "$pkgdir/usr/lib/$pkgname/{}" ';'
 
 	install -Dm644 LICENSE.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE.md"
 	install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"

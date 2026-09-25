@@ -8,6 +8,7 @@
 - [Commands](commands.md)
 - [Configuration](configuration.md)
 - [Markdown](markdown.md)
+- [Plugins](plugins.md)
 - [Themes](themes.md)
 
 # Reference

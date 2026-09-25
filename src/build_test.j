@@ -720,6 +720,80 @@ func testCopyAssetsCopiesEverythingWhenTheOutputIsElsewhere() {
     testing.assertTrue(fs.isFile(path.join($root, "site/logo.png")));
 }
 
+# --- relativeTo, underVersionControl ---------------------------------
+#
+# `fs.walk` prefixes what it yields with the directory it was given - except for
+# `.`, where it does not. Cutting `len(srcDir) + 1` characters off the front was
+# right for `src = "docs"` and took two characters off every name for
+# `src = "."`: a book built that way published `sources/program.txt` as
+# `urces/program.txt`, and its own chapter `a.md` became an asset called `md`,
+# because the truncation happened before the extension was tested.
+
+func testARelativePathIsWhatIsLeftAfterTheRoot() {
+    testing.assertEqual(relativeTo("docs", "docs/index.md"), "index.md");
+    testing.assertEqual(relativeTo("docs", "docs/guide/a.png"), "guide/a.png");
+    testing.assertEqual(relativeTo("docs/", "docs/a.png"), "a.png");
+    testing.assertEqual(relativeTo("/abs/docs", "/abs/docs/a.png"), "a.png");
+}
+
+# The case that was broken: a walk of `.` yields bare names, and they are already
+# relative to the root.
+func testAWalkOfTheWorkingDirectoryKeepsWholeNames() {
+    testing.assertEqual(relativeTo(".", "sources/program.txt"), "sources/program.txt");
+    testing.assertEqual(relativeTo(".", "notes.csv"), "notes.csv");
+    testing.assertEqual(relativeTo(".", "a.md"), "a.md");
+    testing.assertEqual(relativeTo(".", "./a.md"), "a.md");
+    testing.assertEqual(relativeTo(".", ".hidden/secret.txt"), ".hidden/secret.txt");
+}
+
+# A repository's own metadata is never a book's asset, and `src = "."` puts it
+# inside the source tree. `.github` is not version control and stays.
+func testVersionControlMetadataIsRecognised() {
+    testing.assertTrue(underVersionControl(".git/config"));
+    testing.assertTrue(underVersionControl(".git/objects/ab/cdef"));
+    testing.assertTrue(underVersionControl("vendor/thing/.hg/store"));
+    testing.assertTrue(underVersionControl(".jj/repo"));
+    testing.assertFalse(underVersionControl(".github/workflows/test.yml"));
+    testing.assertFalse(underVersionControl("docs/gitignore.md"));
+    testing.assertFalse(underVersionControl("docs/a.png"));
+}
+
+# --- copyAssets with the book at the repository root -----------------
+
+func bookAtItsRoot() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-root-");
+    fs.mkdirAll(path.join($root, "sources"));
+    fs.mkdirAll(path.join($root, ".git/objects"));
+    fs.mkdirAll(path.join($root, ".hidden"));
+    fs.writeString(path.join($root, "index.md"), "# Book\n");
+    fs.writeString(path.join($root, "a.md"), "# A\n");
+    fs.writeString(path.join($root, "notes.csv"), "z");
+    fs.writeString(path.join($root, "sources/program.txt"), "x");
+    fs.writeString(path.join($root, ".hidden/secret.txt"), "y");
+    fs.writeString(path.join($root, ".git/config"), "[core]");
+    fs.writeString(path.join($root, "grimoire.toml"), '[book]');
+    return $root;
+}
+
+# Every path intact, the chapters left as chapters, the repository not published,
+# and the manifest that configured the build not published either.
+func testCopyAssetsFromARootKeepsWholePaths() {
+    def root as string init bookAtItsRoot();
+    def c as config.Config init config.defaults();
+    $c.srcDir = $root;
+    $c.outDir = path.join($root, "out");
+    $c.configFile = path.join($root, "grimoire.toml");
+    testing.assertEqual(copyAssets($c), 3);
+    testing.assertTrue(fs.isFile(path.join($root, "out/sources/program.txt")));
+    testing.assertTrue(fs.isFile(path.join($root, "out/notes.csv")));
+    testing.assertTrue(fs.isFile(path.join($root, "out/.hidden/secret.txt")));
+    testing.assertFalse(fs.isFile(path.join($root, "out/md")));
+    testing.assertFalse(fs.isFile(path.join($root, "out/a.md")));
+    testing.assertFalse(fs.isDir(path.join($root, "out/.git")));
+    testing.assertFalse(fs.isFile(path.join($root, "out/grimoire.toml")));
+    fs.removeAll($root);
+}
+
 # --- writeFile -------------------------------------------------------
 
 # The report prints this as "55 KiB". `len` on a string is its rune count, so a

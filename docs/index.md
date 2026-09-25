@@ -27,6 +27,7 @@ bin/grimoire build --pdf      # site plus the printable book
 bin/grimoire pdf              # the printable book on its own
 bin/grimoire serve            # build, then preview on :8080
 bin/grimoire themes           # list the built-in themes
+bin/grimoire plugins          # list the programs this book runs
 ```
 
 `bin/grimoire` is a Jennifer script with a shebang; the program itself is
@@ -70,6 +71,11 @@ default.
   and four others, with an optional title, labelled in the book's language and
   coloured the same way in all ten themes. A renderer that does not know the
   syntax shows a plain quotation.
+- **[Plugins](plugins.md)** as programs, not modules. A preprocessor reads the
+  book as JSON on stdin and writes the rewritten chapters back, so what it
+  changes reaches the site, the search index and the PDF; a renderer runs on the
+  finished book and makes something else of it. `grimoire-include` and
+  `grimoire-sitemap` ship with them.
 - **[Eleven interface languages](configuration.md#the-interface-language).** The
   twenty-odd words Grimoire adds around your text - "Search", "On this page",
   "Previous" - follow the book's `language`, with English wherever no
@@ -107,6 +113,7 @@ default.
 | [Commands](commands.md) | every subcommand and flag |
 | [Configuration](configuration.md) | `grimoire.toml`, key by key |
 | [Markdown](markdown.md) | what Grimoire reads on top of CommonMark |
+| [Plugins](plugins.md) | running a program over the book, and writing one |
 | [Themes](themes.md) | the ten themes, with screenshots, and how to write one |
 | [Internals](internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](performance.md) | where the time goes, and why it scales the way it does |

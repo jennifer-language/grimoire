@@ -91,6 +91,28 @@ exclude = []
 `src` is where the outline comes from. If it holds a `SUMMARY.md`, that file is
 the outline; if not, the directory tree is walked instead.
 
+Every non-Markdown file under `src` is copied into the site at the same path, so
+images and downloads sit beside the pages that use them. **`src = "."` is
+allowed** - a project whose repository root *is* the book writes it - and it is
+worth knowing what a whole repository then publishes: everything that is not
+Markdown, dotfiles included. Three things are never copied, whatever `src` is:
+
+| | |
+| - | - |
+| the output directory | so a build never copies the last build into this one |
+| version control metadata | `.git`, `.hg`, `.svn`, `.bzr`, `.jj`, `.sl` - never a book's asset, and a published `.git` is the whole history and any credential in its config. `.github` is not version control and is copied |
+| the manifest this build read | `grimoire.toml` is Grimoire's input, not the book's content |
+
+Anything else in a repository root - a `Makefile`, a `node_modules`, a directory
+of spikes - is published, because `src = "."` says the book is the repository. A
+book that wants a subset should say so with a directory.
+
+**A symlink is not followed.** The walk that copies assets does not report
+symlinks at all, so a directory of links into other trees builds its chapters -
+they are read by path, and a link resolves - and copies none of their images. One
+`src` is one directory; a book assembled from several needs its sources staged
+into one tree, which is a build step of its own.
+
 `authors` is used two ways, and only one of them is labelled. The `author` meta
 tag and the PDF `Author` field want the names alone, because those are read by
 software. The page footer and the PDF cover want a credit, because a name

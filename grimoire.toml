@@ -48,6 +48,13 @@ languages = ["bash", "toml", "json", "yaml", "ini"]
 enabled = true
 bodyChars = 1200
 
+# The manual is published at a known address, so it can carry a sitemap. The
+# renderer writes sitemap.xml from the outline and a robots.txt pointing at it,
+# after the site is built - see docs/plugins.md.
+[renderer.sitemap]
+baseUrl = "https://grimoire.jennifer-lang.dev/"
+
+
 [pdf]
 # On, so `grimoire build` always produces the PDF that index.md links to.
 enabled = true

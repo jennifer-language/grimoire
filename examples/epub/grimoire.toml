@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-epub. Build it from this directory:
+#
+#   grimoire build
+#
+# Open `site/field-guide.epub` in a reader afterwards.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-epub` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "Field Guide"
+description = "Two chapters, a picture and a cover, as a site and as an EPUB."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[renderer.epub]
+output = "field-guide.epub"
+cover = "assets/cover.png"

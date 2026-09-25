@@ -66,13 +66,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            fmt --check bin/grimoire src/*.j src/themes/*.j scripts/*.j
+            fmt --check bin/grimoire src/*.j src/themes/*.j scripts/*.j \
+            plugins/*.j plugins/grimoire-*
 
       - name: Lint
         run: |
           docker run --rm -v "$PWD:/work" \
             "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-            lint bin/grimoire src/*.j src/themes/*.j scripts/*.j
+            lint bin/grimoire src/*.j src/themes/*.j scripts/*.j \
+            plugins/*.j plugins/grimoire-*
 
       # Two checks, because the repository has two rules that used to be one
       # grep. `check-style.sh` bans the typographic characters - dashes, curly
@@ -131,8 +133,28 @@ jobs:
           check "src/ holds modules only" \
             '! grep -rlq "^#!" src/' \
             "something under src/ has a shebang; a program belongs in bin/"
+          # The image entrypoint. It reads GRIMOIRE_PLUGINS and then execs the
+          # launcher, so a lost execute bit is a container that cannot start at
+          # all - and nothing else in this job would notice.
+          check "the container entrypoint is executable" \
+            '[ -x packaging/docker-entrypoint.sh ]' \
+            "git tracks the mode; run: chmod +x packaging/docker-entrypoint.sh"
+          check "the container entrypoint ends in the launcher" \
+            'grep -q "^exec jennifer run /opt/grimoire/bin/grimoire" packaging/docker-entrypoint.sh' \
+            "everything after the image name has to reach Grimoire, as one exec"
+          check "the Dockerfile uses it" \
+            'grep -q "ENTRYPOINT \[\"/opt/grimoire/bin/docker-entrypoint.sh\"\]" Dockerfile' \
+            "the entrypoint script is in the image but nothing runs it"
+          check "the build context has a place for third-party plugins" \
+            '[ -f plugins-src/README.md ]' \
+            "COPY plugins-src fails without it; see plugins-src/README.md"
 
           exit "$fail"
+
+      # Every plugin that ships: a launcher, the module beside it, its overlay,
+      # and a book under examples/ that the job below builds.
+      - name: Check the shape of the plugins that ship
+        run: scripts/check-plugins.sh
 
       # The package page shows `org.opencontainers.image.description`. `docker.yml`
       # holds it once, as an env value, and the `Dockerfile` repeats it so a build
@@ -181,8 +203,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Full history, not a shallow clone: `grimoire-feed` and `grimoire-lastmod`
+      # date each chapter by the commit that last touched it, and a depth-1
+      # checkout has one commit for the whole tree - their examples would then be
+      # testing the checkout rather than the plugin.
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Pull the interpreter image
         run: docker pull "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}"
@@ -216,6 +244,116 @@ jobs:
           test -s out-j1/assets/grimoire.css
           test -s out-j1/assets/grimoire.js
           test -s out-j1/assets/search-index.js
+
+      # What a build executes that it did not write. The manual configures the
+      # sitemap renderer, so this reports one program, by its real path, and says
+      # it ships with Grimoire - which is the answer a reader of somebody else's
+      # book needs before they build it.
+      - name: Check that the build says what it runs
+        run: |
+          set -eu
+          out=$(docker run --rm -v "$PWD:/work" \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            run bin/grimoire plugins)
+          echo "$out"
+          echo "$out" | grep -q "renderer  sitemap"
+          echo "$out" | grep -q "plugins/grimoire-sitemap"
+          echo "$out" | grep -q "(ships with Grimoire)"
+
+      # Each shipped plugin's own book, built by the Grimoire in this checkout.
+      # They are small on purpose - one screen each - and they are the only
+      # end-to-end coverage the plugins have: the unit tests cover the pieces,
+      # and this covers the pipeline around them.
+      - name: Build every plugin example
+        run: |
+          set -eux
+          build() {
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$PWD:/work" -w "/work/examples/$1" \
+              "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+              run /work/bin/grimoire build "${@:2}"
+          }
+
+          build apiref
+          grep -q 'id="distance"' examples/apiref/site/reference.html
+          ! grep -q 'apiref src' examples/apiref/site/reference.html
+
+          build epub
+          unzip -v examples/epub/site/field-guide.epub | grep mimetype | grep -q Stored
+          unzip -l examples/epub/site/field-guide.epub | grep -q 'OEBPS/offline.xhtml'
+
+          build feed
+          grep -q '<rss version="2.0"' examples/feed/site/feed.xml
+
+          build glossary
+          grep -q 'href="glossary.html#outline"' examples/glossary/site/index.html
+          grep -q 'href="../glossary.html#search-index"' \
+            examples/glossary/site/guide/building.html
+
+          build lastmod
+          grep -q '<em>Last updated: 20' examples/lastmod/site/index.html
+
+          build linkcheck
+          test -s examples/linkcheck/site/index.html
+
+          build redirects
+          grep -q 'url=../../guide/syntax.html' \
+            examples/redirects/site/archive/2024/notes.html
+
+          build macros
+          grep -q 'version 1.4.0' examples/macros/site/index.html
+          # A fence is not expanded, and a backslash prints the macro instead.
+          grep -q 'thing --version {{ version }}' examples/macros/site/index.html
+          grep -q '{{ book.title }}' examples/macros/site/names.html
+
+          build figure
+          grep -q '<em>How a book is built</em>' examples/figure/site/index.html
+          grep -q '<em>The same picture, captioned by its alt text</em>' \
+            examples/figure/site/index.html
+
+          build emoji
+          # The source is ASCII and the page is not: the shortcode is gone and
+          # the character is there.
+          ! grep -q ':rocket:' examples/emoji/site/index.html
+          grep -q "$(printf '\xf0\x9f\x9a\x80')" examples/emoji/site/index.html
+          # A colon is punctuation long before it is markup.
+          grep -q '10:30' examples/emoji/site/quiet.html
+          grep -q 'std::vector' examples/emoji/site/quiet.html
+          grep -q ':rocket:' examples/emoji/site/quiet.html
+
+          build sitemap
+          grep -q '<loc>https://example.com/manual/guide/deeper.html</loc>' \
+            examples/sitemap/site/sitemap.xml
+          grep -q 'Sitemap: https://example.com/manual/sitemap.xml' \
+            examples/sitemap/site/robots.txt
+
+          # The three XML documents a plugin writes are parsed rather than
+          # grepped: well formed is a parser's judgement, and an EPUB reader or a
+          # crawler refuses what is not.
+          python3 - <<'CHECK'
+          import xml.etree.ElementTree as ET, zipfile
+          ET.parse("examples/sitemap/site/sitemap.xml")
+          ET.parse("examples/feed/site/feed.xml")
+          z = zipfile.ZipFile("examples/epub/site/field-guide.epub")
+          for n in z.namelist():
+              if n.endswith((".xhtml", ".opf", ".xml")):
+                  ET.fromstring(z.read(n))
+          print("every document parses")
+          CHECK
+
+      # The link checker has to be able to fail, or its example proves nothing.
+      - name: Check that a dead link fails the build
+        run: |
+          set -eu
+          printf '\nA [dead link](gone.md).\n' >> examples/linkcheck/docs/anchors.md
+          if docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" -w /work/examples/linkcheck \
+            "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+            run /work/bin/grimoire build --quiet; then
+            echo "expected the build to fail on a dead link"
+            exit 1
+          fi
+          git checkout -- examples/linkcheck/docs/anchors.md
 
       # A build reports a missing *chapter* but not a broken cross-reference, so
       # the one thing a Grimoire build cannot tell you about itself is checked

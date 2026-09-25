@@ -27,24 +27,51 @@ src/
   assets/           vendored: the Jennifer highlight.js grammar
   search.j          the search index
   agents.j          llms.txt and the JSON index, for a reader that is a program
+  plugin.j          the plugin contract: run a program over the book
   pdfbook.j         the printable build
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
   version.j         the version number, and the only copy of it in the sources
   *_test.j          one white-box test overlay per module, run by jennifer test
+plugins/            the nine that ship, found by name beside Grimoire
+  grimoire-NAME     the launcher: read stdin, run the module, exit its status
+  NAME.j            the module, where the work is
+  NAME_test.j       its overlay, run by scripts/test.sh with the rest
+plugins-src/        third-party plugins to bake into the image; empty here
+examples/
+  NAME/             one book per shipped plugin, built by the pipeline
 packaging/
   OVERVIEW.md       the few lines a release page opens with
   arch/             a PKGBUILD, and notes on building it
+  docker-entrypoint.sh  enables third-party plugins, then execs the launcher
 scripts/
   check-style.sh    no typographic characters, anywhere
   check-print.j     what the printable book would lose to WinAnsi
-  test.sh           run every unit test
+  check-plugins.sh  the shape every shipped plugin has to have
+  test.sh           run every unit test, plugins included
   screenshots.sh    regenerate the theme gallery
   theme-css.j       write one theme's stylesheet to a path
   bench.sh          time a build, and the modules under it
   bench-md.j        the markdown / pdf modules on their own
 docs/               this documentation, and the book this repository builds
 ```
+
+Three of those are new enough to be worth a sentence each.
+
+**`plugins/`** is what an install carries beside the launcher, and what a bare
+table name in `grimoire.toml` resolves against before `PATH` is consulted.
+`grimoire-include` is the last single file; the eleven beside it are a launcher,
+a module and an overlay each.
+
+**`plugins-src/`** is a hole in the container build context, not a source
+directory: whatever is in it is copied to `/opt/grimoire-plugins` in the image,
+where the entrypoint links the plugins `GRIMOIRE_PLUGINS` names onto `PATH`. It
+holds nothing but its own README here, so the official image carries no
+third-party plugin at all.
+
+**`examples/`** is one book per shipped plugin, each small enough to read in one
+screen. They are the only end-to-end coverage the plugins have - the overlays
+cover the pieces - and they are built and asserted on every push.
 
 `bin/grimoire` is a Jennifer program with a `#!/usr/bin/env -S jennifer run`
 shebang - the same language as the rest of the tool - and it is deliberately
@@ -284,6 +311,23 @@ exist, but `markdown.renderPdf` returns bytes rather than a `pdf.Document`, so
 the document-level hooks are out of reach from the Markdown path. Having them
 would mean Grimoire laying the book out page by page itself.
 
+## The plugins that ship
+
+`plugins/` holds twelve: a launcher, the module beside it, and a test overlay
+for that module, each with a book of its own under `examples/`. They reach Grimoire
+through the same JSON contract a third-party plugin uses - shipping them in-tree
+is how they are distributed, not a shortcut around the extension point - and
+`scripts/test.sh` and the pipeline treat them as Grimoire's own code, because
+they are released together and break together.
+
+Two are maintained in their own repositories instead: `grimoire-mermaid` and
+`grimoire-katex` each drive a program (`mmdc`, `katex`) that nobody has
+installed by default, and a plugin that is useless without a tool does not
+belong in an install that promises to need none. Both are Jennifer *apps* -
+`jvc app install <url>` puts the command where Grimoire looks - which is the
+same shape jvc itself ships in, and the reason is the same: a program is
+installed and run, a deck is vendored and imported.
+
 ## Building this repository
 
 `grimoire.toml` here builds `docs/` - the pages you are reading - so the
@@ -364,6 +408,32 @@ settings, because a Pages deployment from an artifact publishes exactly what the
 artifact holds - a build that dropped the file would quietly unbind the domain.
 The pipeline asserts its contents for that reason.
 
+### The plugins the image carries
+
+The nine that ship are in `plugins/`, copied into the image with the rest of
+Grimoire and found by name. Nothing about the container enables them; a book's
+own table does, as everywhere else.
+
+`/opt/grimoire-plugins` is the other half: a place for **third-party** plugins,
+filled from `plugins-src/` in the build context and switched off.
+`packaging/docker-entrypoint.sh` reads `GRIMOIRE_PLUGINS`, links the plugins it
+names into a directory on `PATH`, then `exec`s the launcher. Two decisions,
+neither a default, because an image that mounts your directory and runs
+somebody else's program over it should ask twice.
+
+The links are made under `/tmp` rather than in the image, because the container
+runs as whatever uid the caller passes and nothing else is writable for all of
+them. `GRIMOIRE_PLUGIN_DIR` moves that directory, which is what a `--read-only`
+container needs. An unknown name is refused before the build starts, with the
+list of names the image does carry: it is a typo, and a build that silently
+skipped the plugin would report something less useful several minutes later.
+
+A plugin's `NEEDS` file lists the commands it needs, one per line, and the
+entrypoint warns about the ones the image has not got - `git` for
+`grimoire-feed` and `grimoire-lastmod`, and the base image carries none. That is
+a layer of the reader's own, documented in
+[installation](installation.md#plugins-in-the-image).
+
 Sources are formatted with `jennifer fmt` and clean under `jennifer lint`:
 
 ```sh
@@ -417,6 +487,16 @@ the `PKGBUILD`'s `check()` runs one.
 Not built, but the shape is there for them: a link checker over the resolved
 outline (the build already knows every output path and anchor), and
 multi-language books.
+
+A **`grimoire-plugins` repository** is the next piece of the plugin story, and
+deliberately not a page in this manual. A list of other people's programs
+maintained by hand inside the tool's own documentation goes stale between
+releases, ties a third-party plugin's visibility to a Grimoire release, and puts
+this repository in the position of curating software it does not maintain. A
+separate project takes a plugin by merge request, carries its own tests against
+the current `api`, and can say what it needs at build time in its own README.
+This manual then documents the contract and the two plugins that ship, which is
+all it can keep true on its own.
 
 An MCP server is a third. `grimoire mcp` over stdio - the transport the protocol
 leads with, so a subprocess the agent spawns rather than a daemon with a port -

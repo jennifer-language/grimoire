@@ -126,6 +126,23 @@ func renderInline(nodes as list of markdown.Node) {
     return strings.join($out, "");
 }
 
+# A node neither renderer knows: its children, or its own text when it is a leaf.
+#
+# It always **descends**, and that is the whole point. The two `else` branches
+# below used to hand the same node to each other - an inline node in block
+# position went to `renderSpan`, a block node in inline position went to
+# `renderBlock` - so a type neither of them named bounced between them until the
+# interpreter stopped the build at ten thousand frames, with a message about
+# recursion and nothing about the book. A list `item` was such a type, reached
+# through an outline title beginning with an ordered-list marker.
+func renderUnknown(n as markdown.Node) {
+    def kids as list of markdown.Node init markdown.children($n);
+    if (len($kids) == 0) {
+        return html.escape(markdown.text($n));
+    }
+    return renderInline($kids);
+}
+
 # inner renders a styled span's content. A span the module reports no children
 # for is a leaf - its own text, escaped.
 func inner(n as markdown.Node) {
@@ -164,14 +181,18 @@ func renderSpan(n as markdown.Node) {
             return '<img src="' + attrEsc(href(markdown.attr($n, "url"))) + '" alt="' + $alt +
                 '" loading="lazy"' + $extra + ">";
         }
-        else {
-            # A block that turned up in inline position - a nested list, or the
-            # paragraph the module now wraps a multi-line list item in - renders
-            # through the block path. Neither highlighting nor raw HTML can
-            # arrive by this route, so both are off: a fenced block is not inline,
-            # and inline HTML is text by the time the parser is done with it.
-            return renderBlock($n, false, false);
-        }
+        # A block that turned up in inline position - a nested list, or the
+        # paragraph the module wraps a multi-line list item in - renders through
+        # the block path. Neither highlighting nor raw HTML can arrive by this
+        # route, so both are off: a fenced block is not inline, and inline HTML is
+        # text by the time the parser is done with it.
+        when "paragraph" { return renderBlock($n, false, false); }
+        when "list" { return renderList($n); }
+        when "table" { return renderTable($n); }
+        when "code" { return renderCode($n, false); }
+        when "quote" { return renderQuote($n, false, false); }
+        when "heading" { return renderBlock($n, false, false); }
+        else { return renderUnknown($n); }
     }
 }
 
@@ -185,7 +206,15 @@ func renderSpan(n as markdown.Node) {
 export func inline(text as string) {
     def doc as markdown.Node init markdown.parse($text);
     def kids as list of markdown.Node init markdown.children($doc);
-    if (len($kids) == 0) {
+    # A title is inline text, and `markdown.parse` reads blocks. When it made
+    # anything but one paragraph - a list, because `1. Peripherals` opens one; a
+    # heading, because `# ` does; a fence, a quote - the block reading is not what
+    # the author of a `SUMMARY.md` line meant, so the title is taken literally.
+    #
+    # Numbered outlines are the reason this matters: `- [7. Tapes](tapes.md)` is
+    # how a reference manual writes its outline, and it used to lose the number
+    # (at best) or abort the build (at worst).
+    if (len($kids) != 1 or markdown.typeOf($kids[0]) != "paragraph") {
         return html.escape($text);
     }
     return renderInline(markdown.children($kids[0]));
@@ -398,10 +427,13 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
         }
         # A page-break directive is print-only and has nothing to draw here.
         when "page_break" { return ""; }
-        else {
-            # An inline node in block position.
-            return renderSpan($n);
-        }
+        when "text" { return html.escape(markdown.text($n)); }
+        when "codespan" { return renderSpan($n); }
+        when "strong" { return renderSpan($n); }
+        when "emphasis" { return renderSpan($n); }
+        when "link" { return renderSpan($n); }
+        when "image" { return renderSpan($n); }
+        else { return renderUnknown($n); }
     }
 }
 

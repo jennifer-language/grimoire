@@ -33,6 +33,7 @@ import "args.j" as args;
 import "./config.j" as config;
 import "./summary.j" as summary;
 import "./build.j" as build;
+import "./plugin.j" as plugin;
 import "./theme.j" as theme;
 import "./locale.j" as locale;
 import "./serve.j" as serve;
@@ -165,6 +166,15 @@ func initParser() {
     return $p;
 }
 
+# `plugins` takes the config file and nothing else: it reports what a build would
+# run, so a flag that changed the build would make it report something else.
+func pluginsParser() {
+    def p as args.Parser init args.parser(
+        "plugins",
+        "List the programs this book runs, and where each one comes from");
+    return args.flag($p, "config", "c", DEFAULT_CONFIG, "path to grimoire.toml");
+}
+
 func parser() {
     def p as args.Parser init args.parser(
         "grimoire",
@@ -178,6 +188,7 @@ func parser() {
         "themes",
         "List the built-in themes",
         args.parser("themes", "List the built-in themes"));
+    $p = args.command($p, "plugins", "List the programs this book runs", pluginsParser());
     $p = args.command($p, "init", "Write a starter book into a directory", initParser());
     return $p;
 }
@@ -208,6 +219,10 @@ func position(r as args.Result, name as string, deflt as string) {
 # command-line overrides on top, so a flag always wins over a file.
 func configure(r as args.Result, appDir as string) {
     def c as config.Config init config.load(args.asString($r, "config"));
+    # Remembered so the asset pass can leave it out of the site: with `src = "."`
+    # the manifest sits inside the source tree, and Grimoire's input is not part
+    # of the book.
+    $c.configFile = args.asString($r, "config");
     # Where Grimoire itself is installed, so the build can find the assets it
     # ships (the Jennifer highlight.js grammar). The launcher works it out from
     # its own path and hands it down, rather than anything here reading the
@@ -433,6 +448,32 @@ func runServe(r as args.Result, appDir as string) {
     return serve.run($c.outDir, args.asString($r, "addr"), $live);
 }
 
+# runPlugins answers "what does this book execute", without building anything.
+#
+# A plugin runs with the permissions of whoever starts the build, and nothing
+# about a table name says which program answers to it - a bare name is looked for
+# beside Grimoire and then on `PATH`, and a `command` with a separator is a path.
+# This is the step before building somebody else's book.
+func runPlugins(r as args.Result, appDir as string) {
+    def c as config.Config init config.load(args.asString($r, "config"));
+    $c.appDir = $appDir;
+    def found as list of plugin.Resolved init plugin.plan($c);
+    if (len($found) == 0) {
+        io.printf(
+            "No plugins configured. A book names the ones it wants in %s:\n\n",
+            args.asString($r, "config"));
+        io.printf("  [preprocessor.include]\n  [renderer.sitemap]\n");
+        return 0;
+    }
+    io.printf("Programs this book runs, from %s:\n\n", args.asString($r, "config"));
+    for (def line in plugin.listing($found)) {
+        io.printf("  %s\n", $line);
+    }
+    io.printf("\nEach one runs with your permissions and can do anything you can.\n");
+    io.printf("Nothing is discovered: every program above is named in the file.\n");
+    return 0;
+}
+
 func runThemes() {
     io.printf("Built-in themes (set html.theme in grimoire.toml):\n\n");
     for (def line in theme.catalog()) {
@@ -528,6 +569,12 @@ bodyChars = 1200
 # files, written at build time - there is nothing to run and nothing to serve.
 [agents]
 enabled = true
+
+# A program run over the book before it renders, and one run over the site after
+# it. Named here, found on PATH as grimoire-NAME unless command says otherwise,
+# and given the whole book as JSON on stdin. Nothing runs that is not listed.
+# [preprocessor.include]
+# [renderer.sitemap]
 
 [pdf]
 enabled = false
@@ -627,6 +674,7 @@ func dispatch(r as args.Result, appDir as string) {
         when "pdf" { return runPdf($r, $appDir); }
         when "serve" { return runServe($r, $appDir); }
         when "themes" { return runThemes(); }
+        when "plugins" { return runPlugins($r, $appDir); }
         when "init" { return runInit($r); }
         else {
             io.printf("%s\n", args.usage(parser()));

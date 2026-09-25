@@ -1,0 +1,5 @@
+# Words that are not headings in the glossary, and the term each one means.
+# An empty value means the alias is the heading itself, differently spelled.
+[terms]
+outlines = "outline"
+"search indexes" = "search index"

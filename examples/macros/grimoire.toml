@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-macros. Build it from this directory:
+#
+#   grimoire build
+#
+# Every version number on the page comes from the table below, so a release
+# changes one line rather than every chapter that mentions it.
+#
+# The table names the plugin and nothing else: it ships with Grimoire, which
+# looks for `grimoire-macros` beside itself before it looks anywhere else.
+
+[book]
+title = "Written Once"
+description = "A book whose version number lives in one place."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[preprocessor.macros]
+strict = true
+
+[preprocessor.macros.vars]
+version = "1.4.0"
+minimum = "0.25.0"

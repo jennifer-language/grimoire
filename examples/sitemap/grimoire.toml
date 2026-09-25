@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-sitemap. Build it from this directory:
+#
+#   grimoire build
+#
+# Look at `site/sitemap.xml` and `site/robots.txt` afterwards. Delete the
+# robots file and build again to see it come back; write one of your own and it
+# is left alone.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-sitemap` beside itself before it looks anywhere
+# else. Nothing has to be installed, and nothing is enabled that a book does not
+# ask for by name.
+
+[book]
+title = "Published Somewhere"
+description = "Two chapters, and the sitemap a crawler reads them from."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[renderer.sitemap]
+baseUrl = "https://example.com/manual/"

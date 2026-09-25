@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-glossary. Build it from this directory:
+#
+#   grimoire build
+#
+# The terms are the headings of `docs/glossary.md`, so the list maintains itself.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-glossary` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "A Book With Words In It"
+description = "Three chapters and a glossary that links itself."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[preprocessor.glossary]
+chapter = "glossary.md"
+depth = 2
+terms = "docs/terms.toml"

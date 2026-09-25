@@ -8,6 +8,28 @@ Two related settings live elsewhere: [`html.rawHtml`](configuration.md#html)
 decides whether a hand-written HTML block is emitted or escaped, and every
 heading gets an [anchor](internals.md#anchors) matching mdBook and GitHub.
 
+## Titles in the outline
+
+A title in `SUMMARY.md` is **inline** Markdown: `` `code` `` and emphasis are
+rendered in the sidebar and the pager, and a heading, a list or a quote is not -
+a title is one line of text, not a block of them.
+
+That matters for the outline a reference manual actually writes:
+
+```markdown
+- [7. Peripherals](peripherals.md)
+```
+
+`7. ` opens an ordered list in Markdown. Grimoire takes the title literally
+instead, so the entry reads `7. Peripherals` in every place a title appears -
+the sidebar, the pager, the search index, the PDF bookmarks. The same rule
+applies to a title starting with `#`, `>`, `-` or a table pipe.
+
+The one consequence worth knowing: a title taken literally is taken *entirely*
+literally, so `7. A **bold** word` shows its asterisks. A title that does not
+open a block keeps its Markdown, and that covers everything else, `1)` and `1.A`
+included.
+
 ## Admonitions
 
 A blockquote opening with an alert marker becomes a callout:

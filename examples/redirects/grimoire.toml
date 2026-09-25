@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-redirects. Build it from this directory:
+#
+#   grimoire build
+#
+# Look at `site/old-start.html` after a build: it refreshes to the page that
+# replaced it.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-redirects` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "A Book That Moved"
+description = "Two chapters, and the URLs they used to live at."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[renderer.redirects]
+"old-start.html" = "index.html"
+"guide/old-syntax.html" = "syntax.html"
+"archive/2024/notes.html" = "guide/syntax.html"

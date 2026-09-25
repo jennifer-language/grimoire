@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-emoji. Build it from this directory:
+#
+#   grimoire build
+#
+# The source stays ASCII and the page does not. Build with --pdf and run
+# `jennifer run scripts/check-print.j` against a book that uses this: the
+# printable build draws what its fonts carry, and an emoji is not in them.
+#
+# The table names the plugin and nothing else: it ships with Grimoire, which
+# looks for `grimoire-emoji` beside itself before it looks anywhere else.
+
+[book]
+title = "Written In ASCII"
+description = "Shortcodes in the source, characters in the page."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[preprocessor.emoji]
+
+[preprocessor.emoji.extra]
+grimoire = "*"

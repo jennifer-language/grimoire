@@ -113,6 +113,11 @@ jobs:
           test -s site/grimoire.pdf
           grep -q 'href="grimoire.pdf"' site/index.html
           test "$(cat site/CNAME)" = "grimoire.jennifer-lang.dev"
+          # The sitemap comes from a renderer, so this also asserts that the
+          # plugin ran: a missing one means the build skipped it silently.
+          test -f site/sitemap.xml
+          test -f site/robots.txt
+          grep -q 'https://grimoire.jennifer-lang.dev/index.html' site/sitemap.xml
 
       - name: Upload the Pages artifact
         uses: actions/upload-pages-artifact@v3

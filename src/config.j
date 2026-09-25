@@ -12,6 +12,7 @@
  * @license LGPL-3.0-only
  */
 use toml;
+use json;
 use fs;
 use strings;
 use lists;
@@ -31,6 +32,13 @@ use convert;
  *   unless it is set, for the book written in one language whose reader-facing
  *   furniture should be in another
  * @field srcDir {string} the directory holding the Markdown sources
+ * @field contentDir {string} the directory chapters are *read* from, which is
+ *   `srcDir` unless a preprocessor rewrote them into a scratch tree. Derived by
+ *   the build rather than configured; `config.contentDir` reads it
+ * @field configFile {string} the manifest this configuration was read from, so
+ *   the asset pass can leave it out of the site. It only ever *is* in the source
+ *   tree for a book whose `src` is its own root, and Grimoire's input is not the
+ *   book's content. Derived from the command line, not configured
  * @field outDir {string} the directory the site is written to
  * @field clean {bool} empty the output directory before building, so a chapter
  *   deleted from the book stops being published. Off by default, because the
@@ -66,6 +74,10 @@ use convert;
  * @field searchBodyChars {int} how much body text each search record keeps
  * @field agents {bool} write the two files a program reads rather than a reader:
  *   `llms.txt` at the site root and the search index as JSON
+ * @field preprocessors {list of Plugin} the `[preprocessor.NAME]` tables, in the
+ *   order the file lists them
+ * @field renderers {list of Plugin} the `[renderer.NAME]` tables, in the order
+ *   the file lists them
  * @field pdf {bool} whether `grimoire build` also renders the PDF
  * @field pdfOutput {string} the PDF path, relative to the output directory
  * @field pdfPaper {string} the page size: "a4" or "letter"
@@ -98,6 +110,28 @@ use convert;
  * @field verbose {bool} report each chapter as it is rendered; set by the CLI,
  *   never read from `grimoire.toml` - it describes one run, not the book
  */
+/**
+ * One configured plugin: a program Grimoire runs while it builds. A
+ * preprocessor rewrites the Markdown before anything renders; a renderer runs
+ * once the site is written. They are described the same way, so they are one
+ * struct.
+ *
+ * `settings` is the plugin's own table from `grimoire.toml`, already converted
+ * to JSON, because that is the shape the plugin receives it in. Grimoire reads
+ * `command` and `args` out of the table and passes the rest through without
+ * looking at it.
+ * @field name {string} the table name, `[preprocessor.NAME]` or `[renderer.NAME]`
+ * @field command {string} the program to run; defaults to `grimoire-NAME`
+ * @field args {list of string} arguments passed before the request arrives on stdin
+ * @field settings {string} the whole table as a JSON object
+ */
+export def struct Plugin {
+    name as string,
+    command as string,
+    args as list of string,
+    settings as string
+};
+
 export def struct Config {
     title as string,
     description as string,
@@ -106,6 +140,8 @@ export def struct Config {
     language as string,
     uiLanguage as string,
     srcDir as string,
+    contentDir as string,
+    configFile as string,
     outDir as string,
     clean as bool,
     theme as string,
@@ -127,6 +163,8 @@ export def struct Config {
     search as bool,
     searchBodyChars as int,
     agents as bool,
+    preprocessors as list of Plugin,
+    renderers as list of Plugin,
     pdf as bool,
     pdfOutput as string,
     pdfPaper as string,
@@ -186,6 +224,8 @@ export func defaults() {
         language: "en",
         uiLanguage: "en",
         srcDir: "docs",
+        contentDir: "",
+        configFile: "",
         outDir: "site",
         clean: false,
         theme: "grimoire",
@@ -207,6 +247,8 @@ export func defaults() {
         search: true,
         searchBodyChars: 1200,
         agents: true,
+        preprocessors: [],
+        renderers: [],
         pdf: false,
         pdfOutput: "book.pdf",
         pdfPaper: "a4",
@@ -275,6 +317,91 @@ func oneOf(value as string, allowed as list of string, deflt as string) {
     return $deflt;
 }
 
+# A key, as one segment of a pointer. A TOML key is any string - `"old/page.html"
+# = "new/page.html"` is exactly how a redirect table is written - and a pointer
+# separates its segments with `/`, so an unescaped key of that shape addresses two
+# levels that do not exist. RFC 6901 order: `~` first, then `/`.
+func pointerKey(key as string) {
+    return strings.replace(strings.replace($key, "~", "~0"), "/", "~1");
+}
+
+# jsonOf renders a TOML node as JSON text.
+#
+# A plugin receives its own table, and the wire format is JSON, so the two have
+# to meet somewhere. The text is assembled rather than built as a `json.Value`
+# because every branch then returns a string, and `json.encode` of a scalar does
+# the escaping. A date-time goes over as its RFC 3339 text: JSON has no date.
+#
+# The braces are raw strings; a cooked one reads them as an interpolation.
+func jsonOf(doc as toml.Value, ptr as string) {
+    match (toml.typeOf($doc, $ptr)) {
+        when "map" {
+            def parts as list of string;
+            for (def key in toml.keys($doc, $ptr)) {
+                $parts[] = json.encode($key) + ":" +
+                    jsonOf($doc, $ptr + "/" + pointerKey($key));
+            }
+            return '{' + strings.join($parts, ",") + '}';
+        }
+        when "list" {
+            def parts as list of string;
+            for (def i in 0..toml.length($doc, $ptr)) {
+                $parts[] = jsonOf($doc, $ptr + "/" + convert.toString($i));
+            }
+            return "[" + strings.join($parts, ",") + "]";
+        }
+        when "string" { return json.encode(toml.asString($doc, $ptr)); }
+        when "int" { return convert.toString(toml.asInt($doc, $ptr)); }
+        when "float" { return json.encode(toml.asFloat($doc, $ptr)); }
+        when "bool" { if (toml.asBool($doc, $ptr)) {
+            return "true";
+        }
+        return "false"; }
+        when "datetime" { return json.encode(time.toIso(toml.asDatetime($doc, $ptr))); }
+        else { return "null"; }
+    }
+}
+
+# pluginsAt reads the `[preprocessor.NAME]` or `[renderer.NAME]` tables in
+# document order, which is the order they run in: each preprocessor rewrites what
+# the last produced.
+#
+# A TOML bare key needs no JSON Pointer escaping. `command` defaults to
+# `grimoire-NAME`, so the common case is an empty table.
+func pluginsAt(doc as toml.Value, section as string) {
+    def out as list of Plugin;
+    if (not toml.has($doc, "/" + $section) or toml.typeOf($doc, "/" + $section) != "map") {
+        return $out;
+    }
+    def none as list of string;
+    for (def name in toml.keys($doc, "/" + $section)) {
+        def ptr as string init "/" + $section + "/" + $name;
+        if (toml.typeOf($doc, $ptr) != "map") {
+            continue;
+        }
+        $out[] = Plugin{
+            name: $name,
+            command: strAt($doc, $ptr + "/command", "grimoire-" + $name),
+            args: stringsAt($doc, $ptr + "/args", $none),
+            settings: jsonOf($doc, $ptr)
+        };
+    }
+    return $out;
+}
+
+/**
+ * The directory chapters are read from: the scratch tree a preprocessor wrote,
+ * or the source directory when nothing rewrote anything.
+ * @param c {Config} the book configuration
+ * @return {string} the directory
+ */
+export func contentDir(c as Config) {
+    if ($c.contentDir == "") {
+        return $c.srcDir;
+    }
+    return $c.contentDir;
+}
+
 /**
  * Layer a `grimoire.toml` document onto a base configuration. Unknown keys are
  * ignored and a key of the wrong type keeps the base value, so a partial or
@@ -328,6 +455,8 @@ export func apply(base as Config, text as string) {
     $c.search = boolAt($doc, "/search/enabled", $c.search);
     $c.searchBodyChars = intAt($doc, "/search/bodyChars", $c.searchBodyChars);
     $c.agents = boolAt($doc, "/agents/enabled", $c.agents);
+    $c.preprocessors = pluginsAt($doc, "preprocessor");
+    $c.renderers = pluginsAt($doc, "renderer");
     $c.pdf = boolAt($doc, "/pdf/enabled", $c.pdf);
     $c.pdfOutput = strAt($doc, "/pdf/output", $c.pdfOutput);
     $c.pdfPaper = oneOf(strAt($doc, "/pdf/paper", $c.pdfPaper), ["a4", "letter"], $c.pdfPaper);

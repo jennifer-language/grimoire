@@ -161,6 +161,55 @@ jobs:
           test -f smoke/site/assets/grimoire.css
           grep -q "wrapped" smoke/site/index.html
 
+      # The nine plugins that ship are in the image and are found by name, so a
+      # book enables one by naming it and nothing else. That is the whole
+      # arrangement, and it is easy to break by moving a file.
+      - name: Smoke-test a shipped plugin
+        run: |
+          set -eux
+          mkdir -p plug/docs
+          printf '# Title\n\nA chapter, and [another](two.md).\n' > plug/docs/index.md
+          printf '# Two\n\nBack to the [start](index.md).\n' > plug/docs/two.md
+          printf '[book]\ntitle = "Plugged"\nsrc = "docs"\n[build]\nout = "site"\n' \
+            > plug/grimoire.toml
+          printf '[renderer.epub]\noutput = "plugged.epub"\n[renderer.linkcheck]\n' \
+            >> plug/grimoire.toml
+
+          run() {
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/plug:/work" "$@"
+          }
+
+          # What the book would run, before it runs: two programs, both shipped.
+          run grimoire:test plugins | tee /dev/stderr | grep -q "ships with Grimoire"
+
+          run grimoire:test build --quiet
+          test -s plug/site/plugged.epub
+
+          # And the link checker really did run: a dead link fails the build.
+          printf '\nA [dead link](gone.md).\n' >> plug/docs/two.md
+          if run grimoire:test build --quiet; then
+            echo "expected the build to fail on a dead link"
+            exit 1
+          fi
+
+      # The other half: somebody else's plugin is carried switched off, and this
+      # image carries none, so every name is refused with the list it does have.
+      - name: Smoke-test the third-party collection
+        run: |
+          set -eux
+          if docker run --rm --user "$(id -u):$(id -g)" \
+            -e GRIMOIRE_PLUGINS=nosuchthing -v "$PWD/plug:/work" \
+            grimoire:test build --quiet; then
+            echo "expected the entrypoint to refuse an unknown plugin name"
+            exit 1
+          fi
+          # The shipped nine are not on PATH: they are found beside Grimoire, so
+          # `grimoire<TAB>` stays one word.
+          docker run --rm --entrypoint sh grimoire:test -c \
+            'test -x /opt/grimoire/plugins/grimoire-epub'
+          docker run --rm --entrypoint sh grimoire:test -c \
+            '! command -v grimoire-epub'
+
       - name: Build and push
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6

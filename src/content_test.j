@@ -97,6 +97,50 @@ func testInlineOfNothingIsNothing() {
     testing.assertEqual(inline(""), "");
 }
 
+# --- a title the block parser misreads --------------------------------
+#
+# `markdown.parse` reads blocks, and a numbered outline entry - `- [7. Tapes]` -
+# opens an ordered list. The title used to be handed to the block path as a list,
+# where the item node was a type neither renderer named: `renderSpan` sent it to
+# `renderBlock`, `renderBlock` sent it back, and the build died at ten thousand
+# frames with a message about recursion and nothing about the book.
+
+func testANumberedTitleIsTakenLiterally() {
+    testing.assertEqual(inline("1. A"), "1. A");
+    testing.assertEqual(inline("10. Peripherals"), "10. Peripherals");
+    # Literally means literally: a title the parser read as a list gets no
+    # emphasis either, which is the predictable half of the trade.
+    testing.assertEqual(inline("7. A **bold** word"), "7. A **bold** word");
+}
+
+# The same rule covers every other block opener, for the same reason.
+func testATitleThatOpensAnyBlockIsTakenLiterally() {
+    testing.assertEqual(inline("# hashed"), "# hashed");
+    testing.assertEqual(inline("> quoted"), "&gt; quoted");
+    testing.assertEqual(inline("- dashed"), "- dashed");
+    testing.assertEqual(inline("| a | b |"), "| a | b |");
+}
+
+# A title that is one paragraph is still Markdown, which is the whole point of
+# rendering it rather than escaping it.
+func testAnOrdinaryTitleIsStillMarkdown() {
+    testing.assertEqual(
+        inline("`code` and **bold**"),
+        "<code>code</code> and <strong>bold</strong>");
+    testing.assertEqual(inline("1) not a list"), "1) not a list");
+    testing.assertEqual(inline("1.A no space"), "1.A no space");
+}
+
+# The cycle itself, at the node that closed it: an `item` reaches both renderers
+# and neither may hand it back to the other.
+func testANodeNeitherRendererKnowsDescendsInstead() {
+    def doc as markdown.Node init markdown.parse("1. A");
+    def blocks as list of markdown.Node init markdown.children($doc);
+    def item as markdown.Node init markdown.children($blocks[0])[0];
+    testing.assertEqual(renderSpan($item), "A");
+    testing.assertEqual(renderBlock($item, false, false), "A");
+}
+
 # --- render: the body ------------------------------------------------
 
 func testRenderWrapsParagraphs() {

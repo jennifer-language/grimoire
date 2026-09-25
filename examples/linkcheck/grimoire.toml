@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-linkcheck. Build it from this directory:
+#
+#   grimoire build
+#
+# It passes. To watch it fail, add a link to a chapter that does not exist and
+# build again: the build stops, with every dead link listed rather than the
+# first.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-linkcheck` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "Every Link Checked"
+description = "A book whose cross-references are verified on every build."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[renderer.linkcheck]
+external = false

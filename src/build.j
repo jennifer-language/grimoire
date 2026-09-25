@@ -33,6 +33,7 @@ import "./content.j" as content;
 import "./layout.j" as layout;
 import "./theme.j" as theme;
 import "./agents.j" as agents;
+import "./plugin.j" as plugin;
 import "./assets.j" as assets;
 import "./keywords.j" as keywords;
 import "./search.j" as search;
@@ -304,9 +305,50 @@ func plainTitle(title as string) {
 # both recognised and the answer to "is this path inside the output" is written
 # once in this file. `prune` has refused this arrangement since it existed; the
 # copy pass was simply never told.
+# The metadata directories a version control system keeps. None of them is ever
+# a book's asset, and a book whose `src` is its repository root - `src = "."` is
+# a perfectly ordinary thing to write for a project whose root *is* the book -
+# would otherwise publish every object in its own history, credentials in a
+# `.git/config` included.
+def const VCS_DIRS as list of string init [".git", ".hg", ".svn", ".bzr", ".jj", ".sl"];
+
+# Whether a walked path lies in, or is, one of those.
+func underVersionControl(target as string) {
+    for (def part in strings.split(strings.replace($target, "\\", "/"), "/")) {
+        if (lists.contains(VCS_DIRS, $part)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+# The path a walked file has *inside* the source tree.
+#
+# `fs.walk` prefixes what it yields with the directory it was given - except for
+# `.`, where `notes.csv` comes back as `notes.csv` rather than `./notes.csv`.
+# Cutting `len(srcDir) + 1` characters off the front was therefore right for
+# `src = "docs"` and took two characters off every name for `src = "."`: a book
+# built that way published `sources/program.txt` as `urces/program.txt`, and the
+# chapter `a.md` became an asset called `md`, because the truncation happened
+# before the extension was tested.
+func relativeTo(root as string, target as string) {
+    def slashed as string init strings.replace($target, "\\", "/");
+    def prefix as string init strings.replace($root, "\\", "/");
+    if (not strings.endsWith($prefix, "/")) {
+        $prefix = $prefix + "/";
+    }
+    if (strings.startsWith($slashed, $prefix)) {
+        return strings.substring($slashed, len($prefix), len($slashed));
+    }
+    # `./x` and `x` name one file; a walk of `.` yields the second form.
+    if (strings.startsWith($slashed, "./")) {
+        return strings.substring($slashed, 2, len($slashed));
+    }
+    return $slashed;
+}
+
 func copyAssets(c as config.Config) {
     def count as int init 0;
-    def prefix as int init len($c.srcDir) + 1;
     def ours as string init absolutePath($c.outDir);
     for (def st in fs.walk($c.srcDir)) {
         if ($st.isDir) {
@@ -315,10 +357,13 @@ func copyAssets(c as config.Config) {
         if (contains($ours, absolutePath($st.path))) {
             continue;
         }
-        def rel as string init strings.replace(
-            strings.substring($st.path, $prefix, len($st.path)),
-            "\\",
-            "/");
+        if (underVersionControl($st.path)) {
+            continue;
+        }
+        if ($c.configFile != "" and absolutePath($st.path) == absolutePath($c.configFile)) {
+            continue;
+        }
+        def rel as string init relativeTo($c.srcDir, $st.path);
         if (strings.lower(path.ext($rel)) == ".md") {
             continue;
         }
@@ -549,7 +594,7 @@ func assignWork(c as config.Config, pages as list of summary.Entry, jobs as int)
     def chunks as list of Chunk;
     def i as int init 0;
     while ($i < len($pages)) {
-        def file as string init path.join($c.srcDir, $pages[$i].src);
+        def file as string init path.join(config.contentDir($c), $pages[$i].src);
         def weight as int init 0;
         if (fs.isFile($file)) {
             $weight = fs.stat($file).size;
@@ -656,7 +701,7 @@ func renderSlice(
     while ($at < len($mine)) {
         def i as int init $mine[$at];
         def entry as summary.Entry init $pages[$i];
-        def source as string init path.join($c.srcDir, $entry.src);
+        def source as string init path.join(config.contentDir($c), $entry.src);
         note($c, "  render  " + $entry.src + "  ->  " + $entry.out);
         def rendered as content.Rendered init content.render(
             fs.readString($source),
@@ -700,6 +745,44 @@ func renderSlice(
     return Slice{chapters: $chapters, chapterRecords: $chapterRecords, written: $written};
 }
 
+# rendered names what a renderer reports having written, for the build's own
+# line about it. A renderer that reports nothing gets no list rather than an
+# empty one - plenty of them write nothing at all and simply check.
+func rendered(written as list of string) {
+    if (len($written) == 0) {
+        return "";
+    }
+    return "  ->  " + strings.join($written, ", ");
+}
+
+# buildWarnings collects what a build wants to say but not fail over: a book
+# still gets built with a missing logo or a highlight.js grammar it could not
+# find. Shipping the grammar happens here because whether it shipped is the
+# warning.
+func buildWarnings(c as config.Config) {
+    def out as list of string;
+    if ($c.logo != "" and not fs.isFile(path.join($c.srcDir, $c.logo))) {
+        $out[] = "logo not found, falling back to the default mark: " + $c.logo;
+    }
+    if (config.usesHighlightJs($c) and shipHighlightGrammar($c) == 0) {
+        $out[] = "highlight.js grammar for Jennifer not found at " +
+            path.join($c.appDir, HLJS_GRAMMAR) +
+            "; other languages still highlight, Jennifer falls back to the built-in pass";
+    }
+    if (config.highlightJsIgnored($c)) {
+        $out[] = "[highlightjs] enabled = true is ignored while [highlight] enabled = false;" +
+            " no highlighting and no CDN request";
+    }
+    # A plugin whose program came from `PATH` or from elsewhere on the machine is
+    # the one thing in a build that reading the book's own repository does not
+    # show you. `grimoire plugins` lists all of them; this says the ones worth
+    # noticing without being asked.
+    for (def concern in plugin.concerns($c)) {
+        $out[] = $concern;
+    }
+    return $out;
+}
+
 /**
  * Build the site: render every chapter, write the theme stylesheet, the runtime,
  * and the search index, copy the source tree's other files across, and render
@@ -721,6 +804,12 @@ export func run(c as config.Config) {
     }
     def entries as list of summary.Entry init summary.load($c.srcDir);
     def pages as list of summary.Entry init resolvePages($c, $entries);
+    # Preprocessors run here, on this task, before anything is spawned: they see
+    # the resolved outline, and everything downstream - the render, the search
+    # index, the PDF - reads the chapters they hand back rather than the files on
+    # disk. `contentDir` is the only thing that changes; assets and images still
+    # come from the source tree.
+    $c.contentDir = plugin.preprocess($c, $entries, $pages);
     def records as list of search.Record;
     def written as int init 0;
     # Before anything is created, so a refusal leaves the directory exactly as it
@@ -800,21 +889,7 @@ export func run(c as config.Config) {
         $written = $written +
             writeFile(path.join($c.outDir, "index.html"), redirect($c, $pages[0].out));
     }
-    def warnings as list of string;
-    if ($c.logo != "" and not fs.isFile(path.join($c.srcDir, $c.logo))) {
-        $warnings[] = "logo not found, falling back to the default mark: " + $c.logo;
-    }
-    if (config.usesHighlightJs($c)) {
-        if (shipHighlightGrammar($c) == 0) {
-            $warnings[] = "highlight.js grammar for Jennifer not found at " +
-                path.join($c.appDir, HLJS_GRAMMAR) +
-                "; other languages still highlight, Jennifer falls back to the built-in pass";
-        }
-    }
-    if (config.highlightJsIgnored($c)) {
-        $warnings[] = "[highlightjs] enabled = true is ignored while [highlight] enabled = false;" +
-            " no highlighting and no CDN request";
-    }
+    def warnings as list of string init buildWarnings($c);
     def copied as int init copyAssets($c);
     note($c, "  copied  " + plural($copied, "file", "files") + " from " + $c.srcDir);
     def pdfBytes as int init 0;
@@ -822,6 +897,16 @@ export func run(c as config.Config) {
         $pdfBytes = task.wait($pdfTask);
         $written = $written + $pdfBytes;
     }
+    # Renderers run last: what they are given is the book already built, site and
+    # PDF both on disk.
+    for (def result in plugin.render($c, $entries, $pages)) {
+        note($c, "  render  " + $result.name + rendered($result.written));
+        for (def warning in $result.warnings) {
+            $warnings[] = $result.name + ": " + $warning;
+        }
+    }
+    # After the renderers, which read the same chapters the site did.
+    plugin.discard($c, $c.contentDir);
     return Report{
         pages: len($pages),
         assets: $copied,
@@ -847,8 +932,12 @@ export func writePdf(c as config.Config, entries as list of summary.Entry) {
     if ($dir != "" and $dir != ".") {
         fs.mkdirAll($dir);
     }
+    # `grimoire pdf` builds the same book as `grimoire build`, so the chapters
+    # reach the layout through the same preprocessors.
+    $c.contentDir = plugin.preprocess($c, $entries, resolvePages($c, $entries));
     def data as bytes init pdfbook.render($c, $entries);
     fs.writeBytes($target, $data);
+    plugin.discard($c, $c.contentDir);
     return len($data);
 }
 

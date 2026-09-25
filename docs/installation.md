@@ -129,6 +129,71 @@ outside it can connect - hence the explicit `--addr 0.0.0.0:8080`. That is the
 container's loopback being a different loopback from yours, not a Grimoire
 setting worth changing in `grimoire.toml`.
 
+### Plugins in the image
+
+The twelve plugins that [ship with Grimoire](plugins.md) are in the image already,
+at `/opt/grimoire/plugins`, found by name the way they are in any other install.
+A book enables one the only way any book does - by naming it:
+
+```toml
+[renderer.epub]
+output = "book.epub"
+```
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" \
+    -v "$PWD:/work" ghcr.io/jennifer-language/grimoire build
+```
+
+Nothing else is needed, and nothing is enabled that a book does not ask for.
+`docker run --rm ghcr.io/jennifer-language/grimoire plugins` run against a
+mounted book lists what that book would execute.
+
+**Anything else is a third-party plugin, and the image treats it as one.**
+`/opt/grimoire-plugins` is a directory of plugin directories the image can carry,
+and it is switched off: `GRIMOIRE_PLUGINS` links the named ones onto `PATH` at
+startup, and the book's own table still has to name them. Two decisions, neither
+of them a default, because an image that mounts your directory and runs programs
+over it should ask twice.
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" \
+    -e GRIMOIRE_PLUGINS=mermaid \
+    -v "$PWD:/work" ghcr.io/jennifer-language/grimoire build
+```
+
+The official image carries no such collection, so `GRIMOIRE_PLUGINS` there
+refuses every name and says which ones it has. To use it, put the plugin
+directories into `plugins-src/` before building the image, or add them in a layer
+of your own:
+
+```dockerfile
+FROM ghcr.io/jennifer-language/grimoire
+USER root
+COPY grimoire-mermaid /opt/grimoire-plugins/grimoire-mermaid
+USER jennifer
+```
+
+Names are given without the `grimoire-` prefix, separated by commas or spaces. A
+name the image does not carry is refused before the build starts. `GRIMOIRE_PLUGIN_DIR`
+moves the link directory, which matters under `--read-only`: the default is
+`/tmp/grimoire-plugins`, so that image needs `--tmpfs /tmp` or a writable
+directory named here.
+
+**Some plugins need a program the image has not got**, and say so at startup
+when a `NEEDS` file names it. `grimoire-feed` and `grimoire-lastmod` date
+chapters from `git log`, and the base image carries no git; `grimoire-mermaid`
+needs `mmdc` and `grimoire-katex` needs `katex`. Add what you use in a layer of
+your own:
+
+```dockerfile
+FROM ghcr.io/jennifer-language/grimoire
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+USER jennifer
+```
+
 ### A checkout, with no image build
 
 The interpreter image plus a bind mount runs the checkout directly, which is the
@@ -196,6 +261,18 @@ podman build -t grimoire .
 
 Nothing is compiled - Grimoire is Jennifer source, so the image is a copy and an
 entrypoint on top of `ghcr.io/jennifer-language/jennifer`.
+
+The twelve plugins that ship are in `plugins/` and are copied in with the rest of
+Grimoire. `plugins-src/` is the third-party collection, empty in a checkout: put
+plugin directories there before building to bake them into the image, or leave it
+alone and the image carries none, which `GRIMOIRE_PLUGINS` then reports instead
+of failing later.
+
+The entrypoint is a shell script, because something has to read
+`GRIMOIRE_PLUGINS` before Grimoire starts. That is the second thing in the
+`Dockerfile` needing a shell, and both are what a distroless `:static` base would
+have to solve differently - plugins are processes, so a distroless image could
+not run one anyway.
 
 `JENNIFER_TAG` defaults to `dev` for the version reason above, and becomes
 `latest` when 0.25.0 ships. The `static` line will work then too - the distroless

@@ -2,15 +2,20 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
 #
-# Run every unit test in src/.
+# Run every unit test in src/ and plugins/.
 #
 # `jennifer test` takes one file, so this is the loop around it. Each
-# `src/NAME_test.j` is a white-box overlay on `src/NAME.j`: it sees that
+# `NAME_test.j` is a white-box overlay on the `NAME.j` beside it: it sees that
 # module's private names unqualified and shares its imports, which is why the
 # test files import nothing themselves.
 #
+# `plugins/` is in the loop because the plugins that ship are Grimoire's code
+# too - they are programs rather than modules of the site builder, but they are
+# released together and break together.
+#
 #   scripts/test.sh              # everything
 #   scripts/test.sh config util  # just these modules
+#   scripts/test.sh epub         # a shipped plugin
 #
 # Requires a Jennifer interpreter. `JENNIFER` overrides how it is invoked, and is
 # split on whitespace rather than treated as one word, so it can carry a whole
@@ -32,18 +37,19 @@ if [ "$#" -gt 0 ]; then
     for name in "$@"; do
         file="src/${name%_test}_test.j"
         [ -f "$file" ] || file="src/themes/${name%_test}_test.j"
+        [ -f "$file" ] || file="plugins/${name%_test}_test.j"
         [ -f "$file" ] || { echo "no such test: $file" >&2; exit 2; }
         files="$files $file"
     done
 else
-    files=$(ls src/*_test.j src/themes/*_test.j)
+    files=$(ls src/*_test.j src/themes/*_test.j plugins/*_test.j)
 fi
 
 # A module with no test file is the thing this is most likely to miss, so say so
 # rather than reporting a clean run over whatever happens to exist.
 # The themes are modules too, and the publish gate counts them.
 untested=""
-for src in src/*.j src/themes/*.j; do
+for src in src/*.j src/themes/*.j plugins/*.j; do
     case "$src" in *_test.j) continue;; esac
     [ -f "${src%.j}_test.j" ] || untested="$untested $(basename "$src")"
 done

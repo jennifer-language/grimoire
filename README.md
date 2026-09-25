@@ -21,6 +21,7 @@ bin/grimoire build --pdf      # site plus the printable book
 bin/grimoire pdf              # the printable book on its own
 bin/grimoire serve            # build, then preview on :8080
 bin/grimoire themes           # list the built-in themes
+bin/grimoire plugins          # list the programs this book runs
 ```
 
 Point it at a directory of Markdown. If that directory holds a `SUMMARY.md` it

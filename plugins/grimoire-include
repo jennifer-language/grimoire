@@ -1,0 +1,150 @@
+#!/usr/bin/env -S jennifer run
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+# pragma-jennifer-version: >=0.25.0
+
+/**
+ * `{{#include}}` for Grimoire: a preprocessor that pulls a file into a chapter.
+ *
+ *     {{#include examples/hello.j}}          the whole file
+ *     {{#include examples/hello.j:3:12}}     lines 3 to 12, inclusive
+ *     {{#include examples/hello.j:5}}        line 5 onwards
+ *
+ * The point is a book that quotes code it does not own a copy of. A snippet
+ * pasted into a chapter is wrong the day the code changes and nobody notices
+ * until a reader tries it; a file read at build time is either right or a
+ * failed build.
+ *
+ * Paths are relative to the book's source directory. A path that climbs out of
+ * it with `..` is refused: a book is a directory, and a preprocessor that reads
+ * `/etc/passwd` into a page because someone wrote a chapter that says so is a
+ * hole rather than a feature.
+ *
+ * This is also the reference implementation of the preprocessor contract, and
+ * it is deliberately the one plugin that needs nothing installed: read a JSON
+ * request on stdin, write a JSON reply on stdout, exit 0. `src/plugin.j`
+ * documents the shape.
+ * @module grimoireinclude
+ * @author mplx <jennifer@mplx.dev>
+ * @license LGPL-3.0-only
+ */
+use io;
+use fs;
+use path;
+use json;
+use regex;
+use strings;
+use lists;
+use convert;
+
+# The contract version this speaks.
+def const API as int init 1;
+
+# `{{#include path}}`, `{{#include path:from}}`, `{{#include path:from:to}}`.
+# The directive stands alone on its line: a marker inside a sentence is prose
+# about the syntax, which a manual documenting this plugin is full of.
+def const RANGE as string init '(?::([0-9]+))?(?::([0-9]+))?';
+def const DIRECTIVE as string init '^[ \t]*\{\{#include[ \t]+([^:}]+?)' + RANGE +
+    '[ \t]*\}\}[ \t]*$';
+
+func die(message as string) {
+    io.eprintf("grimoire-include: %s\n", $message);
+    exit 1;
+}
+
+# lines picks the requested range out of a file, counting from 1 the way an
+# editor does. An out-of-range line is an error rather than an empty string: the
+# book meant to quote something.
+func slice(file as string, text as string, lo as int, hi as int) {
+    def all as list of string init strings.split($text, "\n");
+    # A file ends with a newline, which splits into a trailing empty line that is
+    # not a line of the file.
+    if (len($all) > 0 and $all[len($all) - 1] == "") {
+        $all = lists.head($all, len($all) - 1);
+    }
+    if ($lo == 0) {
+        return strings.join($all, "\n");
+    }
+    if ($lo > len($all)) {
+        die($file + ": line " + convert.toString($lo) + " is past the end of the file");
+    }
+    def last as int init $hi;
+    if ($last == 0 or $last > len($all)) {
+        $last = len($all);
+    }
+    def out as list of string;
+    def i as int init $lo - 1;
+    while ($i < $last) {
+        $out[] = $all[$i];
+        $i = $i + 1;
+    }
+    return strings.join($out, "\n");
+}
+
+# resolve turns a directive's path into a file inside the book, or stops.
+func resolve(root as string, wanted as string) {
+    def target as string init path.clean(path.join($root, strings.trim($wanted)));
+    if (not strings.startsWith($target, path.clean($root) + "/")) {
+        die(strings.trim($wanted) + ": outside the book");
+    }
+    if (not fs.isFile($target)) {
+        die(strings.trim($wanted) + ": no such file");
+    }
+    return $target;
+}
+
+func number(text as string) {
+    if ($text == "") {
+        return 0;
+    }
+    return convert.toInt($text);
+}
+
+# A directive written with a backslash in front of it is left on the page
+# without the backslash, which is how a book documents the syntax. The convention
+# is mdBook's, and a chapter about this plugin needs it.
+def const ESCAPED as string init '^([ \t]*)\\(\{\{#include.*)$';
+
+# expand rewrites one chapter. Directives are resolved once, not recursively: a
+# file that includes a file that includes a file is a knot to untangle at three
+# in the morning, and nothing in a book needs it.
+func expand(root as string, content as string) {
+    def out as list of string;
+    for (def line in strings.split($content, "\n")) {
+        def esc as regex.Match init regex.find(ESCAPED, $line);
+        if (len($esc.groups) > 0) {
+            $out[] = $esc.groups[0] + $esc.groups[1];
+            continue;
+        }
+        def m as regex.Match init regex.find(DIRECTIVE, $line);
+        if (len($m.groups) == 0) {
+            $out[] = $line;
+            continue;
+        }
+        def file as string init resolve($root, $m.groups[0]);
+        $out[] = slice($file, fs.readString($file), number($m.groups[1]), number($m.groups[2]));
+    }
+    return strings.join($out, "\n");
+}
+
+def request as string init strings.join(io.readLines(), "\n");
+if (strings.trim($request) == "") {
+    die("no request on stdin");
+}
+def doc as json.Value init json.decode($request);
+if (json.asInt($doc, "/api") != API) {
+    die("this plugin speaks api " + convert.toString(API) + ", the request speaks " +
+        convert.toString(json.asInt($doc, "/api")));
+}
+def root as string init json.asString($doc, "/book/src");
+def replies as list of string;
+for (def i in 0..json.length($doc, "/chapters")) {
+    def at as string init "/chapters/" + convert.toString($i);
+    def src as string init json.asString($doc, $at + "/src");
+    def content as string init json.asString($doc, $at + "/content");
+    def expanded as string init expand($root, $content);
+    if ($expanded != $content) {
+        $replies[] = '{"src":' + json.encode($src) + ',"content":' + json.encode($expanded) + '}';
+    }
+}
+io.printf('{"api":%d,"chapters":[%s]}', API, strings.join($replies, ","));

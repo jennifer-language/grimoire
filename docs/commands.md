@@ -215,6 +215,33 @@ deleted back.
 List the built-in themes with a one-line description of each. See
 [Themes](themes.md) for what they look like.
 
+## `grimoire plugins`
+
+List the programs this book would run, and where each one comes from, without
+building anything:
+
+```
+$ grimoire plugins
+Programs this book runs, from grimoire.toml:
+
+  preprocessor  include  ->  /opt/grimoire/plugins/grimoire-include  (ships with Grimoire)
+  renderer      epub     ->  /home/you/book/tools/grimoire-epub      (in this book)
+  renderer      feed     ->  /usr/local/bin/grimoire-feed            (found on PATH)
+
+Each one runs with your permissions and can do anything you can.
+Nothing is discovered: every program above is named in the file.
+```
+
+A table name says nothing about which program answers to it: a bare name is
+looked for beside Grimoire and then on `PATH`, and a `command` with a separator
+in it is a path. This is the step before building somebody else's book - the one
+thing a build does that reading the repository does not show you.
+
+The fourth answer is `(not found)`, which is a build that will stop when it gets
+there.
+
+`-c`, `--config` names the file, as everywhere else.
+
 ## Verbose output
 
 `--verbose` names each chapter as it goes, which is how you find the one that is
@@ -228,7 +255,12 @@ building docs -> site (theme grimoire, 13 chapters, 1 job)
   ...
   assets  stylesheet, runtime, search index
   copied  2 files from docs
+  plugin  renderer sitemap  ->  /opt/grimoire/plugins/grimoire-sitemap
+  render  sitemap  ->  sitemap.xml
 ```
+
+A `plugin` line names the program by its real path, immediately before it runs.
+`grimoire plugins` is the same information without the build.
 
 Chapters render in parallel, so with the default `--jobs` the lines arrive in
 the order chapters *finish*, not the order they are listed. Pass `--jobs 1` when

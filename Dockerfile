@@ -13,6 +13,9 @@
 #
 # Run (the book is whatever you mount at /work):
 #   docker run --rm -v "$PWD:/work" grimoire build
+#
+# With a plugin, which takes two decisions - the container's and the book's:
+#   docker run --rm -e GRIMOIRE_PLUGINS=epub -v "$PWD:/work" grimoire build
 
 # The base image tag. `dev` rather than `latest` because Grimoire's sources
 # require Jennifer 0.25.0 and `latest` is still 0.24.0; switch this back to
@@ -36,6 +39,23 @@ LABEL org.opencontainers.image.title="Grimoire" \
 
 COPY src /opt/grimoire/src
 COPY bin /opt/grimoire/bin
+# Beside the launcher, not on PATH: Grimoire looks in its own `plugins/`
+# directory first, and a `grimoire-include` in /usr/local/bin would make
+# `grimoire<TAB>` ambiguous for anyone working inside the image.
+COPY plugins /opt/grimoire/plugins
+
+# Third-party plugins, carried switched off. These are **not** the ones that ship
+# with Grimoire - those are in the `plugins/` directory above and are found by
+# name like any other install. Nothing here can run until `GRIMOIRE_PLUGINS`
+# names it, and even then it runs only because the book's own `grimoire.toml`
+# names it too. Enabling somebody else's program is deliberately two decisions,
+# one of them the reader's and one of them the book's.
+#
+# `plugins-src/` is empty in a checkout - see `plugins-src/README.md`. An image
+# built without it carries no collection, and `GRIMOIRE_PLUGINS` then says so
+# instead of failing later.
+COPY plugins-src /opt/grimoire-plugins
+COPY packaging/docker-entrypoint.sh /opt/grimoire/bin/docker-entrypoint.sh
 
 # The launcher also at its old path, because other people's Dockerfiles run it
 # directly - `RUN ["jennifer", "run", "/opt/grimoire/grimoire", "build"]` - and
@@ -52,23 +72,36 @@ COPY bin /opt/grimoire/bin
 # would write root-owned files into a reader's bind-mounted book, which is the
 # thing `--user "$(id -u):$(id -g)"` exists to avoid.
 #
-# This is also the one line here that needs a shell, so it is what would have to
-# be reconsidered for the distroless `:static` base - unusable today anyway,
-# since it tracks the release and that is still 0.24.0.
+# The `chmod` rides along: `COPY` keeps the mode git recorded, and this is what
+# makes a build from an export - a tarball, a context assembled by a tool that
+# drops the bit - fail at build time rather than at `docker run` with "permission
+# denied" and no entrypoint.
 USER root
-RUN ln -s bin/grimoire /opt/grimoire/grimoire
+RUN ln -s bin/grimoire /opt/grimoire/grimoire \
+ && chmod +x /opt/grimoire/bin/docker-entrypoint.sh
 USER jennifer
 
 # The base image sets WORKDIR /work and mounts the user's code there; keep that
 # contract so `-v "$PWD:/work"` behaves the same as it does for `jennifer`.
 WORKDIR /work
 
-# Hand the launcher to the interpreter rather than relying on its shebang: the
-# `:static` base is distroless, and there is no guarantee `/usr/bin/env` exists
-# to resolve one. `src/grimoire.j` is a module, not a program - the launcher is
-# what names the app directory - so it has to be this file that runs.
+# A shell script rather than the interpreter directly, because something has to
+# read `GRIMOIRE_PLUGINS` before Grimoire starts and link what it names into a
+# directory on `PATH`. It ends in
 #
-# The launcher, by its real path. Nothing shorter exists to point at: `bin/` is
-# where a program lives once `src/` means "the modules a consumer vendors".
-ENTRYPOINT ["jennifer", "run", "/opt/grimoire/bin/grimoire"]
+#   exec jennifer run /opt/grimoire/bin/grimoire "$@"
+#
+# so the contract is unchanged: everything after the image name is a Grimoire
+# command, and Grimoire is the process the container waits on.
+#
+# The interpreter is handed the launcher rather than the launcher's shebang
+# being relied on: `src/grimoire.j` is a module, not a program - the launcher is
+# what names the app directory - so it has to be that file that runs, by its
+# real path.
+#
+# This is the second thing here that needs a shell, and the one that would have
+# to be reconsidered for the distroless `:static` base - unusable today anyway,
+# since it tracks the release and that is still 0.24.0. Plugins are processes,
+# so a distroless image could not run one in any case.
+ENTRYPOINT ["/opt/grimoire/bin/docker-entrypoint.sh"]
 CMD ["--help"]

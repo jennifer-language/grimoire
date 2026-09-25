@@ -346,6 +346,42 @@ title = "From disk"
     fs.removeAll($dir);
 }
 
+# --- plugin tables ---------------------------------------------------
+
+# A plugin's whole table reaches it as JSON, and a key can be anything TOML
+# allows - a redirect table is a path to a path. A pointer separates its segments
+# with `/` too, so a key of that shape has to be escaped or it addresses two
+# levels that are not there, and the build fails with `no key "old"` and nothing
+# about the plugin in it.
+func testAPluginSettingKeyMayHoldASlash() {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-config-");
+    def file as string init path.join($dir, "grimoire.toml");
+    fs.writeString(
+        $file,
+        '[book]
+title = "Moved"
+
+[renderer.redirects]
+"old/page.html" = "new/page.html"
+"plain.html" = "index.html"
+');
+    def c as Config init load($file);
+    testing.assertEqual(len($c.renderers), 1);
+    def settings as json.Value init json.decode($c.renderers[0].settings);
+    testing.assertEqual(json.asString($settings, "/old~1page.html"), "new/page.html");
+    testing.assertEqual(json.asString($settings, "/plain.html"), "index.html");
+    fs.removeAll($dir);
+}
+
+func testAPointerKeyEscapesInTheOrderTheStandardSays() {
+    testing.assertEqual(pointerKey("plain.html"), "plain.html");
+    testing.assertEqual(pointerKey("old/page.html"), "old~1page.html");
+    testing.assertEqual(pointerKey("a~b"), "a~0b");
+    # `~` first, then `/`: the other order turns the `~1` it just wrote into
+    # `~01` and the key stops resolving.
+    testing.assertEqual(pointerKey("a~/b"), "a~0~1b");
+}
+
 # --- validPosition, showsNav, showsToc -------------------------------
 
 func testValidPositionAcceptsExactlyThreeValues() {

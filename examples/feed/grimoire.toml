@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-feed. Build it from this directory:
+#
+#   grimoire build
+#
+# The dates in `site/feed.xml` are the commits that last touched each chapter of
+# this repository, so a build from an unpacked tarball writes a warning instead
+# of a feed. That is the plugin working, not failing.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-feed` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "Release Notes"
+description = "A book that reads like a changelog, dated by git."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[renderer.feed]
+baseUrl = "https://example.com/release-notes/"
+output = "feed.xml"
+limit = 20

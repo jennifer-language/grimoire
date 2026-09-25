@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-figure. Build it from this directory:
+#
+#   grimoire build --pdf
+#
+# and compare the two editions: the caption is under the picture in both,
+# because the default form is Markdown rather than a `<figure>` element. Set
+# `html = true` and build again to see it in the site and gone from the PDF.
+#
+# The table names the plugin and nothing else: it ships with Grimoire, which
+# looks for `grimoire-figure` beside itself before it looks anywhere else.
+
+[book]
+title = "Pictures With Captions"
+description = "Captions for the pictures a book already has."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[pdf]
+enabled = true
+
+[preprocessor.figure]
+caption = "auto"
+html = false

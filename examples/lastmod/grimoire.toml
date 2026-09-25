@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-lastmod. Build it from this directory:
+#
+#   grimoire build
+#
+# The dates are the commits that last touched each chapter of this repository, so
+# a build from an unpacked tarball adds nothing at all.
+#
+# The table below names the plugin and nothing else: it ships with Grimoire,
+# which looks for `grimoire-lastmod` beside itself before it looks anywhere else.
+# Nothing has to be installed, and nothing is enabled that a book does not ask
+# for by name.
+
+[book]
+title = "Dated"
+description = "Three chapters, each carrying the day it last changed."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[preprocessor.lastmod]
+format = "%Y-%m-%d"
+label = "Last updated"
