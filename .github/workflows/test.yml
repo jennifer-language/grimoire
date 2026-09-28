@@ -300,6 +300,12 @@ jobs:
           grep -q 'url=../../guide/syntax.html' \
             examples/redirects/site/archive/2024/notes.html
 
+          build include
+          # The code on the page is the file on disk, and the page about the
+          # syntax still shows the syntax.
+          grep -q 'greet("world");' examples/include/site/index.html
+          grep -q '{{#include examples/hello.j}}' examples/include/site/syntax.html
+
           build macros
           grep -q 'version 1.4.0' examples/macros/site/index.html
           # A fence is not expanded, and a backslash prints the macro instead.

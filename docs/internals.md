@@ -60,8 +60,7 @@ Three of those are new enough to be worth a sentence each.
 
 **`plugins/`** is what an install carries beside the launcher, and what a bare
 table name in `grimoire.toml` resolves against before `PATH` is consulted.
-`grimoire-include` is the last single file; the eleven beside it are a launcher,
-a module and an overlay each.
+All twelve are a launcher, a module and an overlay each, with no exceptions.
 
 **`plugins-src/`** is a hole in the container build context, not a source
 directory: whatever is in it is copied to `/opt/grimoire-plugins` in the image,

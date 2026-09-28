@@ -758,6 +758,36 @@ a:hover { color: var(--gr-accent-hover); }
 
 .gr-content img { max-width: 100%; height: auto; border-radius: var(--gr-radius); }
 
+/* A list of tasks keeps its boxes and loses its markers: two markers on one line
+   say the same thing twice. `1. [ ] x` is a task list too, so the numbers go the
+   same way as the bullets. The box is disabled, so a browser draws it at the
+   contrast a reader has asked for rather than at the one a theme picked. */
+.gr-content ul.gr-tasks, .gr-content ol.gr-tasks { padding-left: 1.2em; list-style: none; }
+.gr-content li.gr-task { margin: 4px 0; }
+.gr-content li.gr-task input { margin: 0 6px 0 -1.2em; vertical-align: middle; }
+
+/* A definition list, which is how a glossary or an option reference is written.
+   The term carries the weight and the description is indented under it, because
+   a dd with no indent reads as a second paragraph. */
+.gr-content dl { margin: 0 0 16px; }
+.gr-content dt { font-weight: 600; margin: 12px 0 2px; }
+.gr-content dt:first-child { margin-top: 0; }
+.gr-content dd { margin: 0 0 4px 1.5em; }
+
+/* Marked text. The browser default is a fixed yellow with black text, which is
+   unreadable on a dark page and unrelated to any theme, so this borrows the
+   admonition fill that already follows the palette in both modes. */
+.gr-content mark {
+    background: var(--gr-adm-warning-fill);
+    color: inherit;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+/* Withdrawn text: struck through by the element, dimmed so it stops competing
+   with the prose that replaced it. */
+.gr-content del { color: var(--gr-muted); }
+
 .gr-content hr {
     margin: 34px 0;
     border: 0;

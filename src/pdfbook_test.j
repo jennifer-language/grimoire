@@ -414,9 +414,9 @@ func testPrepareSanitisesFirst() {
 
 # --- callouts --------------------------------------------------------
 
-# The marker is the parser's to read, so this pass leaves it alone: it used to
-# rewrite the line into a bold label, which is what `markdown.j` does for itself
-# now.
+# The marker is the parser's to read, so this pass leaves it alone: rewriting the
+# line into a bold label here would do a second time what `markdown.j` already
+# does.
 func testPrepareLeavesTheMarkerToTheParser() {
     def out as string init prepare("> [!NOTE]\n> mind the gap\n", 0, "");
     testing.assertContains($out, "> [!NOTE]");

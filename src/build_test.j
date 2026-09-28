@@ -653,9 +653,10 @@ func testTocForFollowsTheSetting() {
 # --- copyAssets ------------------------------------------------------
 #
 # The output directory sitting inside the source tree is a supported layout -
-# `serve --watch` carries a whole mechanism for it - and the asset walk used to
-# copy the last build into this one, nesting `site/site/site/` a level deeper on
-# every run and republishing chapters deleted from the sources.
+# `serve --watch` carries a whole mechanism for it - and an asset walk that did
+# not skip the output would copy the last build into this one, nesting
+# `site/site/site/` a level deeper on every run and republishing chapters deleted
+# from the sources.
 
 func bookWithNestedOutput() {
     def root as string init fs.makeTempDir(os.tempDir(), "grimoire-nested-");

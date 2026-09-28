@@ -108,8 +108,8 @@ func testProseThatLooksLikeMarkupIsEscaped() {
     testing.assertEqual(xml.tag(xml.decode($out)), "rss");
 }
 
-# The newest item dates the channel. It used to be read back out of the rendered
-# markup with an index and a substring; it comes from the item now.
+# The newest item dates the channel, and the date comes from the item rather than
+# from the markup the item was rendered into.
 func testTheChannelIsDatedByItsNewestItem() {
     def items as list of Item init [
         Item{

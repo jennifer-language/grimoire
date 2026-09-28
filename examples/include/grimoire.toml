@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# The demo book for grimoire-include. Build it from this directory:
+#
+#   grimoire build
+#
+# The code on the page is read from `docs/examples/hello.j` at build time, so it
+# is either right or a failed build. Edit that file and rebuild to watch the
+# page follow it.
+#
+# The table names the plugin and nothing else: it ships with Grimoire, which
+# looks for `grimoire-include` beside itself before it looks anywhere else.
+
+[book]
+title = "Quoted, Not Copied"
+description = "A book whose code samples are read from the files they came from."
+authors = ["mplx"]
+language = "en"
+
+[build]
+src = "docs"
+out = "site"
+
+[preprocessor.include]

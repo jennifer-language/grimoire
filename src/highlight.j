@@ -164,10 +164,10 @@ func classifyWord(word as string, next as string) {
 # test, the identifier scan, and the slicing - are written out inside `render`
 # instead, where `cs` is a local and no binding copies it.
 #
-# The borrow arrived in 0.24.0-dev+15 and makes the copy free, so this is a
-# floor rather than a target: what is inlined below is inlined to remove a call
-# per character, which costs something on every interpreter. Do not undo it on
-# the grounds that the copy is gone.
+# The read-only parameter borrow makes the copy free, so this is a floor rather
+# than a target: what is inlined below is inlined to remove a call per character,
+# which costs something on every interpreter. Do not undo it on the grounds that
+# the copy is gone.
 
 func scanLineComment(cs as list of string, at as int) {
     def i as int init $at;

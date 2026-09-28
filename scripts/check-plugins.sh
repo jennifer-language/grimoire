@@ -42,12 +42,6 @@ for launcher in plugins/grimoire-*; do
         "head -1 $launcher | grep -q '^#!.*jennifer'" \
         "the launcher lost its shebang"
 
-    # `grimoire-include` predates the split and is one file. It is the last
-    # exemption, and nothing else is exempt.
-    case "$name" in
-        include) continue;;
-    esac
-
     check "$name: the launcher imports its module" \
         "grep -q '^import \"\./$name\.j\"' $launcher" \
         "the launcher is a launcher: import ./$name.j and exit its run()"

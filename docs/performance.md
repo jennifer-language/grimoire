@@ -92,24 +92,22 @@ jennifer profile bin/grimoire pdf --src <your-book> --out /tmp/pdfout
 
 ## What these numbers do not include
 
-Two changes landed after the run they come from, and both make a build faster or
-smaller than the tables say.
+A benchmark file is a measurement of one commit against one interpreter, and both
+move. Two things about the code as it stands make a build faster or smaller than
+the tables say, and neither is measured here:
 
-**The `src/highlight.j` rewrite** removed a per-character helper call - and with
-it a per-character copy of the code block - from the build-time syntax
-highlighter. On an interpreter old enough to lack the borrow that was worth about
-a third of the site build; on `+15` the borrow has already collected most of it,
-and how much is left is unmeasured. Any book that uses `[highlight]` is affected.
+**The build-time highlighter** writes its prompt test and its identifier scan out
+inside `render`, so a book with `[highlight]` on pays no helper call per character
+of a code block. How much that is worth depends on the interpreter's parameter
+borrow, which collects most of the same cost.
 
-**Dropping the chapter-at-a-time PDF parse** for a single call, described above.
-The PDF times were measured with the old shape, so the split between the first
-two rows of the phase table is the new one and the total is the old one; expect
-them to disagree slightly until the next run. Peak memory should fall too, and
-the 1.6 GB figure is the spliced version's.
+**The PDF is parsed as one document** rather than a chapter at a time. The split
+between the first two rows of the phase table and the total disagree slightly for
+that reason, and peak memory is lower than the 1.6 GB shown.
 
-That is the general shape of the caveat rather than an exception to it: a
-benchmark file is a measurement of one commit against one interpreter, and both
-move.
+Re-run `scripts/bench.sh` when the figures matter to a decision: it is the only
+way to have numbers for the machine, the book and the interpreter in front of
+you.
 
 ## Taking these numbers on your own machine
 

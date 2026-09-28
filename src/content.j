@@ -41,6 +41,8 @@
  */
 use strings;
 use convert;
+use lists;
+use maps;
 
 import "markdown.j" as markdown;
 import "html.j" as html;
@@ -126,26 +128,19 @@ func renderInline(nodes as list of markdown.Node) {
     return strings.join($out, "");
 }
 
-# A node neither renderer knows: its children, or its own text when it is a leaf.
+# A node's content: its children rendered inline, or its own text when the module
+# reports none - a leaf.
 #
-# It always **descends**, and that is the whole point. The two `else` branches
-# below used to hand the same node to each other - an inline node in block
-# position went to `renderSpan`, a block node in inline position went to
-# `renderBlock` - so a type neither of them named bounced between them until the
-# interpreter stopped the build at ten thousand frames, with a message about
-# recursion and nothing about the book. A list `item` was such a type, reached
-# through an outline title beginning with an ordered-list marker.
-func renderUnknown(n as markdown.Node) {
-    def kids as list of markdown.Node init markdown.children($n);
-    if (len($kids) == 0) {
-        return html.escape(markdown.text($n));
-    }
-    return renderInline($kids);
-}
-
-# inner renders a styled span's content. A span the module reports no children
-# for is a leaf - its own text, escaped.
-func inner(n as markdown.Node) {
+# It serves two callers. A styled span uses it for what is inside the emphasis or
+# the link, and both renderers use it as the fallback for a type neither of them
+# names. The second is the one with a rule attached: it always **descends**, and
+# neither `else` branch may instead hand the same node to the other renderer - an
+# inline node in block position to `renderSpan`, a block node in inline position
+# to `renderBlock`. A type neither names then bounces between the two until the
+# interpreter stops the build at ten thousand frames, with a message about
+# recursion and nothing about the book. A list `item` is such a type, reached
+# through an outline title that begins with an ordered-list marker.
+func contentOf(n as markdown.Node) {
     def kids as list of markdown.Node init markdown.children($n);
     if (len($kids) == 0) {
         return html.escape(markdown.text($n));
@@ -157,26 +152,33 @@ func renderSpan(n as markdown.Node) {
     match (markdown.typeOf($n)) {
         when "text" { return html.escape(markdown.text($n)); }
         when "codespan" { return "<code>" + html.escape(markdown.text($n)) + "</code>"; }
-        when "strong" { return "<strong>" + inner($n) + "</strong>"; }
-        when "emphasis" { return "<em>" + inner($n) + "</em>"; }
+        when "strong" { return "<strong>" + contentOf($n) + "</strong>"; }
+        when "emphasis" { return "<em>" + contentOf($n) + "</em>"; }
+        # Each is the element the syntax means rather than the one it looks
+        # like: `~~x~~` is withdrawn text, not struck-through styling, and
+        # `==x==` is a mark a reader made.
+        when "strikethrough" { return "<del>" + contentOf($n) + "</del>"; }
+        when "highlight" { return "<mark>" + contentOf($n) + "</mark>"; }
+        when "subscript" { return "<sub>" + contentOf($n) + "</sub>"; }
+        when "superscript" { return "<sup>" + contentOf($n) + "</sup>"; }
         when "link" {
             def title as string init markdown.attr($n, "title");
-            def extra as string init "";
+            def extra as string init classOf($n);
             if ($title != "") {
-                $extra = ' title="' + attrEsc($title) + '"';
+                $extra = $extra + ' title="' + attrEsc($title) + '"';
             }
             if (util.isExternal(markdown.attr($n, "href"))) {
                 $extra = $extra + ' rel="noopener noreferrer"';
             }
             return '<a href="' + attrEsc(href(markdown.attr($n, "href"))) + '"' + $extra + ">" +
-                inner($n) + "</a>";
+                contentOf($n) + "</a>";
         }
         when "image" {
             def alt as string init attrEsc(markdown.text($n));
             def title as string init markdown.attr($n, "title");
-            def extra as string init "";
+            def extra as string init classOf($n);
             if ($title != "") {
-                $extra = ' title="' + attrEsc($title) + '"';
+                $extra = $extra + ' title="' + attrEsc($title) + '"';
             }
             return '<img src="' + attrEsc(href(markdown.attr($n, "url"))) + '" alt="' + $alt +
                 '" loading="lazy"' + $extra + ">";
@@ -188,11 +190,12 @@ func renderSpan(n as markdown.Node) {
         # text by the time the parser is done with it.
         when "paragraph" { return renderBlock($n, false, false); }
         when "list" { return renderList($n); }
+        when "definition_list" { return renderDefinitions($n); }
         when "table" { return renderTable($n); }
         when "code" { return renderCode($n, false); }
         when "quote" { return renderQuote($n, false, false); }
         when "heading" { return renderBlock($n, false, false); }
-        else { return renderUnknown($n); }
+        else { return contentOf($n); }
     }
 }
 
@@ -212,8 +215,8 @@ export func inline(text as string) {
     # the author of a `SUMMARY.md` line meant, so the title is taken literally.
     #
     # Numbered outlines are the reason this matters: `- [7. Tapes](tapes.md)` is
-    # how a reference manual writes its outline, and it used to lose the number
-    # (at best) or abort the build (at worst).
+    # how a reference manual writes its outline, and read as a block it is a list
+    # whose item text has lost the number.
     if (len($kids) != 1 or markdown.typeOf($kids[0]) != "paragraph") {
         return html.escape($text);
     }
@@ -222,16 +225,55 @@ export func inline(text as string) {
 
 # --- block rendering -----------------------------------------------
 
+# A task list item: the checkbox a reader cannot tick, because a page is not a
+# form. `disabled` is what makes that plain to a screen reader as well, and the
+# class is what the stylesheet hangs the missing bullet on.
+func renderTask(item as markdown.Node) {
+    def box as string init '<input type="checkbox" disabled';
+    if (markdown.attr($item, "checked") == "true") {
+        $box = $box + " checked";
+    }
+    return '<li class="gr-task">' + $box + "> " +
+        renderInline(markdown.children($item)) + "</li>";
+}
+
 func renderList(n as markdown.Node) {
     def tag as string init "ul";
     if (markdown.attr($n, "ordered") == "true") {
         $tag = "ol";
     }
     def out as list of string init ["<" + $tag + ">"];
+    def tasks as bool init false;
     for (def item in markdown.children($n)) {
+        if (markdown.attr($item, "task") == "true") {
+            $out[] = renderTask($item);
+            $tasks = true;
+            continue;
+        }
         $out[] = "<li>" + renderInline(markdown.children($item)) + "</li>";
     }
     $out[] = "</" + $tag + ">";
+    if ($tasks) {
+        # One class on the list, so the stylesheet can drop the markers for a
+        # list of tasks without touching the ordinary lists around it.
+        $out[0] = "<" + $tag + ' class="gr-tasks">';
+    }
+    return strings.join($out, "");
+}
+
+# A definition list: a term, and what it means. The parser hands the terms and
+# the descriptions back as siblings, in document order, so this is a walk rather
+# than a pairing.
+func renderDefinitions(n as markdown.Node) {
+    def out as list of string init ["<dl>"];
+    for (def child in markdown.children($n)) {
+        if (markdown.typeOf($child) == "def_term") {
+            $out[] = "<dt>" + renderInline(markdown.children($child)) + "</dt>";
+            continue;
+        }
+        $out[] = "<dd>" + renderInline(markdown.children($child)) + "</dd>";
+    }
+    $out[] = "</dl>";
     return strings.join($out, "");
 }
 
@@ -287,6 +329,25 @@ func copyButton() {
         attrEsc(locale.tr("copyCode")) + '">' + COPY_ICON + "</button>";
 }
 
+# `title="..."` out of a fence's info string.
+#
+# The parser keeps the whole info string and splits off only the language, so
+# anything else a fence says is text to read here. Only `title` is read, and only
+# in quotes: an unquoted value cannot hold the space a file name so often has, and
+# a key this does not know is somebody else's convention rather than an error.
+func titleOf(info as string) {
+    def at as int init strings.indexOf($info, 'title="');
+    if ($at < 0) {
+        return "";
+    }
+    def rest as string init strings.substring($info, $at + 7, len($info));
+    def stop as int init strings.indexOf($rest, '"');
+    if ($stop < 0) {
+        return "";
+    }
+    return strings.substring($rest, 0, $stop);
+}
+
 func renderCode(n as markdown.Node, highlighting as bool) {
     def lang as string init strings.trim(markdown.attr($n, "lang"));
     def code as string init markdown.text($n);
@@ -295,6 +356,14 @@ func renderCode(n as markdown.Node, highlighting as bool) {
     if ($lang != "") {
         $label = '<span class="gr-lang">' + html.escape($lang) + "</span>";
         $classes[] = "language-" + attrEsc(util.slugify($lang));
+    }
+    # ```` ```py title="setup.py" ```` names the file the snippet came from, which
+    # is the one thing a reader needs that the code cannot say itself. It replaces
+    # the language chip rather than joining it: both in one corner is noise, and a
+    # file name already says what language it is.
+    def named as string init titleOf(markdown.attr($n, "info"));
+    if ($named != "") {
+        $label = '<span class="gr-lang">' + html.escape($named) + "</span>";
     }
     def body as string init html.escape($code);
     if ($highlighting and highlight.handles($lang)) {
@@ -339,15 +408,27 @@ func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool)
     return strings.join($out, "");
 }
 
+# The blocks that can hold another block, and so a callout with a title. A table
+# cell cannot: the parser gives it inline children only, which is why the descent
+# below does not walk one - a table-heavy page would pay for every cell.
+def const NESTS_BLOCKS as list of string init [
+    "quote",
+    "admonition",
+    "list",
+    "item",
+    "definition_list",
+    "def_desc"
+];
+
 # titlesIn collects the title of every callout at or below a node, in document
 # order. A title is an attribute rather than a child, so `markdown.text` walks
 # past it, and words printed on the page would be unfindable by the search that
 # indexes that page.
 #
-# The descent stops at anything that cannot hold a block: a paragraph's children
-# are inline, a table cell holds no blocks, a code block is text. It visits the
-# container nodes and nothing else, which is less of the tree than the
-# `markdown.text` beside it walks.
+# The descent follows the same containers `flatText` joins, and stops at anything
+# that cannot hold a block: a paragraph's children are inline, a code block is
+# text. It visits the container nodes and nothing else, which is less of the tree
+# than the text walk beside it.
 func titlesIn(n as markdown.Node) {
     def kind as string init markdown.typeOf($n);
     def parts as list of string;
@@ -357,12 +438,49 @@ func titlesIn(n as markdown.Node) {
             $parts[] = $title;
         }
     }
-    if ($kind == "quote" or $kind == "admonition" or $kind == "list" or $kind == "item") {
+    if (lists.contains(NESTS_BLOCKS, $kind)) {
         for (def child in markdown.children($n)) {
             def inner as string init titlesIn($child);
             if ($inner != "") {
                 $parts[] = $inner;
             }
+        }
+    }
+    return strings.join($parts, " ");
+}
+
+# The blocks whose children are separate pieces of prose rather than one run of
+# it: a cell is not the next cell, an item is not the next item.
+#
+# `markdown.text` concatenates a subtree with nothing between the parts, which is
+# right inside a paragraph - `**bold**word` is one word - and wrong for every one
+# of these. A table went into the search index as `KeyTypeDefaultMeaning`, so the
+# first word of each cell could never match at a word boundary and the index was
+# full of tokens no reader would ever type.
+def const JOINED as list of string init [
+    "list",
+    "item",
+    "table",
+    "row",
+    "cell",
+    "definition_list",
+    "def_term",
+    "def_desc",
+    "quote",
+    "admonition"
+];
+
+# flatText is a block's prose for the search index: one run for a paragraph or a
+# leaf, and the children joined by a space for anything in `JOINED`.
+func flatText(n as markdown.Node) {
+    if (not lists.contains(JOINED, markdown.typeOf($n))) {
+        return markdown.text($n);
+    }
+    def parts as list of string;
+    for (def child in markdown.children($n)) {
+        def piece as string init flatText($child);
+        if ($piece != "") {
+            $parts[] = $piece;
         }
     }
     return strings.join($parts, " ");
@@ -378,9 +496,9 @@ func titlesIn(n as markdown.Node) {
 func indexText(n as markdown.Node) {
     def titles as string init titlesIn($n);
     if ($titles == "") {
-        return markdown.text($n);
+        return flatText($n);
     }
-    return $titles + " " + markdown.text($n);
+    return $titles + " " + flatText($n);
 }
 
 func renderQuote(n as markdown.Node, highlighting as bool, rawHtml as bool) {
@@ -403,6 +521,7 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
         }
         when "code" { return renderCode($n, $highlighting); }
         when "list" { return renderList($n); }
+        when "definition_list" { return renderDefinitions($n); }
         when "table" { return renderTable($n); }
         when "quote" { return renderQuote($n, $highlighting, $rawHtml); }
         when "admonition" { return renderAdmonition($n, $highlighting, $rawHtml); }
@@ -433,8 +552,23 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
         when "emphasis" { return renderSpan($n); }
         when "link" { return renderSpan($n); }
         when "image" { return renderSpan($n); }
-        else { return renderUnknown($n); }
+        else { return contentOf($n); }
     }
+}
+
+# The `class` an attribute list put on a link or an image, as an attribute, or "".
+#
+# **Only** the class. An attribute list can carry any key a book writes, and a
+# renderer that passed them all through would let a chapter put `onclick` on a
+# link - markup that runs. A class is styling, and styling is what the syntax is
+# for; anything else a book needs it can write as an HTML block, where the rule is
+# already `[html] rawHtml` and the author's own decision.
+func classOf(n as markdown.Node) {
+    def names as string init strings.trim(markdown.attr($n, "class"));
+    if ($names == "") {
+        return "";
+    }
+    return ' class="' + attrEsc($names) + '"';
 }
 
 # The permalink chip that appears beside a heading on hover.
@@ -474,11 +608,11 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
     def sectionHeading as string init "";
     def buffer as list of string;
     for (def node in markdown.children($doc)) {
-        if (markdown.typeOf($node) != "heading") {
+        def kind as string init markdown.typeOf($node);
+        if ($kind != "heading") {
             $out[] = renderBlock($node, $highlighting, $rawHtml);
             # Raw markup and a rule are both structure rather than prose, so
             # neither goes into the search index - nobody searches for a `<div>`.
-            def kind as string init markdown.typeOf($node);
             if ($kind == "html_block" or $kind == "thematic_break") {
                 continue;
             }
@@ -491,7 +625,36 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
         def text as string init util.squeeze(markdown.text($node));
         def base as string init util.slugify($text);
         def id as string init util.uniqueSlug($seen, $base);
-        $seen = util.remember($seen, $base);
+        # Counted in place rather than through `util.remember`, which hands back a
+        # map and so copies the whole of it once per heading. Measured on a page of
+        # 400 headings - which is what `{{#apiref}}` produces from a large source
+        # tree - that is 104 ms of copying against 9 ms, and it grows
+        # quadratically: the reading side, `uniqueSlug`, is borrowed and free.
+        if (maps.has($seen, $base)) {
+            $seen[$base] = $seen[$base] + 1;
+        } else {
+            $seen[$base] = 1;
+        }
+        # `## Heading {#named}` names its own anchor, and then the name is the
+        # anchor everywhere: the heading, the contents list, the search index.
+        # Assigned here rather than in `renderHeading` for exactly that reason -
+        # one id per heading, computed once, or a book's own cross-references
+        # would point at a fragment the page does not have.
+        #
+        # It goes through `slugify` too: an id reaches an attribute and a URL
+        # fragment, and a book that writes `{#my anchor}` means one word.
+        def named as string init strings.trim(markdown.attr($node, "id"));
+        if ($named != "") {
+            $id = util.slugify($named);
+            # Counted as well, or a later heading whose own slug happens to be
+            # this name would be given it a second time and one of the two links
+            # would go to the wrong place.
+            if (maps.has($seen, $id)) {
+                $seen[$id] = $seen[$id] + 1;
+            } else {
+                $seen[$id] = 1;
+            }
+        }
         $headings[] = Heading{level: markdown.level($node), text: $text, id: $id};
         if ($title == "" and markdown.level($node) == 1) {
             $title = $text;

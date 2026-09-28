@@ -627,18 +627,13 @@ func excluded(c as config.Config, src as string) {
  * Assemble the whole book for the PDF layout - a cover, then each part heading,
  * then each chapter - as one Markdown document.
  *
- * It was a list of pieces until recently, and the history is worth a paragraph
- * because the shape of the code was entirely a workaround. `markdown.parse`
- * handed the whole line list to a collector once per fenced block, quote, and
- * list, so a document that was a book rather than a chapter paid for that copy
- * on every block - quadratic on a manual, where fences are everywhere. Parsing
- * each chapter separately and concatenating the block trees produced the same
- * tree for less: 2.25x less before `looksLikeTable` was fixed, 1.14x less on
- * `0.24.0-dev+13`.
- *
- * The read-only parameter borrow in `0.24.0-dev+15` removes that copy, and the
- * Jennifer team confirmed this collector is covered by it, so the pieces are
- * joined here and `render` makes one `markdown.parse` call.
+ * One document rather than a list of pieces, which is worth a sentence because
+ * the alternative is a tempting optimisation that is not one: parsing each
+ * chapter separately and concatenating the block trees. That only pays where
+ * `markdown.parse` copies the whole line list into a collector once per fenced
+ * block, quote and list - quadratic on a manual, where fences are everywhere -
+ * and the read-only parameter borrow removes that copy, this collector included.
+ * So the pieces are joined here and `render` makes one `markdown.parse` call.
  *
  * Each chapter opens with a blank line, which keeps the joins clean: without it
  * the last line of one chapter runs into the first line of the next.

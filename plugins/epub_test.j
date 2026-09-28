@@ -117,12 +117,21 @@ func testAChapterIsAWellFormedXmlDocument() {
 
 # Whitespace inside a `<pre>` is content, so the document is not pretty-printed:
 # an indented one would put spaces into every code block in the book.
-func testCodeBlocksKeepTheirWhitespace() {
+#
+# The language reaches the archive as a class, which is what a reader that
+# highlights looks for. A renderer that dropped it would leave every code block
+# in every EPUB unhighlightable, which is invisible in the markup and obvious to
+# a reader, so it is asserted here.
+func testCodeBlocksKeepTheirWhitespaceAndTheirLanguage() {
     def out as string init document(
         "en",
         "Intro",
         markdown.toXhtml("```sh\nls -l\n\n    indented\n```\n"));
-    testing.assertContains($out, "<pre><code>ls -l\n\n    indented</code></pre>");
+    # Raw for the quotes, cooked for the newlines: a raw string keeps a `\n` as
+    # two characters.
+    testing.assertContains(
+        $out,
+        '<pre><code class="language-sh">' + "ls -l\n\n    indented" + "</code></pre>");
 }
 
 # A chapter that is not XML would reach a reader as a file it refuses to open,
@@ -136,8 +145,8 @@ func testAChapterThatIsNotXmlIsRefused() {
 }
 
 # Escaping is the library's, not this plugin's. What is tested is that the text
-# reaching markup goes through it: a title with an ampersand in it used to be one
-# careless concatenation away from a file no reader will open.
+# reaching markup goes through it: a title with an ampersand in it is one careless
+# concatenation away from a file no reader will open.
 func testTextThatLooksLikeMarkupIsEscaped() {
     def out as string init document("en", 'Tom & Jerry <"quoted">', "<p>body</p>");
     testing.assertFalse(strings.contains($out, "<title>Tom & Jerry"));

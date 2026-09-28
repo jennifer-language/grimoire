@@ -1,8 +1,12 @@
 # Markdown
 
-Grimoire renders CommonMark plus GitHub tables, through the `markdown` module
-that ships with the interpreter, so a chapter written for another generator
-needs no changes. This chapter covers what Grimoire reads on top of that.
+Grimoire renders CommonMark plus GitHub tables, task lists and strikethrough,
+definition lists, marked and sub/superscript text, and attribute lists - through
+the `markdown` module that ships with the interpreter, so a chapter written for
+another generator needs no changes. This chapter covers all of it.
+
+Footnotes are the one common extension that is **not** supported: `[^1]` reaches
+the page as written.
 
 Two related settings live elsewhere: [`html.rawHtml`](configuration.md#html)
 decides whether a hand-written HTML block is emitted or escaped, and every
@@ -29,6 +33,89 @@ The one consequence worth knowing: a title taken literally is taken *entirely*
 literally, so `7. A **bold** word` shows its asterisks. A title that does not
 open a block keeps its Markdown, and that covers everything else, `1)` and `1.A`
 included.
+
+## Formatting
+
+Beyond CommonMark's bold, italic and code:
+
+| You write | You get | Element |
+| --------- | ------- | ------- |
+| `~~withdrawn~~` | withdrawn text, struck through and dimmed | `del` |
+| `==marked==` | marked text, on the theme's own highlight | `mark` |
+| `H~2~O` | a subscript | `sub` |
+| `x^2^` | a superscript | `sup` |
+
+All four reach the site, the EPUB and the printable book, because they are the
+renderer's rather than a stylesheet's. `mark` borrows the palette's admonition
+fill rather than the browser default, which is a fixed yellow with black text and
+unreadable on a dark page.
+
+## Lists
+
+A task list loses its bullets and gains checkboxes:
+
+```markdown
+- [x] written
+- [ ] reviewed
+```
+
+The boxes are `disabled`, because a page is not a form - a reader cannot tick one,
+and a screen reader says so. An ordinary list beside a task list keeps its
+bullets.
+
+A definition list is a term and what it means, which is how a glossary or an
+option reference is written:
+
+```markdown
+outline
+: the order of the book, as SUMMARY.md gives it
+
+deck
+: a directory of Jennifer modules with a deck.toml
+```
+
+## Attribute lists
+
+A heading can name its own anchor:
+
+```markdown
+## Peripherals and control desk {#tapes}
+```
+
+The name is the anchor **everywhere** - the heading, the contents list, the
+search index - so a cross-reference to `#tapes` works from any page. It goes
+through the same slug rule as a generated anchor (lowercased, punctuation
+dropped), and it is registered like one, so a later heading that would have
+produced the same slug gets `-1` rather than a duplicate id. Use it when a URL
+was published once and the heading has to change.
+
+A link or an image can take a class:
+
+```markdown
+[Download the PDF](grimoire.pdf){.gr-button}
+![A wide diagram](pipeline.png){.wide}
+```
+
+**Only the class comes through.** An attribute list can carry any key, and a
+renderer that passed them all on would let a chapter put an event handler on a
+link. A class is styling, which is what the syntax is for; anything else a book
+needs it writes as an HTML block, where `[html] rawHtml` and the author's own
+judgement already apply.
+
+## Code blocks
+
+A fence can name the file its code came from:
+
+````markdown
+```py title="setup.py"
+x = 1
+```
+````
+
+The name takes the place of the language chip in the corner of the block - a file
+name already says what language it is - and the language still reaches
+`class="language-py"`, which is what a highlighter reads. The name is shown on
+the site; the printable book draws the code without it.
 
 ## Admonitions
 

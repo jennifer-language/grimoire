@@ -100,10 +100,10 @@ func testInlineOfNothingIsNothing() {
 # --- a title the block parser misreads --------------------------------
 #
 # `markdown.parse` reads blocks, and a numbered outline entry - `- [7. Tapes]` -
-# opens an ordered list. The title used to be handed to the block path as a list,
-# where the item node was a type neither renderer named: `renderSpan` sent it to
-# `renderBlock`, `renderBlock` sent it back, and the build died at ten thousand
-# frames with a message about recursion and nothing about the book.
+# opens an ordered list. Handing that to the block path costs the number at best,
+# and at worst reaches the `item` node, which is a type neither renderer names: it
+# would bounce between them until the interpreter stopped the build at ten
+# thousand frames, with a message about recursion and nothing about the book.
 
 func testANumberedTitleIsTakenLiterally() {
     testing.assertEqual(inline("1. A"), "1. A");
@@ -542,11 +542,40 @@ func testTitlesLeadTheRecord() {
     testing.assertTrue(strings.indexOf($text, "TheTitle") < strings.indexOf($text, "the body"));
 }
 
-# A page with no callouts pays nothing and reads the same as it always did.
-func testAPageWithoutCalloutsIsUnchanged() {
+# A page with no callouts contributes its prose and nothing else - and one word
+# per list item, because a list of words is not one word.
+func testAPageWithoutCalloutsIsItsProse() {
     english();
     def r as Rendered init render("# T\n\n> quoted\n\n- a\n- b\n\npara\n", false, true);
-    testing.assertEqual($r.sections[0].text, "quoted ab para");
+    testing.assertEqual($r.sections[0].text, "quoted a b para");
+}
+
+# What a container's children are worth to the search index: separate words.
+# `markdown.text` concatenates a subtree with nothing between the parts, which is
+# right inside a paragraph and wrong for a table - a manual's configuration table
+# went into the index as `KeyTypeDefaultMeaning`, where the first word of every
+# cell could never match at a word boundary.
+func testTableCellsAreSeparateWordsInTheIndex() {
+    english();
+    def md as string init "# T\n\n| Key | Type |\n| --- | --- |\n| enabled | bool |\n";
+    testing.assertEqual(render($md, false, true).sections[0].text, "Key Type enabled bool");
+}
+
+func testDefinitionsAndTasksAreSeparateWordsToo() {
+    english();
+    def defs as string init "# T\n\nterm\n: what it means\n";
+    testing.assertEqual(render($defs, false, true).sections[0].text, "term what it means");
+    def tasks as string init "# T\n\n- [ ] first thing\n- [x] second thing\n";
+    testing.assertEqual(render($tasks, false, true).sections[0].text, "first thing second thing");
+}
+
+# A paragraph is one run of prose, and inserting spaces into it would be the same
+# bug from the other side: `**bold**word` is one word.
+func testAParagraphIsNotSplitApart() {
+    english();
+    testing.assertEqual(
+        render("# T\n\n**bold**word and `code`span\n", false, true).sections[0].text,
+        "boldword and codespan");
 }
 
 # A marker can carry a title, and a title is the author speaking: it is used as
@@ -634,4 +663,243 @@ func testTocHtmlEscapesHeadingText() {
     def toc as string init tocHtml($r.headings, 3);
     testing.assertContains($toc, "&lt;");
     testing.assertContains($toc, "&amp;");
+}
+
+# --- the syntax beyond CommonMark -------------------------------------
+#
+# Grimoire walks nodes rather than calling `markdown.toHtml`, so every node type
+# is one this module has to name. A type it does not name falls to the fallback,
+# which renders the node's children and loses the markup silently - a
+# strikethrough that reads as ordinary prose, a definition list that reads as one
+# run-on line.
+
+func testTheNewInlineSpansAreTheElementsTheyMean() {
+    testing.assertEqual(inline("~~gone~~"), "<del>gone</del>");
+    testing.assertEqual(inline("==marked=="), "<mark>marked</mark>");
+    testing.assertEqual(inline("H~2~O"), "H<sub>2</sub>O");
+    testing.assertEqual(inline("x^2^"), "x<sup>2</sup>");
+}
+
+func testTheNewSpansNestLikeTheOldOnes() {
+    testing.assertContains(render("~~a **b** c~~\n", false, true).html, "<strong>b</strong>");
+    testing.assertContains(render("==`code`==\n", false, true).html, "<code>code</code>");
+}
+
+# A checkbox a reader cannot tick, because a page is not a form - and the classes
+# the stylesheet needs to drop the bullet that would otherwise sit beside it.
+func testATaskListIsCheckboxesWithoutBullets() {
+    def out as string init render("- [ ] todo\n- [x] done\n", false, true).html;
+    testing.assertContains($out, '<ul class="gr-tasks">');
+    testing.assertContains($out, '<li class="gr-task"><input type="checkbox" disabled> todo</li>');
+    testing.assertContains(
+        $out,
+        '<li class="gr-task"><input type="checkbox" disabled checked> done</li>');
+}
+
+# An ordinary list beside a task list keeps its bullets: the class is on the list
+# that needs it and nowhere else.
+func testAnOrdinaryListIsUntouched() {
+    def out as string init render("- one\n- two\n", false, true).html;
+    testing.assertContains($out, "<ul><li>one</li><li>two</li></ul>");
+    testing.assertFalse(strings.contains($out, "gr-tasks"));
+}
+
+func testADefinitionListIsTermsAndDescriptions() {
+    def out as string init render("term\n: what it means\n", false, true).html;
+    testing.assertContains($out, "<dl><dt>term</dt><dd>what it means</dd></dl>");
+}
+
+# Without the branch the parser's nodes fall through to the fallback and the page
+# reads "termwhat it means", which is why this asserts the absence too.
+func testADefinitionListIsNotARunOnLine() {
+    def out as string init render("term\n: what it means\n", false, true).html;
+    testing.assertFalse(strings.contains($out, "termwhat"));
+}
+
+# `## Heading {#named}` names its own anchor, and the name has to be the anchor
+# everywhere - the heading, the contents list, the search index - or a book's own
+# cross-references point at a fragment the page does not have.
+func testAHeadingMayNameItsOwnAnchor() {
+    def page as Rendered init render('## Peripherals {#tapes}' + "\n", false, true);
+    testing.assertContains($page.html, '<h2 id="tapes">');
+    testing.assertContains($page.html, 'href="#tapes"');
+    testing.assertEqual($page.headings[0].id, "tapes");
+    testing.assertEqual($page.headings[0].text, "Peripherals");
+    testing.assertEqual($page.sections[0].anchor, "tapes");
+}
+
+# A name reaches an attribute and a URL fragment, so it goes through the same
+# slug rule as a generated one: lowercased, and punctuation dropped rather than
+# turned into a separator.
+#
+# An attribute list is token-separated, so the parser reads `{#My Anchor}` as the
+# id `My` and drops the rest. One word is what the syntax allows and a slug is
+# what it becomes.
+func testANamedAnchorIsStillASlug() {
+    testing.assertContains(
+        render('## A {#Named-Anchor}' + "\n", false, true).html,
+        '<h2 id="named-anchor">');
+    testing.assertContains(
+        render('## A {#Tapes.and.Drives}' + "\n", false, true).html,
+        '<h2 id="tapesanddrives">');
+}
+
+# A named anchor is registered, or a later heading whose own slug is that name
+# would be given it a second time and one of the two links would go astray.
+func testANamedAnchorIsNotHandedOutTwice() {
+    def page as Rendered init render('## A {#b}' + "\n\n## B\n", false, true);
+    testing.assertEqual($page.headings[0].id, "b");
+    testing.assertEqual($page.headings[1].id, "b-1");
+}
+
+# A fence can name the file its code came from, which is the one thing a reader
+# needs that the code cannot say itself.
+func testAFenceMayNameItsFile() {
+    def out as string init render('```py title="setup.py"' + "\nx = 1\n```\n", false, true).html;
+    testing.assertContains($out, '<span class="gr-lang">setup.py</span>');
+    # The language still reaches the class, which is what a highlighter reads.
+    testing.assertContains($out, 'class="language-py"');
+    # And the chip is the file rather than both at once.
+    testing.assertFalse(strings.contains($out, ">py</span>"));
+}
+
+func testAFenceWithNoTitleKeepsTheLanguageChip() {
+    testing.assertContains(
+        render("```py\nx = 1\n```\n", false, true).html,
+        '<span class="gr-lang">py</span>');
+}
+
+# An attribute list on a link is how a book asks for a button. Only the class
+# comes through: an attribute list can carry any key, and a renderer that passed
+# them all would let a chapter put an event handler on a link.
+func testALinkTakesAClassAndNothingElse() {
+    def out as string init render('[go](x.md){.gr-button}' + "\n", false, true).html;
+    testing.assertContains($out, 'class="gr-button"');
+    def risky as string init render(
+        '[go](x.md){.b onclick="steal()" target="_blank"}' + "\n",
+        false,
+        true).html;
+    testing.assertContains($risky, 'class="b"');
+    testing.assertFalse(strings.contains($risky, "onclick"));
+    testing.assertFalse(strings.contains($risky, "target"));
+}
+
+func testAnImageTakesAClassToo() {
+    testing.assertContains(render('![a](b.png){.wide}' + "\n", false, true).html, 'class="wide"');
+}
+
+# --- every node type this module names --------------------------------
+#
+# Two failures this catches, both of which have happened and neither of which any
+# other test would notice.
+#
+# A **new node type** arriving from the `markdown` module renders through the
+# fallback: its children, with the markup dropped. That is silent - the page still
+# builds, the words are still there, and a strikethrough reads as prose - so the
+# only way to hear about it is a list of what this module names.
+#
+# A **cycle between the two renderers**: if `renderSpan` sends a type to
+# `renderBlock` and `renderBlock` sends the same type back, the build dies at ten
+# thousand frames with a message about recursion and nothing about the book.
+# Rendering one node of every type through *both* entry points is what makes that
+# a failing test rather than a failing build.
+
+# Every construct the parser produces, in one document.
+func everySyntax() {
+    return "# Heading\n\nA paragraph with **bold**, *em*, `code`, ~~gone~~, " +
+        "==marked==, H~2~O, x^2^, [a link](x.md) and ![an image](i.png).\n\n" +
+        "- one\n- two\n  - nested\n\n1. first\n2. second\n\n- [ ] todo\n- [x] done\n\n" +
+        "term\n: what it means\n\n> quoted\n\n> [!NOTE] Titled\n> the body\n\n" +
+        "| a | b |\n| --- | --- |\n| c | d |\n\n```py\nx = 1\n```\n\n---\n\n" +
+        "<div>raw</div>\n";
+}
+
+# The types this module renders on purpose. A type the parser produces that is not
+# here reaches a page through the fallback, which is what this list exists to
+# prevent.
+func namedTypes() {
+    return [
+        "text",
+        "codespan",
+        "strong",
+        "emphasis",
+        "strikethrough",
+        "highlight",
+        "subscript",
+        "superscript",
+        "link",
+        "image",
+        "paragraph",
+        "heading",
+        "list",
+        "item",
+        "definition_list",
+        "def_term",
+        "def_desc",
+        "table",
+        "row",
+        "cell",
+        "code",
+        "quote",
+        "admonition",
+        "thematic_break",
+        "html_block",
+        "page_break"
+    ];
+}
+
+func typesIn(n as markdown.Node, found as map of string to int) {
+    def out as map of string to int init $found;
+    $out[markdown.typeOf($n)] = 1;
+    for (def child in markdown.children($n)) {
+        $out = typesIn($child, $out);
+    }
+    return $out;
+}
+
+func testEveryTypeTheParserProducesIsNamedHere() {
+    def none as map of string to int;
+    def found as map of string to int init typesIn(markdown.parse(everySyntax()), $none);
+    def unnamed as list of string;
+    for (def kind in maps.keys($found)) {
+        if ($kind == "document") {
+            continue;
+        }
+        if (not lists.contains(namedTypes(), $kind)) {
+            $unnamed[] = $kind;
+        }
+    }
+    # A failure here names the type: add a branch to `renderSpan` or `renderBlock`
+    # for it, and its name to `namedTypes` above.
+    testing.assertEqual(strings.join($unnamed, " "), "");
+}
+
+# The cycle alarm. Every type goes through both renderers; a pair that hands the
+# same node to each other exhausts the stack here rather than in somebody's build.
+func testBothRenderersReturnForEveryType() {
+    def none as map of string to int;
+    def found as map of string to int init typesIn(markdown.parse(everySyntax()), $none);
+    def seen as list of markdown.Node init nodesOf(markdown.parse(everySyntax()));
+    def count as int init 0;
+    for (def n in $seen) {
+        if (markdown.typeOf($n) == "document") {
+            continue;
+        }
+        renderSpan($n);
+        renderBlock($n, false, false);
+        $count = $count + 1;
+    }
+    # Every node of every type, rendered both ways, and the build still running.
+    testing.assertTrue($count > 30);
+    testing.assertTrue(len(maps.keys($found)) > 20);
+}
+
+func nodesOf(n as markdown.Node) {
+    def out as list of markdown.Node init [$n];
+    for (def child in markdown.children($n)) {
+        for (def deeper in nodesOf($child)) {
+            $out[] = $deeper;
+        }
+    }
+    return $out;
 }
