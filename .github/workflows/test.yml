@@ -156,6 +156,12 @@ jobs:
       - name: Check the shape of the plugins that ship
         run: scripts/check-plugins.sh
 
+      # In a clone there is nothing but tracked files, so a forgotten `git add`
+      # here is a step failing with "No such file or directory" several minutes
+      # in. The same check run before a push says which file.
+      - name: Check that everything the build needs is tracked
+        run: scripts/check-tracked.sh
+
       # The package page shows `org.opencontainers.image.description`. `docker.yml`
       # holds it once, as an env value, and the `Dockerfile` repeats it so a build
       # by hand produces the same image - two copies of one sentence, which is
@@ -190,12 +196,20 @@ jobs:
 
           test -s packaging/OVERVIEW.md
 
+      # Two shipped plugins date a book from its git history, and their tests
+      # build real repositories - `grimoire-feed` and `grimoire-lastmod`. The
+      # official interpreter image carries no git, so the suite in it would test
+      # the image rather than the plugins: they skip their git half where there is
+      # no git, which should be a contributor's laptop and not this job.
+      - name: An interpreter image with git
+        run: scripts/ci-git-image.sh jennifer-git:test "${JENNIFER_TAG}"
+
       # `scripts/test.sh` splits JENNIFER on whitespace precisely so it can be a
       # whole command, which is what lets the loop run on the runner while every
       # test runs in the image.
       - name: Unit tests
         run: |
-          JENNIFER="docker run --rm -v $PWD:/work ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
+          JENNIFER="docker run --rm -v $PWD:/work jennifer-git:test" \
             scripts/test.sh
 
   book:
@@ -214,6 +228,10 @@ jobs:
 
       - name: Pull the interpreter image
         run: docker pull "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}"
+
+      # For the two examples that read `git log`; see the note in the unit job.
+      - name: An interpreter image with git
+        run: scripts/ci-git-image.sh jennifer-git:test "${JENNIFER_TAG}"
 
       # Twice, at two job counts, into two directories. Byte-identical output at
       # any `--jobs` is a promise Grimoire makes and an easy one to break by
@@ -267,11 +285,19 @@ jobs:
       - name: Build every plugin example
         run: |
           set -eux
+          # `IMAGE=` picks the interpreter for one example: `grimoire-feed` and
+          # `grimoire-lastmod` date a book from `git log`, and the official image
+          # carries no git, so without this their examples would build a book with
+          # no feed and no dates and the assertions below would be about the image.
           build() {
+            name=$1
+            shift
             docker run --rm --user "$(id -u):$(id -g)" \
-              -v "$PWD:/work" -w "/work/examples/$1" \
-              "ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}" \
-              run /work/bin/grimoire build "${@:2}"
+              -v "$PWD:/work" -w "/work/examples/$name" \
+              -e GIT_CONFIG_COUNT=1 \
+              -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+              "${IMAGE:-ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}}" \
+              run /work/bin/grimoire build "$@"
           }
 
           build apiref
@@ -282,7 +308,7 @@ jobs:
           unzip -v examples/epub/site/field-guide.epub | grep mimetype | grep -q Stored
           unzip -l examples/epub/site/field-guide.epub | grep -q 'OEBPS/offline.xhtml'
 
-          build feed
+          IMAGE=jennifer-git:test build feed
           grep -q '<rss version="2.0"' examples/feed/site/feed.xml
 
           build glossary
@@ -290,7 +316,7 @@ jobs:
           grep -q 'href="../glossary.html#search-index"' \
             examples/glossary/site/guide/building.html
 
-          build lastmod
+          IMAGE=jennifer-git:test build lastmod
           grep -q '<em>Last updated: 20' examples/lastmod/site/index.html
 
           build linkcheck

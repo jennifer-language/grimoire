@@ -16,6 +16,35 @@ use testing;
 use fs;
 use path;
 
+# --- the machine may have no git ---------------------------------------
+#
+# The interpreter image carries none - it is debian-slim, the interpreter and
+# ca-certificates - so the tests below cannot demand a repository. This plugin is
+# specified to work both ways, and `withoutGit` asserts the half a machine without
+# git can reach: nothing added, no error, no build stopped. The git half is
+# covered wherever git exists, which for CI means the image `scripts/ci-git-image.sh`
+# builds for exactly that job.
+func gitAvailable() {
+    def result as os.Result;
+    try {
+        $result = os.run(["git", "--version"]);
+    } catch (e) {
+        return false;
+    }
+    return $result.exitCode == 0;
+}
+
+# True when this machine cannot run a git test, having first asserted what the
+# plugin does without one.
+func withoutGit() {
+    if (gitAvailable()) {
+        return false;
+    }
+    testing.assertFalse(isCheckout(os.tempDir()));
+    testing.assertEqual(dateOf(os.tempDir(), "index.md", "%Y-%m-%d"), "");
+    return true;
+}
+
 # A checkout with two chapters committed on two different days, and one that is
 # written but never committed.
 func bookRepo() {
@@ -63,6 +92,9 @@ func requestFor(root as string, settings as string) {
 }
 
 func testTheDateIsTheLastCommitThatTouchedTheFile() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     testing.assertEqual(dateOf($root, "index.md", "%Y-%m-%d"), "2026-03-01");
     testing.assertEqual(dateOf($root, "guide/syntax.md", "%Y-%m-%d"), "2026-04-15");
@@ -72,6 +104,9 @@ func testTheDateIsTheLastCommitThatTouchedTheFile() {
 # The layout is git's, which is strftime, which is also what Jennifer's own
 # `time.format` takes. One idea of what a date looks like, not two.
 func testTheFormatIsPassedThroughToGit() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     testing.assertEqual(dateOf($root, "index.md", "%d.%m.%Y"), "01.03.2026");
     testing.assertEqual(dateOf($root, "index.md", "%Y"), "2026");
@@ -84,6 +119,9 @@ func testTheFormatIsPassedThroughToGit() {
 # says so, and this is the test that would notice if git stopped honouring the
 # locale and the advice became wrong.
 func testASpelledOutMonthFollowsTheMachinesLocale() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     def spelled as string init dateOf($root, "index.md", "%B %Y");
     testing.assertContains($spelled, "2026");
@@ -92,6 +130,9 @@ func testASpelledOutMonthFollowsTheMachinesLocale() {
 }
 
 func testAFileGitHasNeverSeenHasNoDate() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     testing.assertEqual(dateOf($root, "fresh.md", "%Y-%m-%d"), "");
     testing.assertEqual(dateOf($root, "never-existed.md", "%Y-%m-%d"), "");
@@ -127,6 +168,9 @@ func testAChapterWithNoDateIsUntouched() {
 }
 
 func testTheReplyCarriesOnlyTheChaptersGitKnows() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     def out as string init replyFor(json.decode(requestFor($root, '{}')));
     def reply as json.Value init json.decode($out);
@@ -140,6 +184,9 @@ func testTheReplyCarriesOnlyTheChaptersGitKnows() {
 }
 
 func testTheLabelAndTheFormatAreTheBooksOwn() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     def settings as string init '{"label":"Zuletzt geaendert","format":"%d.%m.%Y"}';
     def reply as json.Value init json.decode(replyFor(json.decode(requestFor($root, $settings))));
@@ -159,6 +206,9 @@ func testABookThatIsNotACheckoutChangesNothing() {
 }
 
 func testRunStampsTheBook() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init bookRepo();
     testing.assertEqual(run(requestFor($root, '{}')), 0);
     fs.removeAll($root);

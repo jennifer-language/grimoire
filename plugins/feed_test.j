@@ -18,6 +18,35 @@ use testing;
 
 # A checkout with `commits` applied in order: each is a file, its text, and the
 # date to commit it on.
+
+# --- the machine may have no git ---------------------------------------
+#
+# The interpreter image carries none - it is debian-slim, the interpreter and
+# ca-certificates - so the tests below cannot demand a repository. This plugin is
+# specified to work both ways, and `withoutGit` asserts the half a machine without
+# git can reach: nothing added, no error, no build stopped. The git half is
+# covered wherever git exists, which for CI means the image `scripts/ci-git-image.sh`
+# builds for exactly that job.
+func gitAvailable() {
+    def result as os.Result;
+    try {
+        $result = os.run(["git", "--version"]);
+    } catch (e) {
+        return false;
+    }
+    return $result.exitCode == 0;
+}
+
+# True when this machine cannot run a git test, having first asserted what the
+# plugin does without one: no feed, and a warning that says why.
+func withoutGit() {
+    if (gitAvailable()) {
+        return false;
+    }
+    testing.assertFalse(isCheckout(os.tempDir()));
+    return true;
+}
+
 func repoWith(files as list of string, texts as list of string, dates as list of string) {
     def root as string init fs.makeTempDir(os.tempDir(), "feed-");
     os.run(["git", "-C", $root, "init", "-q"]);
@@ -151,6 +180,9 @@ func testJoinKeepsOneSlash() {
 # --- against a repository --------------------------------------------
 
 func testTheDatesComeFromGit() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init repoWith(
         ["one.md", "two.md"],
         ["# One\n", "# Two\n"],
@@ -170,6 +202,9 @@ func testTheDatesComeFromGit() {
 # `lastBuildDate` is the newest item's own date. The clock would make every
 # build a different file.
 func testLastBuildDateIsTheNewestItem() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init repoWith(["one.md"], ["# One\n"], ["2026-01-01T10:00:00+0000"]);
     def req as json.Value init json.decode(requestFor(
         $root,
@@ -182,6 +217,9 @@ func testLastBuildDateIsTheNewestItem() {
 }
 
 func testTheLimitHolds() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init repoWith(
         ["a.md", "b.md", "c.md"],
         ["# A\n", "# B\n", "# C\n"],
@@ -197,6 +235,9 @@ func testTheLimitHolds() {
 # A chapter git has never seen has no date to publish, and is left out until it
 # is committed.
 func testAnUncommittedChapterIsLeftOut() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init repoWith(["one.md"], ["# One\n"], ["2026-01-01T10:00:00+0000"]);
     fs.writeString(path.join($root, "new.md"), "# New\n");
     def req as json.Value init json.decode(requestFor(
@@ -214,6 +255,9 @@ func testAnUncommittedChapterIsLeftOut() {
 # A book does not know where it is published, so a feed of relative links would
 # be useless. No baseUrl means no feed, and a warning rather than a failure.
 func testWithoutABaseUrlThereIsNoFeed() {
+    if (withoutGit()) {
+        return;
+    }
     def root as string init repoWith(["one.md"], ["# One\n"], ["2026-01-01T10:00:00+0000"]);
     def req as json.Value init json.decode(requestFor($root, [entryJson("one.md", "One")], '{}'));
     testing.assertEqual(feedFor($req), "");
