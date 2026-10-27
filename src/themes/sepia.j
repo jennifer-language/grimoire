@@ -4,7 +4,7 @@
 
 /**
  * The `sepia` theme. Yellowed paper and coffee brown, serif throughout - the
- * archival register, and the gentlest of the ten on a bright screen. A narrow
+ * archival register, and the gentlest of the set on a bright screen. A narrow
  * measure keeps long prose comfortable.
  *
  * Where `grimoire` is warm-neutral parchment with a rust accent, this one commits

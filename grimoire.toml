@@ -15,7 +15,7 @@ src = "docs"
 out = "site"
 
 [html]
-# Any of the ten built-in themes; run `grimoire themes` for the list.
+# Any of the eleven built-in themes; run `grimoire themes` for the list.
 theme = "nordic"
 # The colour mode a first-time reader gets: auto, light, or dark.
 mode = "auto"

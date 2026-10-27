@@ -151,8 +151,11 @@ func testRenderMarksVariablesAndStrings() {
     def html as string init render('io.printf("hi", $name);');
     testing.assertContains($html, '<span class="hljs-variable">$name</span>');
     testing.assertContains($html, '<span class="hljs-built_in">io</span>');
-    # A quote needs no escape in element text, only `<`, `>` and `&` do.
-    testing.assertContains($html, '<span class="hljs-string">"hi"</span>');
+    # Element text needs only `<`, `>` and `&` escaped, but `html.escape` takes
+    # the quote as well. Harmless - what matters is that it happens exactly once,
+    # which a second pass would show as `&amp;quot;`.
+    testing.assertContains($html, '<span class="hljs-string">&quot;hi&quot;</span>');
+    testing.assertFalse(strings.contains($html, "&amp;quot;"));
 }
 
 func testRenderMarksComments() {

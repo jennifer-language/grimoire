@@ -17,6 +17,7 @@ use fs;
 use strings;
 use lists;
 use convert;
+use time;
 
 /**
  * A resolved book configuration. The `book` fields describe the document, the
@@ -357,7 +358,7 @@ func jsonOf(doc as toml.Value, ptr as string) {
             return "true";
         }
         return "false"; }
-        when "datetime" { return json.encode(time.toIso(toml.asDatetime($doc, $ptr))); }
+        when "datetime" { return json.encode(time.iso(toml.asDatetime($doc, $ptr))); }
         else { return "null"; }
     }
 }

@@ -12,7 +12,7 @@
  * pair the wrong way round. None of those stops a build, and the first one makes
  * a theme unreachable through `byName` without anything saying so.
  *
- * `theme_test.j` checks the ten together - that they are complete, uniquely
+ * `theme_test.j` checks the whole set together - that they are complete, uniquely
  * named, and render. These are the checks that need to know which theme they are
  * looking at.
  * @module nordic_test

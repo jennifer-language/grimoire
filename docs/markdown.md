@@ -151,7 +151,7 @@ A title is the author's text: printed as written rather than in the small
 capitals a standing label gets, indexed with the body, and read as plain text -
 markup in it is shown rather than rendered.
 
-**Colours** are five hues shared by all ten themes - blue, green, purple, amber,
+**Colours** are five hues shared by every theme - blue, green, purple, amber,
 red - as a low-alpha wash behind the panel, with the same hue on the left rule
 and the label. Redefine the ten `--gr-adm-*` custom properties to change them;
 [Themes](themes.md#how-a-theme-is-built) says where.

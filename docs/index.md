@@ -69,7 +69,7 @@ default.
   rather than written to disk - the published files never carry it.
 - **[Admonitions](markdown.md#admonitions)** in GitHub's syntax: `> [!WARNING]`
   and four others, with an optional title, labelled in the book's language and
-  coloured the same way in all ten themes. A renderer that does not know the
+  coloured the same way in every theme. A renderer that does not know the
   syntax shows a plain quotation.
 - **[Plugins](plugins.md)** as programs, not modules. A preprocessor reads the
   book as JSON on stdin and writes the rewritten chapters back, so what it
@@ -80,7 +80,7 @@ default.
   twenty-odd words Grimoire adds around your text - "Search", "On this page",
   "Previous" - follow the book's `language`, with English wherever no
   translation exists yet.
-- **[Ten themes](themes.md)**, each with a light and a dark palette.
+- **[Eleven themes](themes.md)**, each with a light and a dark palette.
 - **A mandatory dark mode.** Every theme ships both palettes; the selector in
   the top bar offers light, dark, and follow-the-system, and the choice is
   stamped on the document before the first paint, so there is no white flash on
@@ -114,7 +114,7 @@ default.
 | [Configuration](configuration.md) | `grimoire.toml`, key by key |
 | [Markdown](markdown.md) | what Grimoire reads on top of CommonMark |
 | [Plugins](plugins.md) | running a program over the book, and writing one |
-| [Themes](themes.md) | the ten themes, with screenshots, and how to write one |
+| [Themes](themes.md) | the eleven themes, with screenshots, and how to write one |
 | [Internals](internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](performance.md) | where the time goes, and why it scales the way it does |
 

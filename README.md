@@ -35,7 +35,7 @@ anywhere unless you opt in.
 The words Grimoire adds around your text - "Search", "On this page", the
 colour-mode buttons - follow the book's `language`, in English and ten more.
 
-Ten themes ship, each with a light and a dark palette:
+Eleven themes ship, each with a light and a dark palette:
 
 ![grimoire](docs/screenshots/grimoire.png)
 
@@ -49,7 +49,7 @@ Everything lives in [`docs/`](docs/index.md), which Grimoire builds with itself:
 | [Installation](docs/installation.md) | from a checkout, or from a container with Docker or Podman |
 | [Commands](docs/commands.md) | every subcommand and flag |
 | [Configuration](docs/configuration.md) | `grimoire.toml`, key by key |
-| [Themes](docs/themes.md) | the ten themes, with screenshots, and how to write one |
+| [Themes](docs/themes.md) | the eleven themes, with screenshots, and how to write one |
 | [Internals](docs/internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](docs/performance.md) | where the time goes, and why it scales the way it does |
 

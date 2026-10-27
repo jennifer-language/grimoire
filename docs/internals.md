@@ -18,7 +18,7 @@ src/
   layout.j          the page shell: top bar, sidebar, contents, pager, search
   palette.j         the theme model and the stylesheet generator
   theme.j           the theme registry
-  themes/*.j        the ten shipped themes, each with its own _test.j
+  themes/*.j        the eleven shipped themes, each with its own _test.j
   locale.j          Grimoire's own words, in eleven languages
   keywords.j        the per-page keyword meta tag
   stopwords.j       the words that carry no subject, in nine languages

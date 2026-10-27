@@ -24,6 +24,7 @@ import "./themes/carbon.j" as carbon;
 import "./themes/orchid.j" as orchid;
 import "./themes/sepia.j" as sepia;
 import "./themes/terminal.j" as terminal;
+import "./themes/sixtyfour.j" as sixtyfour;
 
 /**
  * The name of the theme used when the configuration names none, or names one
@@ -49,7 +50,8 @@ export func all() {
         sepia.theme(),
         orchid.theme(),
         ember.theme(),
-        terminal.theme()
+        terminal.theme(),
+        sixtyfour.theme()
     ];
 }
 

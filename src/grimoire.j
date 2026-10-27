@@ -508,7 +508,7 @@ out = "site"
 clean = false
 
 [html]
-# Any of the ten built-in themes; run `grimoire themes` for the list.
+# Any of the eleven built-in themes; run `grimoire themes` for the list.
 theme = "grimoire"
 # The colour mode a first-time reader gets: auto, light, or dark.
 mode = "auto"

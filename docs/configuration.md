@@ -203,7 +203,7 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 
 | Key | Type | Default | Meaning |
 | --- | ---- | ------- | ------- |
-| `theme` | string | `"grimoire"` | one of the [ten themes](themes.md); an unknown name falls back to `grimoire` |
+| `theme` | string | `"grimoire"` | one of the [eleven themes](themes.md); an unknown name falls back to `grimoire` |
 | `mode` | string | `"auto"` | the colour mode a first-time reader gets: `auto`, `light`, `dark` |
 | `uiLanguage` | string | from `book.language` | the language Grimoire's own words are printed in, when it differs from the book's |
 | `rawHtml` | bool | `true` | emit a hand-written HTML block from the Markdown as written; `false` escapes it |

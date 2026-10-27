@@ -7,7 +7,7 @@
 # One page of the book is captured per theme, once in light mode and once
 # in dark, and the pair is composited side by side. The site is built **once**:
 # the HTML is identical for every theme, only assets/grimoire.css differs, so the
-# loop swaps the stylesheet rather than rebuilding 10 times.
+# loop swaps the stylesheet rather than rebuilding once per theme.
 #
 #   scripts/screenshots.sh              # all themes
 #   scripts/screenshots.sh nordic ivy   # just these

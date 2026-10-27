@@ -251,10 +251,10 @@ export func tint(c as Rgb, percent as int) {
 
 # The syntax palette. Unlike everything else here it is not per-theme: one pair
 # tuned to sit on both a warm parchment and a cool slate surface reads better
-# across ten themes than ten hand-tuned sets would, and it is one place to fix
-# rather than ten. A book that wants different token colours can override the
-# `--gr-syn-*` properties, or switch on highlight.js and pick any of its
-# stylesheets - those load after this one and win.
+# across every theme than a hand-tuned set per theme would, and it is one place
+# to fix rather than many. A book that wants different token colours can
+# override the `--gr-syn-*` properties, or switch on highlight.js and pick any
+# of its stylesheets - those load after this one and win.
 def const SYNTAX_LIGHT as list of string init [
     "--gr-syn-comment: #9aa0a6",
     "--gr-syn-keyword: #a626a4",

@@ -9,7 +9,7 @@ Build a documentation website - and a printable PDF - from a directory of
 Markdown files. Written in [Jennifer](https://jennifer-lang.dev/).
 
 A `SUMMARY.md` becomes the outline, or the directory tree is walked when there is
-none. Out comes a self-contained static site - ten themes, light and dark,
+none. Out comes a self-contained static site - eleven themes, light and dark,
 searchable in eleven languages - that works from a web root, from a
 subdirectory, or opened straight off the disk over `file://`, search included.
 Nothing is fetched at build time unless you ask for it.

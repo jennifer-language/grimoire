@@ -1,6 +1,6 @@
 # Themes
 
-Ten themes ship with Grimoire. Every one defines a **light and a dark palette** -
+Eleven themes ship with Grimoire. Every one defines a **light and a dark palette** -
 that is not optional in the theme model, so no theme can render a broken dark
 mode - plus a type stack, a corner radius, and the measure of the text column.
 
@@ -34,7 +34,7 @@ technical reference.
 ### ember
 
 High-contrast neutral with an orange accent, near-square corners, and the widest
-measure at 860px - the most screen-native of the ten.
+measure at 860px - the most screen-native of the set.
 
 ![ember](screenshots/ember.png)
 
@@ -83,11 +83,22 @@ corners of the set. Friendly and light.
 
 ### sepia
 
-Yellowed paper and deep coffee brown, full serif. The gentlest of the ten on a
+Yellowed paper and deep coffee brown, full serif. The gentlest of the set on a
 bright screen, and the only one whose dark mode is dark *brown* - old leather
 rather than the near-black the others use.
 
 ![sepia](screenshots/sepia.png)
+
+### sixtyfour
+
+A tribute to the 8-bit home computers of the early eighties. The dark mode is
+the screen they booted to - a `#4242e7` page in a `#a5a5ff` frame, with code
+blocks in the frame colour on a deeper blue - and the light mode is the same
+two colours inside out: a page tinted with the frame, inked in the screen blue.
+Body text keeps the hue but moves toward white, since the original light blue
+on that blue is under 3:1. Square corners, monospace headings.
+
+![sixtyfour](screenshots/sixtyfour.png)
 
 ### terminal
 
@@ -109,6 +120,7 @@ console in a browser.
 | `obsidian` | sans | sans | 6px | 780px |
 | `orchid` | sans | sans | 8px | 770px |
 | `sepia` | serif | serif | 5px | 700px |
+| `sixtyfour` | sans | mono | 0px | 800px |
 | `terminal` | mono | mono | 2px | 820px |
 
 ## The PDF follows the theme
@@ -193,7 +205,7 @@ side columns do:
 
 | | |
 | - | - |
-| `--gr-syn-*` | the code tokens: one pair tuned to read on both a warm parchment and a cool slate, which beats ten hand-tuned sets and is one place to fix |
+| `--gr-syn-*` | the code tokens: one pair tuned to read on both a warm parchment and a cool slate, which beats a hand-tuned set per theme and is one place to fix |
 | `--gr-adm-*` | the [admonitions](markdown.md#admonitions): a warning is amber in every book or it is not a warning. Each fill is its hue at low alpha, so it composes with whatever the theme put behind it |
 
 A theme does not have to know either exists. To use different values, redefine
@@ -227,7 +239,7 @@ bin/grimoire build --theme yours
 `scripts/screenshots.sh` rebuilds every image in `docs/screenshots/`:
 
 ```sh
-scripts/screenshots.sh              # all ten
+scripts/screenshots.sh              # all of them
 scripts/screenshots.sh nordic ivy   # just these
 ```
 
@@ -235,7 +247,7 @@ It needs `chromium`, ImageMagick, and a Jennifer interpreter on `PATH`
 (override with `CHROMIUM`, `MAGICK`, `JENNIFER`). The book is built
 **once**, because the HTML is identical for every theme - only
 `assets/grimoire.css` differs, so the loop swaps the stylesheet with
-`scripts/theme-css.j` rather than running ten builds. Each theme is then
+`scripts/theme-css.j` rather than running a build per theme. Each theme is then
 captured twice, with the colour mode pinned in `localStorage` before the first
 paint, and the pair is composited side by side.
 

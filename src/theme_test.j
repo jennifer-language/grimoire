@@ -29,9 +29,9 @@ func testFallbackResolves() {
     testing.assertTrue(has(fallback()));
 }
 
-func testAllShipsTenThemes() {
-    testing.assertEqual(len(all()), 10);
-    testing.assertEqual(len(names()), 10);
+func testAllShipsElevenThemes() {
+    testing.assertEqual(len(all()), 11);
+    testing.assertEqual(len(names()), 11);
 }
 
 # The shell cap in `palette.j` is sized so that both side columns at their widest

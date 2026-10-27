@@ -373,6 +373,14 @@ title = "Moved"
     fs.removeAll($dir);
 }
 
+# JSON has no date, so a TOML date-time crosses as its RFC 3339 text. The branch
+# is the one a plugin table rarely takes, which is how a call to a function that
+# does not exist sat in it unnoticed.
+func testAPluginDatetimeSettingCrossesAsText() {
+    def doc as toml.Value init toml.decode("at = 1979-05-27T07:32:00Z\n");
+    testing.assertEqual(jsonOf($doc, "/at"), '"1979-05-27T07:32:00Z"');
+}
+
 func testAPointerKeyEscapesInTheOrderTheStandardSays() {
     testing.assertEqual(pointerKey("plain.html"), "plain.html");
     testing.assertEqual(pointerKey("old/page.html"), "old~1page.html");

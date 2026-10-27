@@ -223,7 +223,7 @@ func testEveryAdmonitionKindHasAnAccentAndAFill() {
 }
 
 # The fill composes with whatever the theme put behind it rather than covering
-# it, which is what lets one palette sit on ten themes.
+# it, which is what lets one palette sit on every theme.
 func testTheFillsAreTranslucent() {
     for (def row in ADMONITION_LIGHT) {
         if (strings.contains($row, "-fill:")) {
