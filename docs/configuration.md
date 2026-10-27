@@ -216,8 +216,8 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 | `repoUrl` | string | `""` | a source-repository link in the top bar; `""` for none |
 | `repoLabel` | string | `"Source"` | the label on that link |
 | `editUrl` | string | `""` | an edit-this-page URL with a `{path}` slot; `""` for none |
-| `favicon` | string | `""` | a favicon path, copied into the site |
-| `logo` | string | `""` | a logo shown beside the title, relative to `src` |
+| `favicon` | string | `""` | a favicon, relative to `src`, or a URL linked as it stands |
+| `logo` | string | `""` | a logo shown beside the title, relative to `src`, or a URL |
 | `keywords` | bool | `true` | derive a `keywords` meta tag for each page from the page itself |
 | `keywordStopwords` | list of string | `[]` | further words the keyword pass should ignore, on top of the list for `book.language` |
 
@@ -402,6 +402,29 @@ is fine:
 ```toml
 logo = "../assets/wordmark.svg"
 ```
+
+`favicon` is resolved the same way. A file inside `src` is copied with the rest
+of the tree and linked where it sits; one outside it is copied to
+`assets/grimoire-favicon.EXT`, or `assets/grimoire-logo.EXT` for a logo that
+is linked rather than inlined, and linked from there. A missing file is a
+warning, not an error: the logo falls back to the default mark, and the favicon
+link is written regardless, so the warning is where a typo shows.
+
+Either one can also be a URL - `https://`, `http://`, or protocol-relative
+`//` - which is linked **as it stands** from every page:
+
+```toml
+logo = "https://example.org/brand/wordmark.svg"
+favicon = "https://example.org/brand/icon.png"
+```
+
+That is the way to share one logo across many books without a copy in each.
+It has three costs, all of them the reader's rather than the build's. The build
+never fetches the file, so an SVG at a URL is linked as an `img` rather than
+inlined and does not follow the colour mode. Every reader's browser requests it
+from that host, which a book otherwise never makes it do. And the book shows
+whatever is at that address when it is read, not what was there when it was
+built.
 
 `keywords` gives each page a `<meta name="keywords">` worked out from its own
 content. The scoring is structural rather than statistical - a term is worth the

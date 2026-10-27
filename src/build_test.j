@@ -637,6 +637,149 @@ func testResolveBrandRejectsAnSvgWithNoRootElement() {
     fs.removeAll($root);
 }
 
+# A URL is linked as it stands. Resolving it against `src` is what made it a
+# missing file, and the build fell back to the default mark.
+func testResolveBrandLinksALogoUrl() {
+    def root as string init sized([1]);
+    def c as config.Config init configFor($root);
+    $c.logo = "https://example.org/brand/mark.svg";
+    testing.assertEqual(resolveBrand($c).image, "https://example.org/brand/mark.svg");
+    testing.assertEqual(resolveBrand($c).svg, "");
+    fs.removeAll($root);
+}
+
+func testResolveBrandCarriesTheFavicon() {
+    def root as string init sized([1]);
+    def c as config.Config init configFor($root);
+    testing.assertEqual(resolveBrand($c).favicon, "");
+    $c.favicon = "https://example.org/icon.png";
+    testing.assertEqual(resolveBrand($c).favicon, "https://example.org/icon.png");
+    $c.favicon = "img/icon.png";
+    testing.assertEqual(resolveBrand($c).favicon, "img/icon.png");
+    fs.removeAll($root);
+}
+
+# A raster logo outside `src` is linked at the name it is copied to; the path as
+# written would point out of the site from every page.
+func testResolveBrandLinksAnOutOfTreeLogoAtItsPlacedName() {
+    def root as string init bookWithBrandOutside();
+    def c as config.Config init brandConfig($root);
+    testing.assertEqual(resolveBrand($c).image, "assets/grimoire-logo.png");
+    fs.removeAll($root);
+}
+
+# --- brandHref, placeBrandFiles ----------------------------------------
+
+# A book in `docs/` with a raster logo, an SVG logo, and a favicon beside it,
+# outside the source tree.
+func bookWithBrandOutside() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-brand-");
+    fs.mkdirAll(path.join($root, "docs"));
+    fs.mkdirAll(path.join($root, "art"));
+    fs.writeString(path.join($root, "docs/index.md"), "# Home\n");
+    fs.writeString(path.join($root, "docs/inside.png"), "png");
+    fs.writeString(path.join($root, "art/mark.png"), "png");
+    fs.writeString(path.join($root, "art/mark.svg"), "<svg/>");
+    fs.writeString(path.join($root, "art/Icon.ICO"), "ico");
+    return $root;
+}
+
+func brandConfig(root as string) {
+    def c as config.Config init config.defaults();
+    $c.srcDir = path.join($root, "docs");
+    $c.outDir = path.join($root, "site");
+    $c.logo = "../art/mark.png";
+    $c.favicon = "../art/Icon.ICO";
+    return $c;
+}
+
+func testBrandHrefLeavesAUrlAndAnEmptyValueAlone() {
+    def c as config.Config init configFor("docs");
+    testing.assertEqual(brandHref($c, "", "favicon"), "");
+    testing.assertEqual(
+        brandHref($c, "https://a.example/i.png", "favicon"),
+        "https://a.example/i.png");
+    testing.assertEqual(brandHref($c, "//cdn.example/i.png", "favicon"), "//cdn.example/i.png");
+}
+
+# Inside the tree the path is the one the file has there, however the value
+# spelled it - `../docs/` out and back in is still `docs/`.
+func testBrandHrefKeepsAnInTreeFileAtItsPlace() {
+    def c as config.Config init configFor("docs");
+    testing.assertEqual(brandHref($c, "favicon.ico", "favicon"), "favicon.ico");
+    testing.assertEqual(brandHref($c, "./img/icon.png", "favicon"), "img/icon.png");
+    testing.assertEqual(brandHref($c, "../docs/icon.png", "favicon"), "icon.png");
+}
+
+func testBrandHrefNamesAnOutOfTreeFileAfterItsRole() {
+    def c as config.Config init configFor("docs");
+    testing.assertEqual(brandHref($c, "../art/Icon.ICO", "favicon"), "assets/grimoire-favicon.ico");
+    testing.assertEqual(brandHref($c, "../art/mark.png", "logo"), "assets/grimoire-logo.png");
+}
+
+func testOutsideSourceIsAboutLocalFilesOnly() {
+    def c as config.Config init configFor("docs");
+    testing.assertFalse(outsideSource($c, ""));
+    testing.assertFalse(outsideSource($c, "https://a.example/i.png"));
+    testing.assertFalse(outsideSource($c, "icon.png"));
+    testing.assertTrue(outsideSource($c, "../icon.png"));
+    # A sibling whose name starts with the source directory's is not inside it.
+    testing.assertTrue(outsideSource($c, "../docs-art/icon.png"));
+}
+
+# `copyAssets` mirrors the tree and nothing else, so a favicon or a linked logo
+# from beside it never reached the site. An SVG logo is inlined, so it needs no
+# copy.
+func testCopyAssetsPlacesOutOfTreeBrandFiles() {
+    def root as string init bookWithBrandOutside();
+    def c as config.Config init brandConfig($root);
+    testing.assertEqual(copyAssets($c), 3);
+    testing.assertEqual(fs.readString(path.join($root, "site/assets/grimoire-favicon.ico")), "ico");
+    testing.assertEqual(fs.readString(path.join($root, "site/assets/grimoire-logo.png")), "png");
+    $c.logo = "../art/mark.svg";
+    testing.assertEqual(placeBrandFiles($c), 1);
+    fs.removeAll($root);
+}
+
+func testPlaceBrandFilesLeavesInTreeAndRemoteFilesToOthers() {
+    def root as string init bookWithBrandOutside();
+    def c as config.Config init brandConfig($root);
+    $c.logo = "inside.png";
+    $c.favicon = "https://a.example/i.png";
+    testing.assertEqual(placeBrandFiles($c), 0);
+    $c.favicon = "../art/missing.ico";
+    testing.assertEqual(placeBrandFiles($c), 0);
+    fs.removeAll($root);
+}
+
+# --- buildWarnings: logo and favicon -----------------------------------
+
+func testBuildWarningsNameAMissingFavicon() {
+    def root as string init bookWithBrandOutside();
+    def c as config.Config init brandConfig($root);
+    $c.favicon = "fav1con.ico";
+    def warnings as string init strings.join(buildWarnings($c), "\n");
+    testing.assertContains($warnings, "favicon not found");
+    testing.assertContains($warnings, "fav1con.ico");
+    fs.removeAll($root);
+}
+
+# Nothing in a build reaches the network, so a URL is never reported missing.
+func testBuildWarningsTrustAUrl() {
+    def root as string init bookWithBrandOutside();
+    def c as config.Config init brandConfig($root);
+    $c.logo = "https://a.example/mark.svg";
+    $c.favicon = "https://a.example/icon.png";
+    testing.assertEqual(len(buildWarnings($c)), 0);
+    fs.removeAll($root);
+}
+
+func testBuildWarningsAreQuietForFilesThatExist() {
+    def root as string init bookWithBrandOutside();
+    testing.assertEqual(len(buildWarnings(brandConfig($root))), 0);
+    fs.removeAll($root);
+}
+
 # --- tocFor ----------------------------------------------------------
 
 # The headings are collected either way - the search index and the PDF bookmarks

@@ -65,8 +65,8 @@ use time;
  * @field repoUrl {string} a source-repository URL linked from the top bar ("" for none)
  * @field repoLabel {string} the label for the repository link
  * @field editUrlTemplate {string} an edit-this-page URL with a `{path}` slot ("" for none)
- * @field favicon {string} a favicon path copied into the site ("" for none)
- * @field logo {string} a logo shown beside the title, relative to the source dir ("" for none)
+ * @field favicon {string} a favicon, relative to the source dir, or a URL ("" for none)
+ * @field logo {string} a logo beside the title, relative to the source dir, or a URL ("" for none)
  * @field keywords {bool} derive a `keywords` meta tag for each page from its own
  *   title, headings, and code spans
  * @field keywordStopwords {list of string} further words this book's keyword pass

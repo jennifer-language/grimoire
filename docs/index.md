@@ -39,8 +39,8 @@ a container instead.
 A built site is a directory of files that works served from a web root, served
 from a subdirectory, or **opened straight off the disk over `file://`** - search
 included. Nothing is fetched from anywhere unless you opt in, and the only
-setting that reaches off the machine at all is `[highlightjs]`, which is off by
-default.
+settings that reach off the machine at all are `[highlightjs]`, which is off by
+default, and a `logo` or `favicon` given as a URL.
 
 > [!TIP]
 > **[Read this manual as a single PDF](grimoire.pdf).** Every page in one
@@ -91,7 +91,8 @@ default.
   a configurable CDN for the other languages. Both are off by default, and the
   second does nothing without the first.
 - **A logo** beside the title: an SVG is inlined, so it inherits the colour mode
-  and costs no extra request.
+  and costs no extra request. A logo or favicon can also be a URL, to share one
+  file across many books.
 - **A printable book**: every chapter in one PDF, with a cover page, chapters
   starting on fresh pages, a nested bookmark outline, and document metadata. It
   wears the book's theme too - heading bars, table headers, code panels, and the

@@ -90,19 +90,22 @@ func attrEsc(s as string) {
 }
 
 /**
- * The mark drawn beside the title in the top-left corner: a book's own logo, or
- * the default book glyph when it has none.
+ * A book's brand as the pages show it: the mark drawn beside the title in the
+ * top-left corner - its own logo, or the default book glyph when it has none -
+ * and the favicon the page head links.
  *
  * An SVG logo is inlined rather than linked, so it needs no second request and
  * its `currentColor` strokes follow the active colour mode; any other image is
- * referenced, and its path is resolved per page. Exactly one of the two fields
- * is ever set.
+ * referenced, and its path is resolved per page. At most one of `svg` and
+ * `image` is ever set. `favicon` is independent of both.
  * @field svg {string} inline SVG markup ("" when there is none)
- * @field image {string} an image path relative to the site root ("" when there is none)
+ * @field image {string} an image path relative to the site root, or a URL ("" when there is none)
+ * @field favicon {string} the favicon path relative to the site root, or a URL ("" for none)
  */
 export def struct Brand {
     svg as string,
-    image as string
+    image as string,
+    favicon as string
 };
 
 /**
@@ -110,7 +113,7 @@ export def struct Brand {
  * @return {Brand} an empty brand
  */
 export func noBrand() {
-    return Brand{svg: "", image: ""};
+    return Brand{svg: "", image: "", favicon: ""};
 }
 
 /**
@@ -119,16 +122,27 @@ export func noBrand() {
  * @return {Brand} the brand
  */
 export func svgBrand(svg as string) {
-    return Brand{svg: $svg, image: ""};
+    return Brand{svg: $svg, image: "", favicon: ""};
 }
 
 /**
- * A brand from an image path, relative to the site root.
- * @param image {string} the image path
+ * A brand from an image path, relative to the site root, or from a URL, which
+ * every page then uses as it stands.
+ * @param image {string} the image path or URL
  * @return {Brand} the brand
  */
 export func imageBrand(image as string) {
-    return Brand{svg: "", image: $image};
+    return Brand{svg: "", image: $image, favicon: ""};
+}
+
+# siteRef is how a page refers to something the site holds: through the page's
+# relative root, unless it is a URL, which is the same from every page and which
+# a root in front of it turns into a path that does not exist.
+func siteRef(root as string, target as string) {
+    if (util.isExternal($target)) {
+        return $target;
+    }
+    return $root + $target;
 }
 
 func brandMark(b as Brand, root as string, title as string) {
@@ -136,7 +150,8 @@ func brandMark(b as Brand, root as string, title as string) {
         return '<span class="gr-mark" data-logo="true" aria-hidden="true">' + $b.svg + "</span>";
     }
     if ($b.image != "") {
-        return '<span class="gr-mark" data-logo="true"><img src="' + attrEsc($root + $b.image) +
+        return '<span class="gr-mark" data-logo="true"><img src="' +
+            attrEsc(siteRef($root, $b.image)) +
             '" alt="' + attrEsc($title) + '"></span>';
     }
     return '<span class="gr-mark" aria-hidden="true">' + ICON_BOOK + "</span>";
@@ -377,7 +392,7 @@ func searchDialog(c as config.Config) {
         "</span></div></div></div>";
 }
 
-func head(c as config.Config, v as View) {
+func head(c as config.Config, v as View, b as Brand) {
     def title as string init $c.title;
     if ($v.title != "" and $v.title != $c.title) {
         $title = $v.title + " - " + $c.title;
@@ -402,8 +417,8 @@ func head(c as config.Config, v as View) {
     $out[] = '<meta name="generator" content="Grimoire">';
     $out[] = '<meta property="og:title" content="' + attrEsc($title) + '">';
     $out[] = '<meta property="og:type" content="article">';
-    if ($c.favicon != "") {
-        $out[] = '<link rel="icon" href="' + attrEsc($v.root + $c.favicon) + '">';
+    if ($b.favicon != "") {
+        $out[] = '<link rel="icon" href="' + attrEsc(siteRef($v.root, $b.favicon)) + '">';
     }
     $out[] = '<link rel="stylesheet" href="' + attrEsc($v.root + "assets/grimoire.css") + '">';
     # The mode is stamped on the root element before the first paint, so a reader
@@ -435,12 +450,12 @@ func runtimeStrings(c as config.Config) {
  * @param v {View} the per-page values
  * @param nav {string} the sidebar navigation HTML for this page, ignored when
  *   `html.navPosition` is "off"
- * @param b {Brand} the mark drawn beside the title
+ * @param b {Brand} the brand: the mark beside the title, and the favicon
  * @return {string} the complete HTML document
  */
 export func page(c as config.Config, v as View, nav as string, b as Brand) {
     def out as list of string;
-    $out[] = head($c, $v);
+    $out[] = head($c, $v, $b);
     $out[] = "<body>";
     $out[] = '<a class="gr-skip" href="#gr-main">' +
         html.escape(locale.tr("skipToContent")) + "</a>";

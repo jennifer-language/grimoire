@@ -107,6 +107,9 @@ func testBrandMarkInlinesSvgAndReferencesAnImage() {
     testing.assertContains(brandMark(svgBrand("<svg/>"), "", "T"), "<svg/>");
     testing.assertContains(brandMark(imageBrand("logo.png"), "../", "T"), 'src="../logo.png"');
     testing.assertContains(brandMark(imageBrand("logo.png"), "", "T"), 'alt="T"');
+    testing.assertContains(
+        brandMark(imageBrand("https://a.example/l.png"), "../", "T"),
+        'src="https://a.example/l.png"');
 }
 
 func testBrandMarkFallsBackToTheBookGlyph() {
@@ -382,7 +385,7 @@ func testTheSearchDialogKeepsItsKeyCaps() {
 func testHeadCombinesThePageAndBookTitles() {
     english();
     testing.assertContains(
-        head(config.defaults(), view()),
+        head(config.defaults(), view(), noBrand()),
         "<title>A Chapter - Documentation</title>");
 }
 
@@ -390,12 +393,12 @@ func testHeadDoesNotRepeatTheBookTitle() {
     english();
     def v as View init view();
     $v.title = "Documentation";
-    testing.assertContains(head(config.defaults(), $v), "<title>Documentation</title>");
+    testing.assertContains(head(config.defaults(), $v, noBrand()), "<title>Documentation</title>");
 }
 
 func testHeadCarriesTheLanguageAndStylesheet() {
     english();
-    def html as string init head(config.defaults(), view());
+    def html as string init head(config.defaults(), view(), noBrand());
     testing.assertContains($html, '<html lang="en">');
     testing.assertContains($html, 'href="assets/grimoire.css"');
     testing.assertContains($html, '<meta name="generator" content="Grimoire">');
@@ -405,26 +408,47 @@ func testHeadResolvesAssetPathsPerPage() {
     english();
     def v as View init view();
     $v.root = "../";
-    testing.assertContains(head(config.defaults(), $v), 'href="../assets/grimoire.css"');
+    testing.assertContains(head(config.defaults(), $v, noBrand()), 'href="../assets/grimoire.css"');
 }
 
 func testOptionalMetaTagsAreOmittedWhenEmpty() {
     english();
-    def html as string init head(config.defaults(), view());
+    def html as string init head(config.defaults(), view(), noBrand());
     testing.assertFalse(strings.contains($html, 'name="description"'));
     testing.assertFalse(strings.contains($html, 'name="keywords"'));
     testing.assertFalse(strings.contains($html, 'rel="icon"'));
+}
+
+# A URL is the same from every page; the relative root in front of it made the
+# favicon a broken link everywhere below the top level.
+func testHeadLinksAFaviconUrlAsItStands() {
+    english();
+    def v as View init view();
+    $v.root = "../../";
+    def b as Brand init noBrand();
+    $b.favicon = "https://example.org/icon.png";
+    testing.assertContains(head(config.defaults(), $v, $b), 'href="https://example.org/icon.png"');
+    $b.favicon = "icon.png";
+    testing.assertContains(head(config.defaults(), $v, $b), 'href="../../icon.png"');
+}
+
+func testSiteRefPrefixesOnlyASitePath() {
+    testing.assertEqual(siteRef("../", "logo.png"), "../logo.png");
+    testing.assertEqual(siteRef("../", "https://a.example/l.png"), "https://a.example/l.png");
+    testing.assertEqual(siteRef("../", "//cdn.example/l.png"), "//cdn.example/l.png");
+    testing.assertEqual(siteRef("", "logo.png"), "logo.png");
 }
 
 func testOptionalMetaTagsAppearWhenSet() {
     english();
     def c as config.Config init config.defaults();
     $c.description = "About the thing";
-    $c.favicon = "icon.png";
     $c.authors = ["Ada"];
     def v as View init view();
     $v.keywords = "one, two";
-    def html as string init head($c, $v);
+    def b as Brand init noBrand();
+    $b.favicon = "icon.png";
+    def html as string init head($c, $v, $b);
     testing.assertContains($html, 'content="About the thing"');
     testing.assertContains($html, 'content="one, two"');
     testing.assertContains($html, 'href="icon.png"');
@@ -435,7 +459,7 @@ func testOptionalMetaTagsAppearWhenSet() {
 # chose dark never gets a white flash between pages.
 func testHeadCarriesTheBootScript() {
     english();
-    testing.assertContains(head(config.defaults(), view()), "<script>");
+    testing.assertContains(head(config.defaults(), view(), noBrand()), "<script>");
 }
 
 # --- page: the whole shell -------------------------------------------

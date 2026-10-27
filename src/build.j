@@ -292,6 +292,8 @@ func plainTitle(title as string) {
 
 # copyAssets mirrors every non-Markdown file from the source tree into the
 # output, so images, downloads, and a favicon sit beside the pages that use them.
+# A favicon or a linked logo from outside the tree is placed too, by
+# `placeBrandFiles`, since nothing else would bring it across.
 #
 # Everything under the output directory is skipped, because for a book whose
 # `out` sits inside its `src` - `src = "docs"`, `out = "docs/site"`, the layout
@@ -375,7 +377,8 @@ func copyAssets(c as config.Config) {
         fs.writeBytes($target, fs.readBytes($st.path));
         $count = $count + 1;
     }
-    return $count;
+    # After the tree, so the two fixed names are the last word on their paths.
+    return $count + placeBrandFiles($c);
 }
 
 # redirect is the stand-in landing page for a book whose outline has no chapter
@@ -407,22 +410,97 @@ func redirect(c as config.Config, target as string) {
 
 # --- brand and highlighting assets ---------------------------------
 
-# resolveBrand turns the configured logo path into the markup the top bar uses.
+# outsideSource reports whether a configured logo or favicon is a local file
+# that lies outside the source tree - the case `copyAssets`, which mirrors only
+# that tree, never reaches. A URL is not a file anywhere, and "" is not set.
+func outsideSource(c as config.Config, value as string) {
+    if ($value == "" or util.isExternal($value)) {
+        return false;
+    }
+    return not contains(absolutePath($c.srcDir), absolutePath(path.join($c.srcDir, $value)));
+}
+
+# brandHref is where the built site finds a configured logo or favicon: a URL as
+# it stands, a file in the source tree at its place there, and a file outside it
+# at the fixed name `placeBrandFiles` copies it to. `name` is that name's stem.
+#
+# The in-tree path is recomputed rather than passed through, because the value is
+# written against `src` and `../docs/icon.png` with `src = "docs"` is in the tree
+# but would leave the site if a page root were put in front of it as written.
+#
+# Fixed names rather than the file's own: the favicon and the logo can each come
+# from anywhere on the disk, and two files called `mark.png` in two directories
+# would otherwise land on one path in a different order on every build.
+func brandHref(c as config.Config, value as string, name as string) {
+    if ($value == "" or util.isExternal($value)) {
+        return $value;
+    }
+    if (outsideSource($c, $value)) {
+        return "assets/grimoire-" + $name + strings.lower(path.ext($value));
+    }
+    return relativeTo(absolutePath($c.srcDir), absolutePath(path.join($c.srcDir, $value)));
+}
+
+# placeBrandFiles copies a favicon, and a logo that is linked rather than
+# inlined, into the site when it lives outside the source tree, and returns how
+# many it copied. One that is missing is left to the warning `buildWarnings`
+# gives; one in the tree is `copyAssets`'s.
+func placeBrandFiles(c as config.Config) {
+    def count as int init 0;
+    if (outsideSource($c, $c.favicon)) {
+        $count = $count + placeBrandFile($c, $c.favicon, "favicon");
+    }
+    if (outsideSource($c, $c.logo) and strings.lower(path.ext($c.logo)) != ".svg") {
+        $count = $count + placeBrandFile($c, $c.logo, "logo");
+    }
+    return $count;
+}
+
+func placeBrandFile(c as config.Config, value as string, name as string) {
+    def source as string init path.join($c.srcDir, $value);
+    if (not fs.isFile($source)) {
+        return 0;
+    }
+    def target as string init path.join($c.outDir, brandHref($c, $value, $name));
+    fs.mkdirAll(path.dir($target));
+    fs.writeBytes($target, fs.readBytes($source));
+    return 1;
+}
+
+# resolveBrand is the book's brand as every page shows it: the mark beside the
+# title, and where the favicon is found. Both are worked out once per build
+# rather than per page, and the favicon travels with the mark because the page
+# head needs the same answer `brandHref` gives the logo - a page root in front
+# of a site path, and nothing in front of a URL.
+func resolveBrand(c as config.Config) {
+    def b as layout.Brand init resolveMark($c);
+    $b.favicon = brandHref($c, $c.favicon, "favicon");
+    return $b;
+}
+
+# resolveMark turns the configured logo into the markup the top bar uses.
 # An SVG is read and inlined so it inherits the colour mode and costs no extra
 # request; anything else is referenced as an image. A `<script>` inside an SVG
 # would run with the page`s own origin, so it is stripped: a logo is artwork.
-func resolveBrand(c as config.Config) {
+#
+# A URL is referenced as an image too, SVG or not. Inlining it would mean
+# fetching it, and a build makes no network request: the reader's browser does
+# the fetching, the way it does for any image on another host.
+func resolveMark(c as config.Config) {
     if ($c.logo == "") {
         return layout.noBrand();
+    }
+    if (util.isExternal($c.logo)) {
+        return layout.imageBrand($c.logo);
     }
     def source as string init path.join($c.srcDir, $c.logo);
     if (not fs.isFile($source)) {
         return layout.noBrand();
     }
     if (strings.lower(path.ext($c.logo)) != ".svg") {
-        # Copied into the site by copyAssets, alongside every other non-Markdown
-        # file, so the reference resolves without any extra work here.
-        return layout.imageBrand($c.logo);
+        # In the tree it is copied by copyAssets with every other non-Markdown
+        # file; outside it, by placeBrandFiles. Either way brandHref says where.
+        return layout.imageBrand(brandHref($c, $c.logo, "logo"));
     }
     def markup as string init fs.readString($source);
     def at as int init strings.indexOf($markup, "<svg");
@@ -755,14 +833,29 @@ func rendered(written as list of string) {
     return "  ->  " + strings.join($written, ", ");
 }
 
+# missingLocal reports whether a configured logo or favicon names a local file
+# that is not there.
+func missingLocal(c as config.Config, value as string) {
+    return $value != "" and not util.isExternal($value) and
+        not fs.isFile(path.join($c.srcDir, $value));
+}
+
 # buildWarnings collects what a build wants to say but not fail over: a book
-# still gets built with a missing logo or a highlight.js grammar it could not
-# find. Shipping the grammar happens here because whether it shipped is the
-# warning.
+# still gets built with a missing logo or favicon, or a highlight.js grammar it
+# could not find. Shipping the grammar happens here because whether it shipped is
+# the warning.
+#
+# A URL is not checked: nothing in a build reaches the network to look. A missing
+# favicon has no fallback the way a logo does - the page links it regardless -
+# so the warning is the only place a typo shows before a browser.
 func buildWarnings(c as config.Config) {
     def out as list of string;
-    if ($c.logo != "" and not fs.isFile(path.join($c.srcDir, $c.logo))) {
+    if (missingLocal($c, $c.logo)) {
         $out[] = "logo not found, falling back to the default mark: " + $c.logo;
+    }
+    if (missingLocal($c, $c.favicon)) {
+        $out[] = "favicon not found, every page links to a file the site does not have: " +
+            $c.favicon;
     }
     if (config.usesHighlightJs($c) and shipHighlightGrammar($c) == 0) {
         $out[] = "highlight.js grammar for Jennifer not found at " +
