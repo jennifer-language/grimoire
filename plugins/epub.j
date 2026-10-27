@@ -216,8 +216,21 @@ func bodyOf(body as string) {
     return xml.element("body");
 }
 
-# The XHTML wrapper every chapter and the navigation document share.
+# A chapter's content document: its rendered XHTML, parsed so a malformed one
+# fails here rather than in a reader.
 func document(lang as string, title as string, body as string) {
+    return xhtmlPage($lang, $title, bodyOf($body));
+}
+
+# The XHTML wrapper every chapter and the navigation document share, around a
+# `<body>` that is already a tree.
+#
+# A tree, not markup, because the navigation document is built as one: encoding
+# it only for `bodyOf` to parse it back put its `epub:type` in a fragment whose
+# `xmlns:epub` is declared on the `<html>` around it - outside what is parsed.
+# A parser that checks namespace prefixes refuses that, and the interpreter's
+# `xml.decode` started to.
+func xhtmlPage(lang as string, title as string, body as xml.Value) {
     def head as xml.Value init xml.element("head");
     $head = xml.append($head, xml.setAttr(xml.element("meta"), "charset", "utf-8"));
     $head = xml.append($head, xml.setText(xml.element("title"), $title));
@@ -229,7 +242,7 @@ func document(lang as string, title as string, body as string) {
     $page = xml.setAttr($page, "xmlns:epub", OPS_NS);
     $page = xml.setAttr($page, "xml:lang", $lang);
     $page = xml.append($page, $head);
-    $page = xml.append($page, bodyOf($body));
+    $page = xml.append($page, $body);
     return xhtmlDocument($page);
 }
 
@@ -566,7 +579,7 @@ func navXhtml(lang as string, title as string, entries as json.Value) {
     $nav = xml.setAttr($nav, "id", "toc");
     $nav = xml.append($nav, xml.setText(xml.element("h1"), $title));
     $nav = xml.append($nav, $toc);
-    return document($lang, $title, xml.encode($nav));
+    return xhtmlPage($lang, $title, xml.append(xml.element("body"), $nav));
 }
 
 # --- building the book -----------------------------------------------

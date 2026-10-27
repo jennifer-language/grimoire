@@ -115,6 +115,21 @@ func testAChapterIsAWellFormedXmlDocument() {
     testing.assertEqual(xml.tag(xml.decode($out)), "html");
 }
 
+# The navigation document is the one place `epub:type` is written, and its
+# prefix is declared on the `<html>` element. It used to be encoded and parsed
+# back as a bare `<body>` fragment, where the declaration is out of sight, and an
+# interpreter whose `xml.decode` checks prefixes refused every book with it.
+func testTheNavigationDocumentIsWellFormedWithItsPrefixDeclared() {
+    def out as string init navXhtml(
+        "en",
+        "Contents",
+        json.decode('[{"kind":"page","title":"Intro","src":"index.md","out":"index.html"}]'));
+    testing.assertContains($out, 'xmlns:epub="http://www.idpf.org/2007/ops"');
+    testing.assertContains($out, '<nav epub:type="toc" id="toc">');
+    testing.assertContains($out, '<a href="index.xhtml">Intro</a>');
+    testing.assertEqual(xml.tag(xml.decode($out)), "html");
+}
+
 # Whitespace inside a `<pre>` is content, so the document is not pretty-printed:
 # an indented one would put spaces into every code block in the book.
 #
