@@ -1,0 +1,263 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
+#
+# Publish a Grimoire book to GitHub Pages from the latest release, not from the
+# tip of the default branch. A reusable workflow: Grimoire's own `pages.yml`
+# calls it, and so can any repository whose documentation is a Grimoire book.
+#
+# The problem it solves is a version skew. A reader installs the latest release
+# and reads documentation built from whatever was merged since, which describes
+# options that release does not have. So what is published at the site root is
+# always the book as it stood at the highest release tag:
+#
+#   - a release is a tag in plain semver, `MAJOR.MINOR.PATCH` with no leading
+#     `v` and no pre-release or build suffix - `0.4.0`, never `v0.4.0` or
+#     `0.5.0-rc.1`. Anything else is not a release and is ignored;
+#   - "highest" is numeric, field by field, so `0.10.0` outranks `0.9.3`, and a
+#     patch pushed to an older line - `0.3.5` after `0.4.0` - does not take the
+#     site back to 0.3;
+#   - with `dev: true`, the tip of the default branch is built as well and
+#     published under `/dev/`, so unreleased documentation exists and says what
+#     it is by its address.
+#
+# A pull request builds the book from the pull request itself and runs the
+# checks, and never publishes. Every other event publishes.
+#
+# A caller, in full:
+#
+#   on:
+#     push:
+#       tags: ["[0-9]+.[0-9]+.[0-9]+"]
+#       branches: [main]          # only with `dev: true`; without it, a push
+#                                 # to main would republish the same release
+#     pull_request:
+#     workflow_dispatch:
+#   jobs:
+#     pages:
+#       permissions:
+#         contents: read
+#         pages: write
+#         id-token: write
+#       uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@<release>
+#       with:
+#         image: ghcr.io/jennifer-language/grimoire:<release>
+#         args: --pdf
+#
+# `permissions` has to be granted by the caller: a called workflow can narrow
+# what it is given but never widen it, and deploying to Pages needs both
+# `pages: write` and `id-token: write`.
+#
+# The repository needs two settings besides: Pages built by "GitHub Actions",
+# and the `github-pages` environment allowed to deploy from tags. GitHub usually
+# creates that environment with the default branch as the only deployment
+# branch, and a tag-triggered deploy is then refused by its protection rules.
+# Add a tag rule - `[0-9]*.[0-9]*.[0-9]*` - under Settings, Environments. Pin `uses` to a Grimoire release rather
+# than `main`, for the reason this workflow exists. 0.4.0 is the first release
+# that carries this file, so it is the oldest `<release>` can name.
+#
+# The build runs in a container, so the runner needs nothing but Docker. By
+# default that is the Grimoire image, whose entrypoint is the `grimoire` command;
+# a repository that carries its own launcher - Grimoire itself - names it in
+# `launcher` and passes a plain Jennifer image instead.
+name: docs-pages
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: >-
+          The container to build in. The Grimoire image by default, whose
+          `latest` is the newest Grimoire release; pin a version - `0.4.0` -
+          for a build that does not change when Grimoire does. With `launcher`
+          set, a Jennifer image that runs that launcher instead.
+        type: string
+        default: ghcr.io/jennifer-language/grimoire:latest
+      launcher:
+        description: >-
+          A Grimoire launcher inside the repository, such as `bin/grimoire`.
+          Empty runs the image's own entrypoint.
+        type: string
+        default: ""
+      directory:
+        description: The directory holding `grimoire.toml`, relative to the repository root.
+        type: string
+        default: "."
+      args:
+        description: Extra flags for `grimoire build`, such as `--pdf`.
+        type: string
+        default: ""
+      plugins:
+        description: >-
+          `GRIMOIRE_PLUGINS` for the Grimoire image: the shipped plugins to put
+          on `PATH`, comma separated. Ignored by a plain Jennifer image.
+        type: string
+        default: ""
+      dev:
+        description: Also build the tip of the default branch, published under `/dev/`.
+        type: boolean
+        default: false
+      check:
+        description: >-
+          A shell script run after the build, in the checkout the published book
+          was built from. `SITE` is the output directory, `RELEASE` the release
+          it was built from ("" on a pull request), and `IMAGE` the container.
+          Non-zero fails the run before anything is published.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.release.outputs.release }}
+    env:
+      IMAGE: ${{ inputs.image }}
+      LAUNCHER: ${{ inputs.launcher }}
+      BOOK_DIR: ${{ inputs.directory }}
+      BUILD_ARGS: ${{ inputs.args }}
+      PLUGINS: ${{ inputs.plugins }}
+      SITE: ${{ runner.temp }}/pages
+    steps:
+      # Full history and every tag: the release is found among the tags, and
+      # both builds are worktrees of commits a shallow clone would not have.
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pull the build image
+        run: docker pull --quiet "$IMAGE"
+
+      # `book SOURCE OUT VERSION COMMIT` builds the book in checkout SOURCE into
+      # OUT. Written once into a file so every later step builds the same way.
+      #
+      # The version stamp is handed in rather than left to the build: the images
+      # carry no git, so `[pdf] footerLeft` would otherwise print nothing where
+      # the version goes. Exactly one of the two is set - the release for a
+      # release, the short commit id for anything else - which is the contract
+      # `GRIMOIRE_VERSION` / `GRIMOIRE_COMMIT` have.
+      #
+      # `--out` is a directory of its own, mounted beside the checkout rather
+      # than inside it, so the book's own `out` setting cannot decide where the
+      # published files land, and the `dev` build cannot be pruned by the
+      # release build or the other way round.
+      - name: Prepare the build command
+        run: |
+          set -eu
+          cat > "$RUNNER_TEMP/book.sh" <<'SH'
+          set -eu
+          src=$1 out=$2 version=$3 commit=$4
+          mkdir -p "$out"
+          if [ -n "$LAUNCHER" ]; then
+              set -- run "/work/$LAUNCHER" build
+          else
+              set -- build
+          fi
+          # Word splitting on BUILD_ARGS is the point: it is a list of flags.
+          # shellcheck disable=SC2086
+          docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$src:/work" -v "$out:/out" -w "/work/$BOOK_DIR" \
+              -e GRIMOIRE_VERSION="$version" -e GRIMOIRE_COMMIT="$commit" \
+              -e GRIMOIRE_PLUGINS="$PLUGINS" \
+              "$IMAGE" "$@" --out /out $BUILD_ARGS
+          SH
+
+      # The highest plain-semver tag, compared field by field. `sort -V` would
+      # also order these correctly, but the three numeric keys say what is
+      # meant, and the pattern has already thrown out everything that is not
+      # three numbers - a `v` prefix, a pre-release, a stray `latest`.
+      - name: Find the release
+        id: release
+        if: github.event_name != 'pull_request'
+        run: |
+          set -eu
+          release=$(git tag --list |
+              grep -E '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' |
+              sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1 || true)
+          if [ -z "$release" ]; then
+              echo "::error::no release tag (MAJOR.MINOR.PATCH, no leading v) to publish"
+              exit 1
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "publishing the documentation of $release"
+
+      - name: Build the release
+        if: github.event_name != 'pull_request'
+        env:
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          set -eu
+          git worktree add --detach "$RUNNER_TEMP/release" "refs/tags/$RELEASE"
+          sh "$RUNNER_TEMP/book.sh" "$RUNNER_TEMP/release" "$SITE" "$RELEASE" ""
+
+      # Built after the release, into a directory inside its output: the release
+      # build prunes its own `--out` before it writes, so the other order would
+      # lose this one.
+      - name: Build the default branch into /dev/
+        if: github.event_name != 'pull_request' && inputs.dev
+        env:
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -eu
+          git worktree add --detach "$RUNNER_TEMP/dev" "refs/remotes/origin/$BRANCH"
+          commit=$(git -C "$RUNNER_TEMP/dev" rev-parse --short HEAD)
+          sh "$RUNNER_TEMP/book.sh" "$RUNNER_TEMP/dev" "$SITE/dev" "" "$commit"
+
+      - name: Build the pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          set -eu
+          commit=$(git rev-parse --short HEAD)
+          sh "$RUNNER_TEMP/book.sh" "$GITHUB_WORKSPACE" "$SITE" "" "$commit"
+
+      # A landing page always, whatever the caller checks: a build that wrote
+      # nothing would otherwise publish an empty site and report success.
+      #
+      # The caller's script runs from the checkout the published book came
+      # from, so a check that reads the sources - or runs that revision's tests
+      # - sees the same files the build did. It is passed through the
+      # environment rather than spliced into this script, so nothing in an
+      # input is ever parsed as workflow syntax.
+      - name: Check the output
+        env:
+          CHECK: ${{ inputs.check }}
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          set -eu
+          test -f "$SITE/index.html"
+          if [ -n "$RELEASE" ]; then
+              cd "$RUNNER_TEMP/release"
+          fi
+          if [ -n "$CHECK" ]; then
+              bash -euxo pipefail -c "$CHECK"
+          fi
+
+      - name: Upload the Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # One deployment at a time, and never cancel one half-way: a partial
+    # publish would leave the site serving a mixture of two builds. Per
+    # repository, since every caller shares this file.
+    concurrency:
+      group: pages-${{ github.repository }}
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

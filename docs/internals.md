@@ -342,14 +342,18 @@ bin/grimoire serve        # read it at http://127.0.0.1:8080/
 which is what the download link on the [introduction](index.md) points at. Turn
 it off and that link goes dead.
 
-`.github/workflows/pages.yml` runs exactly that build on every push, in the
-official Jennifer image, and publishes `site/` to GitHub Pages. It works the PDF
-footer's version stamp out on the runner and passes it in as `GRIMOIRE_VERSION` /
-`GRIMOIRE_COMMIT`, because the image has no git of its own. It asserts the
-pieces a reader needs - the landing page, the stylesheet, the search index, a
-non-empty PDF, and the link between the last two - so an empty publish fails in
-CI rather than on the live site. A pull request builds and checks without
-publishing.
+`.github/workflows/pages.yml` runs exactly that build when a release is tagged,
+in the official Jennifer image, and publishes it to GitHub Pages - the manual as
+it stood at the **highest release tag**, so a reader reads about the version they
+can install rather than about whatever has been merged since. The work is done
+by `docs-pages.yml`, the reusable workflow described under
+[Installation](installation.md#publishing-to-github-pages); `pages.yml` adds the
+checks only this manual needs. The PDF footer's version stamp is worked out on
+the runner and passed in as `GRIMOIRE_VERSION` / `GRIMOIRE_COMMIT`, because the
+image has no git of its own. The pieces a reader needs are asserted - the landing
+page, the stylesheet, the search index, a non-empty PDF, and the link between the
+last two - so an empty publish fails in CI rather than on the live site. A pull
+request builds and checks without publishing.
 
 ### One version number, checked before anything ships
 
