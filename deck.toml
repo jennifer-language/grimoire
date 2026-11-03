@@ -23,16 +23,16 @@ authors = ["mplx <jennifer@mplx.dev>"]
 # Nothing here uses `sql`.
 capabilities = ["net", "exec"]
 keywords = ["documentation", "markdown", "static-site", "pdf", "generator"]
+# The launcher, for `jvc app install`, which unpacks the whole tree and links
+# this file onto PATH. The command takes the deck half of the name, `grimoire`.
+# Vendoring the deck into a project ignores it: a vendored command has to live
+# inside `src/`, and a program with a shebang does not belong there.
+bin = "bin/grimoire"
 
 # Project URLs by role. `deck` is mandatory to publish: it is where the registry
 # reads this manifest from, so it points at the file itself on the default
 # branch rather than at the repository around it.
-#
-# No `bin` key above, deliberately. A deck's command has to live *inside* `src/`,
-# because `src/` is the only thing vendored into a consumer - and the launcher
-# is in `bin/` precisely because it is a program rather than a module. So
-# installing this deck vendors the modules and exposes no command; the ways to
-# get a `grimoire` command are the container, the Arch package, and a checkout.
+
 [package.urls]
 deck = "https://raw.githubusercontent.com/jennifer-language/grimoire/main/deck.toml"
 homepage = "https://github.com/jennifer-language/grimoire"
