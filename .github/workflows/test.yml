@@ -20,13 +20,12 @@ name: test
 on:
   push:
     branches: [main]
-    # Both spellings. Everything downstream strips a leading `v` - the release
-    # notes, the image tags, the check in `version.yml` - and the tag actually pushed
-    # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
-    # on it.
-    tags: ["v*", "[0-9]*"]
   pull_request:
   workflow_dispatch:
+  # A tag is tested by `release.yml`, which calls this and waits for it before
+  # it publishes anything - rather than by a second run of its own here, which
+  # would gate nothing.
+  workflow_call:
 
 permissions:
   contents: read

@@ -1,7 +1,21 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
 #
-# Publish a GitHub Release for a `v*` tag.
+# Tag-triggered release, in the shape jvc's own release takes. Publishes three
+# packages to GitHub Releases, each with a sidecar `.sha256`:
+#
+#   grimoire-<version>.tar.gz             the runtime tree, unpack and run
+#   grimoire_<version>_all.deb            Debian / Ubuntu
+#   grimoire-<pkgver>-1-any.pkg.tar.zst   Arch (<pkgver> is <version> without
+#                                         its `-`, see the PKGBUILD)
+#
+# plus the PKGBUILD with its checksum filled in, for an AUR maintainer to
+# commit as it is.
+#
+# Grimoire is architecture-independent Jennifer source, so there is no build
+# matrix: one tarball and one package of each kind serve every platform the
+# interpreter runs on. The Arch package is assembled from the same tarball the
+# release ships, so the three cannot disagree about their contents.
 #
 # The body is `packaging/OVERVIEW.md` - a blurb of a few lines - with the parts
 # that only make sense for one tag generated on top of it: how to get this
@@ -11,15 +25,12 @@
 # The package page carries its own one-sentence description, capped at 512
 # characters by the registry; that one lives in `docker.yml`.
 #
-# Nothing is built here. The site publishes from `pages.yml` and the image from
-# `docker.yml`, both of which already run on a tag; this job waits for neither,
-# because a release that failed to appear is easier to notice than one that
-# appeared with the wrong notes.
-#
-# It does wait for one thing, in `version.yml`: that the tag being released and
-# the version in the files are the same number. That is the one error a release
-# cannot absorb, since the tag it names is also what the registry publishes from
-# and what the image is called.
+# The site publishes from `pages.yml` and the image from `docker.yml`, both of
+# which already run on a tag; this workflow waits for neither. It waits for two
+# things: `version.yml`, that the tag being released and the version in the
+# files are the same number - the one error a release cannot absorb, since the
+# tag it names is also what the registry publishes from and what the image is
+# called - and `test.yml`, so a red suite blocks the release.
 
 name: release
 
@@ -30,22 +41,32 @@ on:
     # here, `0.1.0`, carries none, so `v*` alone would have run nothing at all
     # on it.
     tags: ["v*", "[0-9]*"]
+  # Releases an existing tag again: the packages are rebuilt and replaced, and
+  # the notes rewritten. The packaging - the scripts, the control file, the
+  # PKGBUILD - comes from the branch this is run on, and the files packaged from
+  # the tag, so a tag made before a packaging change still gets its packages.
   workflow_dispatch:
     inputs:
       tag:
         description: the existing tag to release
         required: true
 
+# Read-only by default. Only the publish job, which creates the Release, is
+# granted write access, so the jobs that run the tests and the build scripts
+# never hold a token that can rewrite the repository.
 permissions:
-  contents: write
+  contents: read
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   # Before anything is published, and this is the workflow that most needs it.
   # A release is the copy of the version number that cannot be corrected in
   # place: the tag it points at is what the registry publishes from and what the
-  # image is named after. `test.yml` checks the same thing, but it is a separate
-  # workflow started by the same push, so it finishes well after this one would
-  # have created the release. Calling the check here is what makes it a gate.
+  # image is named after. `test.yml` checks the same thing, but on its own it
+  # finishes well after a release would have been created. Calling the check
+  # here is what makes it a gate.
   #
   # The dispatch input is passed along: a release composed for a tag by hand has
   # to compare the files at *that* tag, not the ones on the branch this run
@@ -55,78 +76,226 @@ jobs:
     with:
       tag: ${{ github.event.inputs.tag || '' }}
 
-  release:
-    needs: version
-    runs-on: ubuntu-latest
+  # The whole suite. On a run by hand it tests the branch the run started from,
+  # whose scripts do the packaging; the tag was tested when it was pushed.
+  tests:
+    uses: ./.github/workflows/test.yml
 
+  linux:
+    name: Tarball and .deb
+    needs: [version, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the packaging
+        uses: actions/checkout@v7
+
+      # Full history: the tag's own commit date stamps every archive member.
+      - name: Check out the tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+          path: tree
+          fetch-depth: 0
+
+      - name: Build the tarball and the .deb
+        run: |
+          set -eu
+          version="${TAG#v}"
+          # Timestamp every archive member with the tagged commit's own date,
+          # so rebuilding the tag reproduces the same bytes and the published
+          # checksum stays meaningful.
+          SOURCE_DATE_EPOCH="$(git -C tree log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          scripts/build-tarball.sh "$version" release tree
+          scripts/build-deb.sh "$version" release tree
+          ls -l release
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: release/
+          if-no-files-found: error
+
+  arch:
+    name: Arch package
+    needs: linux
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      # base-devel carries makepkg but not git, and actions/checkout wants it
+      # for anything but a REST download.
+      - name: Install git
+        run: pacman -Sy --noconfirm --needed git
+
+      - name: Check out the packaging
+        uses: actions/checkout@v7
+
+      - name: Fetch the tarball built upstream of this job
+        uses: actions/download-artifact@v8
+        with:
+          name: linux
+          path: release
+
+      - name: Build the package
+        run: |
+          set -eu
+          version="${TAG#v}"
+          sum="$(sha256sum "release/grimoire-$version.tar.gz" | cut -d' ' -f1)"
+
+          mkdir -p build
+          # Stamp the tag and the real checksum into the PKGBUILD. The result
+          # is published as a release asset, so an AUR maintainer can commit it
+          # without rerunning updpkgsums. pacman's pkgver cannot hold a `-`;
+          # see the PKGBUILD for why a prerelease drops it (0.5.0-rc.1 ->
+          # 0.5.0rc.1).
+          pkgver="$(printf '%s\n' "$version" | sed 's/-//g')"
+          sed -e "s/^_tag=.*/_tag=$version/" \
+              -e "s/^pkgver=.*/pkgver=$pkgver/" \
+              -e "s/^sha256sums=.*/sha256sums=('$sum')/" \
+              packaging/archlinux/PKGBUILD > build/PKGBUILD
+          # makepkg finds the source in the build directory and skips the
+          # download, so the package holds the exact bytes the release ships.
+          cp "release/grimoire-$version.tar.gz" build/
+
+          # makepkg refuses to run as root, and the container is root.
+          useradd -m builder
+          chown -R builder build
+          # --nodeps because `jennifer` is not in any Arch repository yet;
+          # --nocheck for the same reason, since check() runs the interpreter.
+          # The suite already ran in the tests job.
+          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/build' && makepkg --nodeps --nocheck"
+
+          mkdir -p out
+          cp build/*.pkg.tar.zst out/
+          cp build/PKGBUILD out/PKGBUILD
+          (cd out && for f in *.pkg.tar.zst; do sha256sum "$f" > "$f.sha256"; done)
+          ls -l out
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: arch
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [linux, arch]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # Full history and tags: the changelog below asks git what happened since
       # the previous tag, and a shallow clone knows about neither.
-      - name: Check out
-        uses: actions/checkout@v4
+      - name: Check out the tag
+        uses: actions/checkout@v7
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Collect the packages
+        uses: actions/download-artifact@v8
+        with:
+          path: release
+          merge-multiple: true
 
       - name: Compose the release notes
-        id: notes
         run: |
           set -eu
-          tag="${{ github.event.inputs.tag || github.ref_name }}"
-          version="${tag#v}"
-          previous=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+          version="${TAG#v}"
+          # The Arch package carries pacman's spelling of the version.
+          pkgver="$(printf '%s\n' "$version" | sed 's/-//g')"
+          previous=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
 
           {
             cat packaging/OVERVIEW.md
             echo
-            echo "## This release"
+            echo "## Install"
+            echo
+            echo "With [jvc](https://github.com/jennifer-language/jvc), the recommended way:"
+            echo
+            echo '```sh'
+            echo "jvc app install https://github.com/jennifer-language/grimoire --version $version"
+            echo '```'
+            echo
+            echo "Debian / Ubuntu, beside the \`jennifer\` package:"
+            echo
+            echo '```sh'
+            echo "sudo apt install ./grimoire_${version}_all.deb"
+            echo '```'
+            echo
+            echo "Arch:"
+            echo
+            echo '```sh'
+            echo "sudo pacman -U grimoire-${pkgver}-1-any.pkg.tar.zst"
+            echo '```'
+            echo
+            echo "Anywhere else, unpack and put the launcher on PATH:"
+            echo
+            echo '```sh'
+            echo "tar xzf grimoire-${version}.tar.gz"
+            echo "ln -s \"\$PWD/grimoire-${version}/bin/grimoire\" ~/.local/bin/grimoire"
+            echo '```'
+            echo
+            echo "Or nothing on the machine but a container runtime:"
             echo
             echo '```sh'
             echo "docker pull ghcr.io/jennifer-language/grimoire:$version"
             echo '```'
             echo
-            echo "Or a checkout at this tag, which needs only a Jennifer interpreter:"
-            echo
-            echo '```sh'
-            echo "git clone --branch $tag https://github.com/jennifer-language/grimoire"
-            echo "cd grimoire && bin/grimoire build"
-            echo '```'
+            echo "Every package needs Jennifer at the floor \`deck.toml\` sets. The .deb"
+            echo "declares it; the Arch package cannot, because the interpreter packages"
+            echo "provide an unversioned \`jennifer\`. Either way the interpreter enforces"
+            echo "it at load time. Every file ships a sidecar \`.sha256\`, and the tarball"
+            echo "is reproducible: rebuilding this tag yields the same bytes."
             if [ -n "$previous" ]; then
               echo
               echo "## Changes since $previous"
               echo
-              git log --no-merges --pretty='- %s' "$previous..$tag"
+              git log --no-merges --pretty='- %s' "$previous..$TAG"
               echo
-              echo "[Full diff](https://github.com/jennifer-language/grimoire/compare/$previous...$tag)"
+              echo "[Full diff](https://github.com/jennifer-language/grimoire/compare/$previous...$TAG)"
             fi
           } > notes.md
 
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "--- notes.md ---"
           cat notes.md
+          ls -l release
 
       # `--verify-tag` so a mistyped dispatch input fails here rather than
       # creating a release pointing at a tag that does not exist.
       #
-      # An existing release is edited rather than refused. A tag pushed before
-      # this workflow existed already has a release with whatever notes GitHub
-      # generated, and `workflow_dispatch` above is how it gets these ones
-      # instead; a `create` that fails on "already exists" would make that the
-      # one case the workflow cannot fix.
+      # An existing release is edited rather than refused, and its packages
+      # replaced. A tag pushed before this workflow existed already has a release
+      # with whatever notes GitHub generated, and `workflow_dispatch` above is how
+      # it gets these ones instead; a `create` that fails on "already exists"
+      # would make that the one case the workflow cannot fix.
+      #
+      # A SemVer prerelease (`0.5.0-rc.1`) is marked as one. A plain release is
+      # not, whatever its major version: it is what `latest` points at, in the
+      # image and on the site.
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          tag="${{ steps.notes.outputs.tag }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "the release exists; replacing its notes"
-            gh release edit "$tag" \
-              --title "Grimoire $tag" \
-              --notes-file notes.md
-          else
-            gh release create "$tag" \
-              --title "Grimoire $tag" \
+          prerelease=false
+          case "$TAG" in
+              *-*) prerelease=true ;;
+          esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "the release exists; replacing its notes and packages"
+            gh release edit "$TAG" \
+              --title "Grimoire $TAG" \
               --notes-file notes.md \
-              --verify-tag
+              --prerelease="$prerelease"
+            gh release upload "$TAG" --clobber release/*
+          else
+            gh release create "$TAG" \
+              --title "Grimoire $TAG" \
+              --notes-file notes.md \
+              --prerelease="$prerelease" \
+              --verify-tag \
+              release/*
           fi

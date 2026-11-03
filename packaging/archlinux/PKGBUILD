@@ -1,0 +1,90 @@
+# Maintainer: mplx <jennifer@mplx.dev>
+#
+# AUR PKGBUILD for `grimoire`: installs the release tarball published with each
+# tag. Pair to `PKGBUILD-git`, which builds from the tip of main.
+#
+# There is no `-bin` variant: Grimoire is architecture-independent Jennifer
+# source, and the release tarball is already the runtime tree.
+
+# `_tag` is the release tag exactly as published (SemVer, so a prerelease is
+# `0.5.0-rc.1`); it names the download and the directory it unpacks to.
+# `pkgver` is the same version in pacman's spelling, which cannot hold a `-`.
+# The hyphen is dropped (`0.5.0rc.1`) rather than turned into `_` or `.`,
+# because vercmp orders `0.5.0rc.1` before `0.5.0` and either separator after
+# it, and a prerelease must sort below its release. The release pipeline
+# stamps both lines from the tag.
+pkgname=grimoire
+_tag=0.4.0
+pkgver=0.4.0
+pkgrel=1
+pkgdesc='Build a documentation website, and a printable PDF, from a directory of Markdown files'
+arch=('any')
+url='https://github.com/jennifer-language/grimoire'
+license=('LGPL-3.0-only')
+
+# Unversioned on purpose. Grimoire needs `jennifer >= 0.25.0`, but
+# `jennifer-bin` and `jennifer-git` provide an unversioned `jennifer`, so the
+# versioned form would be unsatisfiable and pacman would refuse the package.
+# The interpreter enforces the floor at load time from each source file's
+# `# pragma-jennifer-version`. Add the version here once the interpreter
+# packages declare `provides=("jennifer=$pkgver")`.
+depends=('jennifer')
+optdepends=(
+    'git: the version stamp in the PDF footer, and the feed and lastmod plugins'
+)
+provides=("grimoire=$pkgver")
+conflicts=('grimoire-git')
+
+# The runtime tarball from scripts/build-tarball.sh, not GitHub's source
+# archive, which carries the tests, examples, packaging and CI config.
+source=("$pkgname-$_tag.tar.gz::$url/releases/download/$_tag/$pkgname-$_tag.tar.gz")
+
+# The release publishes a copy of this PKGBUILD with the sum filled in; take it
+# from there, or run `updpkgsums`, when bumping pkgver. Here it is a placeholder
+# of zeros - a wrong hash rather than SKIP, so an unverified build fails loudly.
+sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+
+check() {
+	cd "$pkgname-$_tag"
+
+	# Catches the case this package is most likely to get wrong: an interpreter
+	# too old to parse the sources it has just been paired with.
+	jennifer lint bin/grimoire src/*.j src/themes/*.j plugins/*
+
+	# A real build, PDF included, of a book written on the spot: the tarball
+	# carries the manual's Markdown but not its images. Nothing is fetched, so
+	# this is safe in a clean chroot. GRIMOIRE_VERSION is how the PDF footer gets
+	# its version stamp where there is no repository to ask.
+	local book="$srcdir/smoke"
+	mkdir -p "$book/docs"
+	printf '# Smoke\n\nA paragraph with `code`.\n' > "$book/docs/index.md"
+	printf '[book]\ntitle = "Smoke"\nsrc = "docs"\n[pdf]\nenabled = true\n' \
+		> "$book/grimoire.toml"
+	bin/grimoire --version
+	(cd "$book" && GRIMOIRE_VERSION="$pkgver" "$srcdir/$pkgname-$_tag/bin/grimoire" \
+		build --out site --quiet)
+	[[ -s "$book/site/index.html" ]]
+	[[ -s "$book/site/book.pdf" ]]
+}
+
+package() {
+	cd "$pkgname-$_tag"
+
+	# The launcher finds `src/` from its own resolved path - up out of `bin/`,
+	# then down into `src/` - and the plugins it ships in `plugins/` beside it,
+	# so the tree goes under /usr/share as it is, and /usr/bin holds a link
+	# into it. Do not flatten this into /usr/bin: the launcher would then look
+	# for /usr/src.
+	install -dm755 "$pkgdir/usr/share/$pkgname"
+	cp -a bin src plugins deck.toml "$pkgdir/usr/share/$pkgname/"
+
+	# A symlink, as `jvc app install` writes: the launcher resolves it before it
+	# looks for `src/`. The plugins stay beside the launcher rather than in
+	# /usr/bin, so `grimoire` is the only command and `grimoire<TAB>` completes.
+	install -dm755 "$pkgdir/usr/bin"
+	ln -s "/usr/share/$pkgname/bin/grimoire" "$pkgdir/usr/bin/$pkgname"
+
+	install -Dm644 LICENSE.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE.md"
+	install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname"
+	cp -a docs "$pkgdir/usr/share/doc/$pkgname/"
+}

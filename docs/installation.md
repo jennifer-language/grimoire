@@ -11,7 +11,7 @@ Pick whichever fits:
 | - | - |
 | [jvc](#with-jvc) | the recommended way: one command, a tagged release, and an update later |
 | [A checkout](#from-a-checkout) | unreleased code, or working on Grimoire itself |
-| [A package](#from-a-package) | Arch Linux, with a `PKGBUILD` in the repository |
+| [A package](#from-a-package) | a `.deb`, an Arch package, or a tarball, from each release |
 | [A container](#in-a-container) | nothing on the machine but Docker or Podman |
 
 ## Requirements
@@ -97,24 +97,54 @@ jennifer-tiny run bin/grimoire build
 
 ## From a package
 
-**Arch Linux.** `packaging/arch/PKGBUILD` in the repository builds one:
+Every release publishes packages beside its notes on the
+[releases page](https://github.com/jennifer-language/grimoire/releases), each
+with a sidecar `.sha256`:
+
+| | |
+| - | - |
+| `grimoire_VERSION_all.deb` | Debian and Ubuntu |
+| `grimoire-VERSION-1-any.pkg.tar.zst` | Arch Linux, with the `PKGBUILD` it was built from |
+| `grimoire-VERSION.tar.gz` | anywhere else: the runtime tree, to unpack and run in place |
+
+All of them need Jennifer 0.25.0 or later. Grimoire is architecture-independent
+source, so one package of each kind serves every platform the interpreter runs
+on.
+
+**Debian and Ubuntu.** Jennifer publishes a `.deb` of its own, and installing
+both together lets apt check the dependency between them:
 
 ```sh
-cd packaging/arch
-updpkgsums          # the checksum placeholder is deliberate, see the README there
-makepkg -si
+sudo apt install ./jennifer_0.25.0_amd64.deb ./grimoire_0.4.0_all.deb
 ```
 
-It lands the program in `/usr/lib/grimoire` with a symlink at `/usr/bin/grimoire`,
-which is the same arrangement as the `ln -s` above and for the same reason - the
-launcher looks for `src/` beside its own resolved path. Its `check()` lints the
-sources and then builds this documentation with `--pdf`, so a mismatch between
-the package and the installed interpreter fails at build time rather than at
-first use. `packaging/arch/README.md` covers the rest, including a `-git`
-variant.
+**Arch Linux.** The package, or the published `PKGBUILD` to build it yourself:
 
-There is no package for any other distribution yet. The container images below
-are the portable answer in the meantime.
+```sh
+sudo pacman -U grimoire-0.4.0-1-any.pkg.tar.zst
+```
+
+The Arch package depends on `jennifer` without a version, because the
+interpreter's own Arch packages provide it without one; the interpreter enforces
+the floor itself when it loads Grimoire. `packaging/archlinux/` in the
+repository also has a `PKGBUILD-git` that builds the tip of `main`, and a README
+that covers both.
+
+Both packages put the program in `/usr/share/grimoire` with a symlink at
+`/usr/bin/grimoire`, which is the same arrangement as the `ln -s` above and for
+the same reason - the launcher looks for `src/` beside its own resolved path. The
+plugins that ship with Grimoire are installed beside it, in
+`/usr/share/grimoire/plugins`, where a book finds them by name.
+
+**Anywhere else.** The tarball is the same tree, without the packaging:
+
+```sh
+tar xzf grimoire-0.4.0.tar.gz
+ln -s "$PWD/grimoire-0.4.0/bin/grimoire" ~/.local/bin/grimoire
+```
+
+It is reproducible - rebuilding a release tag yields the same bytes - so the
+published checksum can be checked.
 
 ## In a container
 

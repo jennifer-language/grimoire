@@ -364,7 +364,7 @@ request builds and checks without publishing.
 
 The number lives in four places that cannot see each other: `deck.toml`, which
 the registry publishes; `src/version.j`, which `--version` prints;
-`packaging/arch/PKGBUILD`, which builds from a release tarball; and the tag
+`packaging/archlinux/PKGBUILD`, which builds from a release tarball; and the tag
 itself. Each is edited for its own unrelated reason, so nothing but a check
 keeps them together.
 

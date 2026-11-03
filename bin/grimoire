@@ -27,7 +27,7 @@ import "../src/grimoire.j" as grimoire;
 
 # Where Grimoire's own bundled assets live, from the path this file was invoked
 # by. The path is resolved through any symlinks first, so `ln -s
-# /usr/lib/grimoire/bin/grimoire /usr/bin/grimoire` - how a command gets onto a
+# /usr/share/grimoire/bin/grimoire /usr/bin/grimoire` - how a command gets onto a
 # PATH - finds the assets beside the real file rather than beside the link.
 #
 # `src/` then sits one directory up, out of `bin/`. Resolving the symlink is

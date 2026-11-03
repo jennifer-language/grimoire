@@ -42,7 +42,7 @@ func testTheRuntimeCarriesEveryFeature() {
 }
 
 # No framework, no search library, no icon font, nothing from a CDN: a built site
-# is self-contained, and `packaging/arch/README.md` claims as much.
+# is self-contained, and `packaging/archlinux/README.md` claims as much.
 func testTheRuntimeHasNoDependencies() {
     def js as string init runtime();
     testing.assertFalse(strings.contains($js, "cdn."));

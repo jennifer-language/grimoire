@@ -42,7 +42,7 @@ report() {
 
 # What the pipeline and the packaging name by path.
 named=$(grep -ohE '(scripts|packaging|plugins-src)/[A-Za-z0-9_./-]+\.(sh|j|md)' \
-    .github/workflows/*.yml Dockerfile packaging/arch/PKGBUILD 2>/dev/null | sort -u)
+    .github/workflows/*.yml Dockerfile packaging/archlinux/PKGBUILD* 2>/dev/null | sort -u)
 for file in $named; do
     [ -e "$file" ] || continue
     if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then

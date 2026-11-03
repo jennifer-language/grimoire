@@ -1,0 +1,32 @@
+Source: grimoire
+Section: text
+Priority: optional
+Maintainer: mplx <jennifer@mplx.dev>
+Homepage: https://grimoire.jennifer-lang.dev/
+Vcs-Browser: https://github.com/jennifer-language/grimoire
+Vcs-Git: https://github.com/jennifer-language/grimoire.git
+Standards-Version: 4.6.2
+
+Package: grimoire
+Architecture: all
+Depends: jennifer (>= @ENGINE_FLOOR@)
+Recommends: git
+Description: documentation website and printable PDF from Markdown files
+ Grimoire builds a book - a directory of Markdown chapters and a
+ grimoire.toml - into a static website with search, navigation, themes
+ and a dark mode, and optionally into a printable PDF of the same book.
+ The site works served from a web root, from a subdirectory, or opened
+ straight off the disk.
+ .
+ The package is architecture-independent Jennifer source: the launcher at
+ /usr/bin/grimoire is a symlink into /usr/share/grimoire, where bin/, src/
+ and the shipped plugins sit side by side, because the launcher finds its
+ modules relative to its own resolved path.
+ .
+ The versioned dependency on jennifer mirrors the [engines] table in
+ Grimoire's deck.toml; the interpreter enforces the same floor at load time
+ from each source file's `# pragma-jennifer-version:` header.
+ .
+ git is recommended, not required: it stamps the PDF footer with the
+ book's version, and the feed and lastmod plugins date chapters from the
+ git history. Without it those are left out, and the book still builds.

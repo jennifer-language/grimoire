@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
 #
 # One number, four places, checked once and reusable by everything that would
-# ship it: `deck.toml`, `src/version.j`, `packaging/arch/PKGBUILD`, and - on a
-# tag - the tag itself.
+# ship it: `deck.toml`, `src/version.j`, `packaging/archlinux/PKGBUILD`, and -
+# on a tag - the tag itself.
 #
 # This is a `workflow_call` workflow rather than a step inside `test.yml`
 # because of what a tag push actually does: `test.yml`, `release.yml` and
@@ -68,13 +68,20 @@ jobs:
           # Nothing but this keeps them together.
           manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' deck.toml)
           program=$(sed -n 's/^def const NUMBER as string init "\(.*\)";/\1/p' src/version.j)
-          package=$(sed -n 's/^pkgver=//p' packaging/arch/PKGBUILD)
+          # `_tag`, the version as tagged: `pkgver` is pacman's spelling, which
+          # drops the `-` of a prerelease. `packaging/arch` is where a tag made
+          # before the packaging moved keeps it, with a plain `pkgver`, so a
+          # release made by hand for one of those still passes.
+          pkgbuild=packaging/archlinux/PKGBUILD
+          [ -f "$pkgbuild" ] || pkgbuild=packaging/arch/PKGBUILD
+          package=$(sed -n 's/^_tag=//p' "$pkgbuild")
+          [ -n "$package" ] || package=$(sed -n 's/^pkgver=//p' "$pkgbuild")
 
           if [ -z "$manifest" ] || [ -z "$program" ] || [ -z "$package" ]; then
             echo "FAIL  a version could not be read"
             printf '      deck.toml: %s\n' "${manifest:-<none>}"
             printf '      src/version.j: %s\n' "${program:-<none>}"
-            printf '      packaging/arch/PKGBUILD: %s\n' "${package:-<none>}"
+            printf '      %s: %s\n' "$pkgbuild" "${package:-<none>}"
             exit 1
           elif [ "$manifest" != "$program" ] || [ "$manifest" != "$package" ]; then
             echo "FAIL  version drift"

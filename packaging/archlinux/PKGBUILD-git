@@ -1,0 +1,89 @@
+# Maintainer: mplx <jennifer@mplx.dev>
+
+# Grimoire is architecture-independent Jennifer source, so the package copies
+# the tree the launcher needs - bin/, src/ and the shipped plugins - plus the
+# documentation.
+#
+# `jennifer-bin` and `jennifer-git` both provide an unversioned `jennifer`, so
+# the sources' floor (`# pragma-jennifer-version: >=0.25.0`) cannot be written
+# here as `jennifer>=0.25.0`: it would be unsatisfiable. The interpreter checks
+# the pragma at load time instead.
+
+_pkgname=grimoire
+pkgname=grimoire-git
+pkgver=0.4.0.r0.g0000000
+pkgrel=1
+pkgdesc="Build a documentation website, and a printable PDF, from a directory of Markdown files"
+arch=('any')
+url="https://github.com/jennifer-language/grimoire"
+license=('LGPL-3.0-only')
+depends=('jennifer')
+# git fetches the source, and check() needs it too: the feed and lastmod tests
+# build real repositories. At run time it is optional, as in PKGBUILD and the
+# .deb.
+makedepends=('git')
+optdepends=(
+	'git: the version stamp in the PDF footer, and the feed and lastmod plugins'
+)
+provides=("${_pkgname}=${pkgver%%.r*}")
+conflicts=("${_pkgname}")
+source=("${_pkgname}::git+${url}.git")
+# A git source is verified by its ref, not by a hash of a tarball.
+sha256sums=('SKIP')
+
+pkgver() {
+	cd "${srcdir}/${_pkgname}"
+
+	# The newest release tag plus the commits since: 0.4.0.r12.g1a2b3c4. Tags are
+	# plain semver, so there is no `v` to strip.
+	git describe --long --tags --abbrev=7 --match '[0-9]*.[0-9]*.[0-9]*' |
+		sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+check() {
+	cd "${srcdir}/${_pkgname}"
+
+	# Every module has a white-box overlay, and scripts/test.sh runs them all,
+	# the plugins' included.
+	scripts/test.sh
+
+	jennifer lint bin/grimoire src/*.j src/themes/*.j plugins/*
+
+	# The repository is its own book, so a real build is available for free.
+	# Nothing is fetched, so this is safe in a clean chroot, and the PDF footer
+	# takes its version stamp from the checkout itself.
+	bin/grimoire build --pdf --out "${srcdir}/smoke" --quiet
+	[[ -s "${srcdir}/smoke/index.html" ]]
+	[[ -s "${srcdir}/smoke/grimoire.pdf" ]]
+}
+
+package() {
+	cd "${srcdir}/${_pkgname}"
+
+	# The launcher finds `src/` from its own resolved path, and the plugins it
+	# ships in `plugins/` beside it, so the three stay siblings under /usr/share.
+	install -Dm755 bin/grimoire "${pkgdir}/usr/share/${_pkgname}/bin/grimoire"
+	install -Dm644 deck.toml "${pkgdir}/usr/share/${_pkgname}/deck.toml"
+
+	# The test overlays are not shipped: nothing imports them at run time.
+	local f
+	while IFS= read -r -d '' f; do
+		[[ ${f} == *_test.j ]] && continue
+		if [[ ${f} == plugins/grimoire-* ]]; then
+			install -Dm755 "${f}" "${pkgdir}/usr/share/${_pkgname}/${f}"
+		else
+			install -Dm644 "${f}" "${pkgdir}/usr/share/${_pkgname}/${f}"
+		fi
+	done < <(find src plugins -type f -print0)
+
+	# A symlink, as `jvc app install` writes: the launcher resolves it before it
+	# looks for `src/`.
+	install -dm755 "${pkgdir}/usr/bin"
+	ln -s "/usr/share/${_pkgname}/bin/grimoire" "${pkgdir}/usr/bin/${_pkgname}"
+
+	install -Dm644 LICENSE.md "${pkgdir}/usr/share/licenses/${_pkgname}/LICENSE.md"
+	install -Dm644 README.md -t "${pkgdir}/usr/share/doc/${_pkgname}"
+	while IFS= read -r -d '' f; do
+		install -Dm644 "${f}" "${pkgdir}/usr/share/doc/${_pkgname}/${f}"
+	done < <(find docs -type f -name '*.md' -print0)
+}
