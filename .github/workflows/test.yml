@@ -32,10 +32,13 @@ permissions:
   contents: read
 
 env:
-  # Grimoire's sources require Jennifer 0.25.0, and the `latest` image is still
-  # 0.24.0. Switch this to `latest` the day 0.25.0 is released - the same line
-  # lives in `Dockerfile` and `pages.yml`.
-  JENNIFER_TAG: dev
+  # The interpreter every job runs in: the 0.25 release line, so a patch release
+  # that breaks Grimoire fails here first. Not `latest`, which Jennifer currently
+  # publishes as the distroless `static` image - no shell for
+  # `ci-git-image.sh` to install git with, and no `env` for a plugin's shebang.
+  # `Dockerfile` follows the same line; `pages.yml` pins an exact version, for
+  # the reason it gives.
+  JENNIFER_TAG: "0.25"
 
 jobs:
   # The version numbers, as their own callable workflow. It used to be a block

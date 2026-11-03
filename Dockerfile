@@ -9,7 +9,6 @@
 #
 # Build:
 #   docker build -t grimoire .
-#   docker build --build-arg JENNIFER_TAG=static -t grimoire:static .   # see below
 #
 # Run (the book is whatever you mount at /work):
 #   docker run --rm -v "$PWD:/work" grimoire build
@@ -17,14 +16,15 @@
 # With a plugin, which takes two decisions - the container's and the book's:
 #   docker run --rm -e GRIMOIRE_PLUGINS=epub -v "$PWD:/work" grimoire build
 
-# The base image tag. `dev` rather than `latest` because Grimoire's sources
-# require Jennifer 0.25.0 and `latest` is still 0.24.0; switch this back to
-# `latest` the day 0.25.0 is released.
+# The base image tag: the 0.25 release line, the first Grimoire's sources run
+# on, so a 0.25.x patch release is picked up and nothing further.
 #
-# The distroless `static` variant is unusable until then for the same reason -
-# it tracks the release too, so today it is 0.24.0 and there is no `dev-static`
-# to stand in for it.
-ARG JENNIFER_TAG=dev
+# Not `latest`: Jennifer's `latest` is currently the distroless `static` image -
+# the same digest as `static` and `0.25.0-static` - and that has no shell. This
+# image needs one twice, for the `RUN` that links and marks the launcher below
+# and for the entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
+# `#!/usr/bin/env jennifer` needs `env`.
+ARG JENNIFER_TAG=0.25
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
 # The registry shows `description` on the package page, so it says how to run the
@@ -100,8 +100,7 @@ WORKDIR /work
 # real path.
 #
 # This is the second thing here that needs a shell, and the one that would have
-# to be reconsidered for the distroless `:static` base - unusable today anyway,
-# since it tracks the release and that is still 0.24.0. Plugins are processes,
-# so a distroless image could not run one in any case.
+# to be reconsidered for the distroless `:static` base, which has none. Plugins
+# are processes, so a distroless image could not run one in any case.
 ENTRYPOINT ["/opt/grimoire/bin/docker-entrypoint.sh"]
 CMD ["--help"]
