@@ -79,13 +79,46 @@ the permissions it is given but never widen them, and deploying to Pages needs
 
 ### 3. Change two repository settings
 
-Once, before the first deployment:
+Once per repository, before the first release is published. Both need admin
+rights on the repository, and neither can be done by the workflow itself.
 
 1. **Settings, Pages:** set the source to *GitHub Actions*.
 2. **Settings, Environments, `github-pages`:** allow deployments from tags.
-   GitHub usually creates the environment with the default branch as its only
-   deployment branch, and a deployment started by a tag is then refused. Under
-   *Deployment branches and tags*, add a tag rule: `[0-9]*.[0-9]*.[0-9]*`.
+   GitHub usually creates this environment with the default branch as its only
+   deployment branch, so a deployment started by a release tag is refused -
+   after the book has built, at the very last step. Under *Deployment branches
+   and tags*, add a rule of type *Tag* with the pattern `[0-9]*.[0-9]*.[0-9]*`.
+
+The same two settings with the [GitHub CLI](https://cli.github.com/), with
+`OWNER/REPOSITORY` replaced:
+
+```sh
+repo=repos/OWNER/REPOSITORY
+
+# Pages, built by GitHub Actions. -X PUT instead, if Pages is on already.
+gh api -X POST $repo/pages -f build_type=workflow
+
+# The environment, deploying from the default branch - before the first
+# release - and from release tags.
+gh api -X PUT $repo/environments/github-pages \
+    -F 'deployment_branch_policy[protected_branches]=false' \
+    -F 'deployment_branch_policy[custom_branch_policies]=true'
+gh api -X POST $repo/environments/github-pages/deployment-branch-policies \
+    -f name=main -f type=branch
+gh api -X POST $repo/environments/github-pages/deployment-branch-policies \
+    -f name='[0-9]*.[0-9]*.[0-9]*' -f type=tag
+```
+
+The environment commands are safe to repeat: the `PUT` creates the environment
+or leaves it as it is, and a rule that exists already is not added twice. Use
+your default branch's name if it is not `main`. To check:
+
+```sh
+gh api $repo/environments/github-pages/deployment-branch-policies \
+    --jq '.branch_policies[] | .type + " " + .name'
+```
+
+which lists `branch main` and `tag [0-9]*.[0-9]*.[0-9]*`.
 
 ### 4. Publish
 
@@ -271,8 +304,11 @@ change you choose to make.
 ## When it fails
 
 **"Tag "1.0.0" is not allowed to deploy to github-pages due to environment
-protection rules".** The `github-pages` environment has no tag rule yet; see
-[step 3](#3-change-two-repository-settings), then re-run the failed jobs.
+protection rules".** The `github-pages` environment has no tag rule yet. The
+build succeeded; only the deployment was refused. Add the rule as in
+[step 3](#3-change-two-repository-settings), then re-run only the failed job, so
+the finished build is reused: *Re-run failed jobs* on the run's page, or
+`gh run rerun RUN-ID --failed`.
 
 **The site shows the default branch, not the release.** The workflow found no
 plain-semver tag, so it published the default branch instead; the run's summary
