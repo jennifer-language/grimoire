@@ -129,7 +129,6 @@ jobs:
       BOOK_DIR: ${{ inputs.directory }}
       BUILD_ARGS: ${{ inputs.args }}
       PLUGINS: ${{ inputs.plugins }}
-      SITE: ${{ runner.temp }}/pages
     steps:
       # Full history and every tag: the release is found among the tags, and
       # both builds are worktrees of commits a shallow clone would not have.
@@ -154,9 +153,14 @@ jobs:
       # than inside it, so the book's own `out` setting cannot decide where the
       # published files land, and the `dev` build cannot be pruned by the
       # release build or the other way round.
+      #
+      # `SITE` is set here rather than in the job's `env`: the `runner` context
+      # is not available there, and GitHub rejects the whole file - every
+      # caller fails before a job starts - if it is used.
       - name: Prepare the build command
         run: |
           set -eu
+          echo "SITE=$RUNNER_TEMP/pages" >> "$GITHUB_ENV"
           cat > "$RUNNER_TEMP/book.sh" <<'SH'
           set -eu
           src=$1 out=$2 version=$3 commit=$4
