@@ -1,15 +1,16 @@
 # Installation
 
-Grimoire is Jennifer source with a shebang on the front. Nothing is compiled,
-there is no build step and no package to install, so "installing" it means only
-putting the interpreter and a checkout where they can find each other - or
-skipping both and running a container.
+Grimoire is Jennifer source with a shebang on the front. Nothing is compiled
+and there is no build step, so "installing" it means only putting the interpreter
+and the source where they can find each other - or skipping both and running a
+container.
 
 Pick whichever fits:
 
 | | |
 | - | - |
-| [A checkout](#from-a-checkout) | the usual way, and the one to use while writing a book |
+| [jvc](#with-jvc) | the recommended way: one command, a tagged release, and an update later |
+| [A checkout](#from-a-checkout) | unreleased code, or working on Grimoire itself |
 | [A package](#from-a-package) | Arch Linux, with a `PKGBUILD` in the repository |
 | [A container](#in-a-container) | nothing on the machine but Docker or Podman |
 
@@ -22,6 +23,42 @@ the default binary and `jennifer-tiny`; `serve` needs the default binary, since
 The container images carry a suitable interpreter, so nothing below the
 container section needs Jennifer on the host.
 
+## With jvc
+
+**The recommended way.** Grimoire is a Jennifer app, so
+[jvc](https://github.com/jennifer-language/jvc) installs it and puts `grimoire`
+on your `PATH`:
+
+```sh
+jvc app install https://github.com/jennifer-language/grimoire
+```
+
+```
+installed grimoire 0.4.0
+  from:    https://github.com/jennifer-language/grimoire
+  app:     /home/you/.local/share/jvc/apps/grimoire (209 file(s))
+  command: /home/you/.local/bin/grimoire
+```
+
+jvc installs the newest release tag, unpacked whole into its app store, with the command a symlink to `bin/grimoire` inside it. The
+twelve shipped plugins come along in `plugins/`, where Grimoire finds them, so a
+book that names one needs nothing else. jvc needs `git` on `PATH`, and the
+command runs on the default `jennifer` binary, which its shebang names.
+
+0.4.0 is the first release that installs this way; earlier ones declare no
+entry script and jvc refuses them.
+
+| | |
+| - | - |
+| `--version "0.4.0"` | a release other than the newest; any range jvc accepts |
+| `--scope project` | `bin/grimoire` beside one book instead, a relative link that survives a move |
+| `--system` | `/usr/local/bin`, for every user; needs the privileges to write there |
+| `jvc app update grimoire` | the newest release that still matches the original `--version` |
+| `jvc app uninstall grimoire` | the command and the unpacked tree, both |
+
+A project-scoped install pins the tool to a book, but nothing in the book's own
+files records it, so a fresh clone of that book needs the same command again.
+
 ## From a checkout
 
 ```sh
@@ -30,7 +67,9 @@ cd grimoire
 bin/grimoire build          # builds this documentation, which is the repository's own book
 ```
 
-That is the whole install. The repository is its own worked example: its
+That is the whole install, at the tip of the default branch rather than a
+release - the way to run unreleased code, or to work on Grimoire itself. The
+repository is its own worked example: its
 `grimoire.toml` builds `docs/` into `site/`, so a fresh clone has something to
 build before you have written anything.
 
@@ -208,19 +247,19 @@ USER jennifer
 
 The interpreter image plus a bind mount runs the checkout directly, which is the
 fastest way to test a change to Grimoire without building anything. Name the
-release line, `:0.25`, rather than leaving the tag off: Jennifer's `latest` is
-currently its distroless `static` image, which has no `/usr/bin/env` to start a
-plugin with.
+release, `:0.25.0`, rather than leaving the tag off, so the interpreter changes
+only when you say so. Not the `:static` variant: it is distroless, with
+no `/usr/bin/env` to start a plugin with.
 
 ```sh
 # From the Grimoire checkout: build the book mounted at /work.
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/work" \
-    ghcr.io/jennifer-language/jennifer:0.25 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.25.0 run bin/grimoire build --pdf
 
 podman run --rm --userns=keep-id \
     -v "$PWD:/work:Z" \
-    ghcr.io/jennifer-language/jennifer:0.25 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.25.0 run bin/grimoire build --pdf
 ```
 
 The launcher is handed to the interpreter rather than executed, because the
@@ -231,7 +270,7 @@ To build a book that lives somewhere else, mount both:
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/grimoire" -v "/path/to/my-book:/work" \
-    ghcr.io/jennifer-language/jennifer:0.25 run /grimoire/grimoire build
+    ghcr.io/jennifer-language/jennifer:0.25.0 run /grimoire/bin/grimoire build
 ```
 
 ### Why the two flags differ
@@ -284,10 +323,10 @@ The entrypoint is a shell script, because something has to read
 have to solve differently - plugins are processes, so a distroless image could
 not run one anyway.
 
-`JENNIFER_TAG` defaults to `0.25`, the Jennifer release line Grimoire's sources
-require. Not `latest`, which Jennifer currently publishes as its distroless
-`static` image: the distroless variant is no base for this one, because both the
-`RUN` that installs the launcher and the entrypoint need a shell.
+`JENNIFER_TAG` defaults to `0.25.0`, the newest Jennifer release, so a new one
+is a change made on purpose rather than one that arrives with `latest`. The distroless `:static` variant is no base for this
+image, because both the `RUN` that installs the launcher and the entrypoint need
+a shell.
 
 ### The CI pipeline
 
@@ -311,72 +350,6 @@ its `MAJOR.MINOR`, and `latest` if it is the highest release.
 
 ## Publishing to GitHub Pages
 
-`.github/workflows/docs-pages.yml` is a reusable workflow that publishes a book
-to GitHub Pages from its **latest release** rather than from the tip of the
-default branch. A reader who installs the latest release then reads the
-documentation of that release, not of options merged since.
-
-A release is a tag in plain semver - `MAJOR.MINOR.PATCH`, no leading `v`, no
-pre-release suffix - and the highest one wins, compared number by number:
-`0.10.0` outranks `0.9.3`, and a patch to an older line does not take the site
-back to it. A pull request is built and checked but never published.
-
-```yaml
-on:
-  push:
-    tags: ["[0-9]+.[0-9]+.[0-9]+"]
-  pull_request:
-  workflow_dispatch:
-
-jobs:
-  pages:
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@<release>
-    with:
-      image: ghcr.io/jennifer-language/grimoire:<release>
-      args: --pdf
-```
-
-The repository needs two settings, once:
-
-1. **Settings, Pages:** the source is *GitHub Actions*.
-2. **Settings, Environments, `github-pages`:** allow deployments from tags.
-   GitHub usually creates the environment with the default branch as its only
-   deployment branch, and a deploy started by a tag is then refused with *Tag
-   "1.2.0" is not allowed to deploy to github-pages due to environment
-   protection rules*. Add a tag rule, `[0-9]*.[0-9]*.[0-9]*`.
-
-The project needs one release tag of its own before the first publish.
-
-| Input | Default | |
-| ----- | ------- | - |
-| `image` | `grimoire:latest` | the container the book is built in; pin it |
-| `launcher` | `""` | a Grimoire launcher in the repository, run with a plain Jennifer `image` instead |
-| `directory` | `.` | where `grimoire.toml` is |
-| `args` | `""` | extra flags for `grimoire build` |
-| `plugins` | `""` | `GRIMOIRE_PLUGINS` for the Grimoire image |
-| `dev` | `false` | also build the default branch, under `/dev/` |
-| `check` | `""` | a shell script that fails the run before anything is published |
-
-`check` runs in the checkout the book was built from, with the output directory
-in `SITE`, the release in `RELEASE`, and the container in `IMAGE`. The caller has
-to grant the `permissions`: a called workflow can narrow them but never widen
-them. Pin `uses` to a Grimoire release rather than `main`, for the same reason
-the workflow exists. 0.4.0 is the first release that carries `docs-pages.yml`,
-so it is the oldest `<release>` can name.
-
-Pin `image` to the same release. `latest` is the newest Grimoire release, never
-unreleased code, but it moves: a book republished after a Grimoire release is
-built by that release, and may come out different from the build its own
-release got. With both pinned, a Grimoire upgrade is a one-line change the
-project chooses to make.
-
-With `dev: true`, add `branches: [main]` to the trigger, so a merge publishes the
-new `/dev/` - without it, a push to the default branch would only republish the
-same release. Nothing marks the `/dev/` pages as unreleased to a search engine:
-expect them to be indexed beside the release, and the sitemap a `sitemap`
-renderer writes into `/dev/` to list the release's addresses rather than its
-own.
+Grimoire ships a reusable workflow that builds a book and publishes it to GitHub
+Pages from the project's latest release. [Publishing on GitHub
+Pages](github-pages.md) walks through calling it from another repository.

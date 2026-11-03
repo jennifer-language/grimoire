@@ -110,12 +110,13 @@ default, and a `logo` or `favicon` given as a URL.
 
 | | |
 | - | - |
-| [Installation](installation.md) | from a checkout, or from a container with Docker or Podman |
+| [Installation](installation.md) | with jvc, from a checkout, or from a container with Docker or Podman |
 | [Commands](commands.md) | every subcommand and flag |
 | [Configuration](configuration.md) | `grimoire.toml`, key by key |
 | [Markdown](markdown.md) | what Grimoire reads on top of CommonMark |
 | [Plugins](plugins.md) | running a program over the book, and writing one |
 | [Themes](themes.md) | the eleven themes, with screenshots, and how to write one |
+| [Publishing on GitHub Pages](github-pages.md) | the shared workflow that publishes a book from its latest release |
 | [Internals](internals.md) | the source layout, and what Grimoire does to the Markdown |
 | [Performance](performance.md) | where the time goes, and why it scales the way it does |
 

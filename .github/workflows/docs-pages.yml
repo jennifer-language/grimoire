@@ -8,7 +8,7 @@
 # The problem it solves is a version skew. A reader installs the latest release
 # and reads documentation built from whatever was merged since, which describes
 # options that release does not have. So what is published at the site root is
-# always the book as it stood at the highest release tag:
+# the book as it stood at the highest release tag:
 #
 #   - a release is a tag in plain semver, `MAJOR.MINOR.PATCH` with no leading
 #     `v` and no pre-release or build suffix - `0.4.0`, never `v0.4.0` or
@@ -18,7 +18,14 @@
 #     site back to 0.3;
 #   - with `dev: true`, the tip of the default branch is built as well and
 #     published under `/dev/`, so unreleased documentation exists and says what
-#     it is by its address.
+#     it is by its address;
+#   - until the first release, the tip of the default branch is published at
+#     the root instead, so a new project has a site before it has a version.
+#     The first release tag takes the root over, and `/dev/` - which would be
+#     the same book twice before that - only appears then.
+#
+# How to call it, step by step, is in the manual:
+# https://grimoire.jennifer-lang.dev/github-pages.html
 #
 # A pull request builds the book from the pull request itself and runs the
 # checks, and never publishes. Every other event publishes.
@@ -28,8 +35,9 @@
 #   on:
 #     push:
 #       tags: ["[0-9]+.[0-9]+.[0-9]+"]
-#       branches: [main]          # only with `dev: true`; without it, a push
-#                                 # to main would republish the same release
+#       branches: [main]          # with `dev: true`, or before the first
+#                                 # release; otherwise a push to main only
+#                                 # republishes the same release
 #     pull_request:
 #     workflow_dispatch:
 #   jobs:
@@ -88,8 +96,9 @@ on:
         default: ""
       plugins:
         description: >-
-          `GRIMOIRE_PLUGINS` for the Grimoire image: the shipped plugins to put
-          on `PATH`, comma separated. Ignored by a plain Jennifer image.
+          `GRIMOIRE_PLUGINS` for the Grimoire image: the third-party plugins it
+          carries to switch on, comma separated. The plugins that ship with
+          Grimoire need no entry here. Ignored by a plain Jennifer image.
         type: string
         default: ""
       dev:
@@ -100,7 +109,8 @@ on:
         description: >-
           A shell script run after the build, in the checkout the published book
           was built from. `SITE` is the output directory, `RELEASE` the release
-          it was built from ("" on a pull request), and `IMAGE` the container.
+          it was built from ("" on a pull request, and before the first
+          release), and `IMAGE` the container.
           Non-zero fails the run before anything is published.
         type: string
         default: ""
@@ -168,7 +178,8 @@ jobs:
       # The highest plain-semver tag, compared field by field. `sort -V` would
       # also order these correctly, but the three numeric keys say what is
       # meant, and the pattern has already thrown out everything that is not
-      # three numbers - a `v` prefix, a pre-release, a stray `latest`.
+      # three numbers - a `v` prefix, a pre-release, a stray `latest`. None at
+      # all leaves `release` empty, and the default branch takes the root.
       - name: Find the release
         id: release
         if: github.event_name != 'pull_request'
@@ -177,15 +188,15 @@ jobs:
           release=$(git tag --list |
               grep -E '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' |
               sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1 || true)
-          if [ -z "$release" ]; then
-              echo "::error::no release tag (MAJOR.MINOR.PATCH, no leading v) to publish"
-              exit 1
-          fi
           echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "publishing the documentation of $release"
+          if [ -n "$release" ]; then
+              echo "publishing the documentation of $release"
+          else
+              echo "::notice::no release tag (MAJOR.MINOR.PATCH, no leading v) yet: publishing the default branch at the root"
+          fi
 
       - name: Build the release
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.release.outputs.release != ''
         env:
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
@@ -195,16 +206,24 @@ jobs:
 
       # Built after the release, into a directory inside its output: the release
       # build prunes its own `--out` before it writes, so the other order would
-      # lose this one.
-      - name: Build the default branch into /dev/
-        if: github.event_name != 'pull_request' && inputs.dev
+      # lose this one. Before the first release this is the root itself, and
+      # there is no `/dev/` - it would be the same book twice.
+      - name: Build the default branch
+        if: >-
+          github.event_name != 'pull_request' &&
+          (inputs.dev || steps.release.outputs.release == '')
         env:
           BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE: ${{ steps.release.outputs.release }}
         run: |
           set -eu
+          out=$SITE/dev
+          if [ -z "$RELEASE" ]; then
+              out=$SITE
+          fi
           git worktree add --detach "$RUNNER_TEMP/dev" "refs/remotes/origin/$BRANCH"
           commit=$(git -C "$RUNNER_TEMP/dev" rev-parse --short HEAD)
-          sh "$RUNNER_TEMP/book.sh" "$RUNNER_TEMP/dev" "$SITE/dev" "" "$commit"
+          sh "$RUNNER_TEMP/book.sh" "$RUNNER_TEMP/dev" "$out" "" "$commit"
 
       - name: Build the pull request
         if: github.event_name == 'pull_request'
@@ -230,6 +249,8 @@ jobs:
           test -f "$SITE/index.html"
           if [ -n "$RELEASE" ]; then
               cd "$RUNNER_TEMP/release"
+          elif [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+              cd "$RUNNER_TEMP/dev"
           fi
           if [ -n "$CHECK" ]; then
               bash -euxo pipefail -c "$CHECK"

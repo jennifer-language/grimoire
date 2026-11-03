@@ -106,7 +106,7 @@ so when it is.
 `deck.toml` publishes Grimoire to the
 [registry](https://registry.jennifer-lang.dev/), and the
 [specification](https://registry.jennifer-lang.dev/manual/publishing-a-deck.html)
-is what decides three things about the layout above:
+is what decides four things about the layout above:
 
 - **`src/` is the tree a consumer vendors**, and everything in it is a module.
   That is why the launcher moved to `bin/`: a program with a shebang is not a
@@ -114,6 +114,11 @@ is what decides three things about the layout above:
   somebody else's project.
 - **The entry module is named after the deck.** `@jennifer/grimoire` needs
   `src/grimoire.j`, so that is what the CLI module is called.
+- **A command outside `src/` is an app's, not a deck's.** `[package] bin`
+  names `bin/grimoire`, which `jvc app install` links onto `PATH` from the
+  unpacked tree. Vendoring the deck ignores it, since only `src/` is vendored -
+  so `grimoire` is a command you install, never one a project's `jvc install`
+  drops into its `bin/`.
 - **`capabilities` declares what the code actually reaches for.** `net` for
   `serve`, which binds a port through `httpd`; `exec` for the one `os.run` that
   asks git for the PDF footer's version stamp. Neither is needed to build a book,
@@ -347,7 +352,7 @@ in the official Jennifer image, and publishes it to GitHub Pages - the manual as
 it stood at the **highest release tag**, so a reader reads about the version they
 can install rather than about whatever has been merged since. The work is done
 by `docs-pages.yml`, the reusable workflow described under
-[Installation](installation.md#publishing-to-github-pages); `pages.yml` adds the
+[Publishing on GitHub Pages](github-pages.md); `pages.yml` adds the
 checks only this manual needs. The PDF footer's version stamp is worked out on
 the runner and passed in as `GRIMOIRE_VERSION` / `GRIMOIRE_COMMIT`, because the
 image has no git of its own. The pieces a reader needs are asserted - the landing

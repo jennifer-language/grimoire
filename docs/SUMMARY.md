@@ -10,6 +10,7 @@
 - [Markdown](markdown.md)
 - [Plugins](plugins.md)
 - [Themes](themes.md)
+- [Publishing on GitHub Pages](github-pages.md)
 
 # Reference
 
