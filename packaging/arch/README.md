@@ -22,9 +22,10 @@ send it looking for `/usr/src`.
 
 ## Building it
 
-The `source=` line points at a `v$pkgver` tag, and the checksum in the file is a
-deliberate placeholder - a wrong hash rather than `SKIP`, so a build that skips
-verification fails instead of passing quietly. Fill it in first:
+The `source=` line points at the `$pkgver` tag - plain semver, no `v` - and
+the checksum in the file is a deliberate placeholder: a wrong hash rather than
+`SKIP`, so a build that skips verification fails instead of passing quietly.
+Fill it in first:
 
 ```sh
 cd packaging/arch
@@ -54,10 +55,8 @@ name `jennifer`, which is what its binary is called. It is not in the official
 repositories, so the package resolves against whatever provides that name -
 check it before publishing, and adjust if upstream settles on something else.
 
-Note that **neither this package nor the one below installs today**: Grimoire
-requires Jennifer 0.25.0 and the current release is 0.24.0. Both are ready for
-the day it ships, which is the same day the `JENNIFER_TAG` in `Dockerfile` and
-`.github/workflows/pages.yml` goes back to `latest`.
+Both this package and the one below need Jennifer 0.25.0 or later, the first
+release Grimoire's sources run on.
 
 ## A VCS variant
 

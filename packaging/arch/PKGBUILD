@@ -1,7 +1,7 @@
 # Maintainer: mplx <jennifer@mplx.dev>
 
 pkgname=grimoire
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="Build a documentation website, and a printable PDF, from a directory of Markdown files"
 arch=('any')
@@ -11,7 +11,8 @@ license=('LGPL-3.0-only')
 # is a hard runtime dependency rather than a build one. The floor is the version
 # the `pragma-jennifer-version` line in every source file declares.
 depends=('jennifer>=0.25.0')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Releases are tagged in plain semver, `0.4.0` and never `v0.4.0`.
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$pkgver.tar.gz")
 # Replace with `updpkgsums` once the tag exists. The placeholder is deliberately
 # a wrong hash rather than SKIP, so an unverified build fails loudly.
 sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
