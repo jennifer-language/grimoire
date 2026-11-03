@@ -302,7 +302,7 @@ jobs:
 
           build apiref
           grep -q 'id="distance"' examples/apiref/site/reference.html
-          ! grep -q 'apiref src' examples/apiref/site/reference.html
+          if grep -q 'apiref src' examples/apiref/site/reference.html; then exit 1; fi
 
           build epub
           unzip -v examples/epub/site/field-guide.epub | grep mimetype | grep -q Stored
@@ -350,7 +350,7 @@ jobs:
           build emoji
           # The source is ASCII and the page is not: the shortcode is gone and
           # the character is there.
-          ! grep -q ':rocket:' examples/emoji/site/index.html
+          if grep -q ':rocket:' examples/emoji/site/index.html; then exit 1; fi
           grep -q "$(printf '\xf0\x9f\x9a\x80')" examples/emoji/site/index.html
           # A colon is punctuation long before it is markup.
           grep -q '10:30' examples/emoji/site/quiet.html
