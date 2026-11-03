@@ -107,6 +107,16 @@ on:
         description: Also build the tip of the default branch, published under `/dev/`.
         type: boolean
         default: false
+      prepare:
+        description: >-
+          A shell script run before each build, on the runner, in the checkout
+          that build reads - the place to generate pages, or to drop files under
+          the book's source that the build copies through as assets. `RELEASE`
+          is the release being built ("" for the default branch and a pull
+          request), `COMMIT` its short commit id ("" for a release), and
+          `IMAGE` the container. Non-zero fails the run.
+        type: string
+        default: ""
       check:
         description: >-
           A shell script run after the build, in the checkout the published book
@@ -131,6 +141,9 @@ jobs:
       BOOK_DIR: ${{ inputs.directory }}
       BUILD_ARGS: ${{ inputs.args }}
       PLUGINS: ${{ inputs.plugins }}
+      # Passed through the environment, like `check`, so nothing in an input is
+      # ever parsed as workflow syntax.
+      PREPARE: ${{ inputs.prepare }}
     steps:
       # Full history and every tag: the release is found among the tags, and
       # both builds are worktrees of commits a shallow clone would not have.
@@ -166,6 +179,13 @@ jobs:
           cat > "$RUNNER_TEMP/book.sh" <<'SH'
           set -eu
           src=$1 out=$2 version=$3 commit=$4
+          # The caller's `prepare` runs in the checkout this build reads, so
+          # what it generates is what this build sees - and a release build
+          # and the `dev` build each get their own.
+          if [ -n "$PREPARE" ]; then
+              (cd "$src" && RELEASE="$version" COMMIT="$commit" \
+                  bash -euxo pipefail -c "$PREPARE")
+          fi
           mkdir -p "$out"
           if [ -n "$LAUNCHER" ]; then
               set -- run "/work/$LAUNCHER" build

@@ -173,6 +173,7 @@ the published address, custom or not.
 | `args` | `""` | extra flags for `grimoire build`, such as `--pdf` |
 | `plugins` | `""` | `GRIMOIRE_PLUGINS`: third-party plugins the image carries, to switch on |
 | `dev` | `false` | also build the default branch, published under `/dev/` |
+| `prepare` | `""` | a shell script run before each build, in the checkout it reads |
 | `check` | `""` | a shell script that fails the run before anything is published |
 | `launcher` | `""` | a Grimoire launcher in the repository, run with a plain Jennifer `image` instead |
 
@@ -218,6 +219,38 @@ registry, and name it:
 
 `git` in the image is enough for the git-based plugins: the workflow checks out
 the full history, so `git log` sees every commit.
+
+### Generating pages before the build
+
+`prepare` (Grimoire 0.4.1 and later) is a shell script, run with
+`bash -euxo pipefail` on the runner before each build, in the checkout that
+build reads. It is for a book that is partly
+generated - an API reference built from the sources, a chapter assembled from
+several directories - and for files the site needs that are not written by the
+build: every non-Markdown file under the book's `src` is copied into the site,
+so a file the script puts there is published with it.
+
+```yaml
+      prepare: |
+        mkdir -p docs/reference
+        ./scripts/gen-reference.sh > docs/reference/api.md
+        cp assets/download.pdf docs/download.pdf
+```
+
+The runner is GitHub's `ubuntu-latest`, so `go`, `python3`, `git` and Docker are
+there; the build image is not, but the script can run it as `docker run ...
+"$IMAGE"`. With `dev: true` it runs once per build, in each one's own checkout.
+These are set:
+
+| Variable | |
+| -------- | - |
+| `RELEASE` | the release being built; empty for the default branch and a pull request |
+| `COMMIT` | the short commit id being built; empty for a release |
+| `IMAGE` | the container the book is built in |
+
+The script comes from the workflow that triggered the run, but it runs in the
+release's checkout: when a release is republished, it has to work against that
+release's files.
 
 ### Checks before publishing
 
