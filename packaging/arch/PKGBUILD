@@ -13,9 +13,10 @@ license=('LGPL-3.0-only')
 depends=('jennifer>=0.25.0')
 # Releases are tagged in plain semver, `0.4.0` and never `v0.4.0`.
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$pkgver.tar.gz")
-# Replace with `updpkgsums` once the tag exists. The placeholder is deliberately
-# a wrong hash rather than SKIP, so an unverified build fails loudly.
-sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+# Filled in by `updpkgsums` once the tag is pushed, since it is the hash of
+# GitHub's archive of that tag. A version bump resets it to a placeholder of
+# zeros - a wrong hash rather than SKIP, so an unverified build fails loudly.
+sha256sums=('98595be4f815f57bbbaa2b74e701909dcdba2f89548a99671d40db1504658acf')
 
 check() {
 	cd "$pkgname-$pkgver"

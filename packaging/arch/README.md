@@ -22,16 +22,27 @@ send it looking for `/usr/src`.
 
 ## Building it
 
-The `source=` line points at the `$pkgver` tag - plain semver, no `v` - and
-the checksum in the file is a deliberate placeholder: a wrong hash rather than
-`SKIP`, so a build that skips verification fails instead of passing quietly.
-Fill it in first:
+The `source=` line points at the `$pkgver` tag - plain semver, no `v` - and the
+checksum is the hash of GitHub's archive of that tag, so it can only be filled in
+once the tag is pushed. Between a version bump and that point it is a deliberate
+placeholder of zeros: a wrong hash rather than `SKIP`, so a build that skips
+verification fails instead of passing quietly.
+
+```sh
+cd packaging/arch
+makepkg -si
+```
+
+After tagging a release, fill it in and commit it:
 
 ```sh
 cd packaging/arch
 updpkgsums          # pacman-contrib
-makepkg -si
+git commit -m "arch: checksum for X.Y.Z" -- PKGBUILD
 ```
+
+A tag that is moved after that changes the archive, and the checksum has to be
+filled in again.
 
 `check()` runs `jennifer lint` over the sources and then builds the repository's
 own documentation with `--pdf`, asserting the HTML, the PDF, and the stylesheet
