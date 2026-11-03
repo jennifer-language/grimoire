@@ -45,8 +45,12 @@ jobs:
       packages: write
 
     steps:
+      # Every tag, because whether this one becomes `latest` depends on the
+      # others; a shallow checkout has none.
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Grimoire is interpreted source, so the image is the same bytes on every
       # architecture - but the base image is multi-arch, and emulation is what
@@ -83,6 +87,27 @@ jobs:
       # GHCR reads its description off the index, finds nothing there whatever the
       # per-platform configs say, and shows the README instead. The same metadata
       # has to arrive a second time, as an annotation on the index.
+      # `latest` is the newest stable release, as it is for the Jennifer image
+      # this one is built on, and `dev` is the tip of the default branch. So a
+      # tag push gets `latest` only when it is the highest plain-semver release
+      # - compared field by field, as `docs-pages.yml` compares them - and a
+      # patch to an older line, `0.3.5` after `0.4.0`, does not take it back.
+      - name: Decide whether this is the latest release
+        id: latest
+        run: |
+          set -eu
+          latest=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              highest=$(git tag --list |
+                  grep -E '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' |
+                  sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1 || true)
+              if [ "$GITHUB_REF_NAME" = "$highest" ]; then
+                  latest=true
+              fi
+              echo "tag $GITHUB_REF_NAME, highest release ${highest:-none}: latest=$latest"
+          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
       - name: Derive tags and labels
         id: meta
         uses: docker/metadata-action@v5
@@ -90,12 +115,18 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          # `latest=false` turns off the action's own `latest`, which it adds to
+          # every release tag pushed, newest or not; the step above decides
+          # instead. `main` stays beside `dev` for anyone already pulling it.
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ steps.latest.outputs.latest }}
+            type=raw,value=dev,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=Grimoire
             org.opencontainers.image.description=${{ env.DESCRIPTION }}
