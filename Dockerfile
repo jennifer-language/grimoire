@@ -16,15 +16,15 @@
 # With a plugin, which takes two decisions - the container's and the book's:
 #   docker run --rm -e GRIMOIRE_PLUGINS=epub -v "$PWD:/work" grimoire build
 
-# The base image tag: the 0.25 release line, the first Grimoire's sources run
-# on, so a 0.25.x patch release is picked up and nothing further.
+# The base image tag: an exact Jennifer release, the newest, so the interpreter
+# under an image only changes when this line does.
 #
-# Not `latest`: Jennifer's `latest` is currently the distroless `static` image -
-# the same digest as `static` and `0.25.0-static` - and that has no shell. This
-# image needs one twice, for the `RUN` that links and marks the launcher below
-# and for the entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
+# Not `latest`, which is the same release today and moves with the next one,
+# and not the distroless `static` variant either: this image needs a shell
+# twice, for the `RUN` that links and marks the launcher below and for the
+# entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
 # `#!/usr/bin/env jennifer` needs `env`.
-ARG JENNIFER_TAG=0.25
+ARG JENNIFER_TAG=0.25.0
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
 # The registry shows `description` on the package page, so it says how to run the

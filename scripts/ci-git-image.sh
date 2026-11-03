@@ -18,7 +18,7 @@
 set -eu
 
 tag=${1:-jennifer-git:test}
-base=${2:-${JENNIFER_TAG:-0.25}}
+base=${2:-${JENNIFER_TAG:-0.25.0}}
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

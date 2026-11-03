@@ -22,7 +22,7 @@
 # command - which is how CI runs these inside the official image without
 # installing an interpreter on the runner:
 #
-#   JENNIFER="docker run --rm -v $PWD:/work ghcr.io/jennifer-language/jennifer:0.25" \
+#   JENNIFER="docker run --rm -v $PWD:/work ghcr.io/jennifer-language/jennifer:0.25.0" \
 #       scripts/test.sh
 
 set -eu
