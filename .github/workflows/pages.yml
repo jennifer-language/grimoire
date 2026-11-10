@@ -29,6 +29,8 @@ permissions:
 
 jobs:
   pages:
+    # Publishes to GitHub; skipped on the project's Forgejo, which runs this too.
+    if: github.server_url == 'https://github.com'
     permissions:
       contents: read
       pages: write
