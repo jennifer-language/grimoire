@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * White-box tests for `epub.j`, run by `jennifer test epub_test.j`.
@@ -26,7 +26,7 @@ func bookTree() {
     fs.writeString(
         path.join($root, "src/guide/syntax.md"),
         "# Syntax\n\n![logo](../img/logo.png)\n");
-    fs.writeBytes(path.join($root, "src/img/logo.png"), convert.bytesFromString("PNG", "utf-8"));
+    fs.writeBytes(path.join($root, "src/img/logo.png"), convert.bytesFromString("utf-8", "PNG"));
     return $root;
 }
 
@@ -46,7 +46,7 @@ func requestFor(root as string) {
 }
 
 func digestOf(data as bytes) {
-    return encoding.toText(hash.compute($data, "sha256"), "hex");
+    return encoding.toText("hex", hash.compute("sha256", $data));
 }
 
 func testLittleEndianFieldsAreWrittenLowByteFirst() {
@@ -75,9 +75,9 @@ func testTheArchiveOpensWithAStoredMimetype() {
     # Bytes 8 and 9 are the compression method: 0 is stored, 8 is deflate.
     testing.assertEqual($z[8], 0);
     testing.assertEqual($z[9], 0);
-    testing.assertEqual(convert.stringFromBytes(binary.slice($z, 30, 38), "utf-8"), "mimetype");
+    testing.assertEqual(convert.stringFromBytes("utf-8", binary.slice($z, 30, 38)), "mimetype");
     testing.assertEqual(
-        convert.stringFromBytes(binary.slice($z, 38, 38 + len(MIMETYPE)), "utf-8"),
+        convert.stringFromBytes("utf-8", binary.slice($z, 38, 38 + len(MIMETYPE))),
         MIMETYPE);
 }
 

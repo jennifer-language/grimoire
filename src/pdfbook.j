@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * The printable build: the whole book as one paginated PDF, laid out by the
@@ -29,6 +29,7 @@ use time;
 use encoding;
 
 import "markdown.j" as markdown;
+import "doctree.j" as doctree;
 import "pdf.j" as pdf;
 import "./config.j" as config;
 import "./locale.j" as locale;
@@ -264,7 +265,7 @@ def const TRANSLITERATIONS as map of string to string init {
 # encodable reports whether the PDF font encoding can carry the whole string.
 func encodable(s as string) {
     try {
-        def probe as bytes init encoding.encode($s, CODEC);
+        def probe as bytes init encoding.encode(CODEC, $s);
         return len($probe) >= 0;
     } catch (e) {
         return false;
@@ -756,14 +757,14 @@ def const PDF_CREDIT as string init "Made with Grimoire - " + GRIMOIRE_URL;
 # fillOf turns a palette colour into a layout fill.
 func fillOf(hex as string) {
     def c as palette.Rgb init palette.parseHex($hex);
-    return markdown.rgb($c.r, $c.g, $c.b);
+    return doctree.rgb($c.r, $c.g, $c.b);
 }
 
 # tintOf turns a palette colour into a fill mixed toward white, for a bar that
 # has to sit behind black text.
 func tintOf(hex as string, percent as int) {
     def c as palette.Rgb init palette.tint(palette.parseHex($hex), $percent);
-    return markdown.rgb($c.r, $c.g, $c.b);
+    return doctree.rgb($c.r, $c.g, $c.b);
 }
 
 # options builds the layout options: the configured paper size, tighter margins
@@ -779,14 +780,14 @@ func tintOf(hex as string, percent as int) {
  * heading and table fills, and the document metadata. Exported so a build can be
  * timed phase by phase without reaching into the module.
  * @param c {config.Config} the book configuration
- * @return {markdown.PdfOptions} the layout options
+ * @return {doctree.PdfOptions} the layout options
  */
 export func pdfOptions(c as config.Config) {
     return options($c);
 }
 
 func options(c as config.Config) {
-    def opts as markdown.PdfOptions init markdown.pdfDefaults();
+    def opts as doctree.PdfOptions init doctree.pdfDefaults();
     $opts.imageDpi = $c.pdfImageDpi;
     $opts.pageWidth = A4_WIDTH;
     $opts.pageHeight = A4_HEIGHT;
@@ -800,12 +801,12 @@ func options(c as config.Config) {
     def light as palette.Palette init theme.byName($c.theme).light;
     $opts.tableHeaderFill = fillOf($light.surfaceAlt);
     $opts.headingStyles = [
-        markdown.headingStyle(tintOf($light.accent, 22)),
-        markdown.headingStyle(tintOf($light.accent, 12)),
-        markdown.headingStyle(tintOf($light.accent, 6)),
-        markdown.headingStyle(fillOf($light.surface)),
-        markdown.headingStyle(markdown.noFill()),
-        markdown.headingStyle(markdown.noFill())
+        doctree.headingStyle(tintOf($light.accent, 22)),
+        doctree.headingStyle(tintOf($light.accent, 12)),
+        doctree.headingStyle(tintOf($light.accent, 6)),
+        doctree.headingStyle(fillOf($light.surface)),
+        doctree.headingStyle(doctree.noFill()),
+        doctree.headingStyle(doctree.noFill())
     ];
     # A blockquote gets a tinted panel and an accent bar down its left edge, and a
     # code block a panel with a hairline. Both are the theme's own colours, and
@@ -1039,7 +1040,7 @@ func pictures(c as config.Config, md as string) {
  */
 export func render(c as config.Config, entries as list of summary.Entry) {
     def book as string init combine($c, $entries);
-    def opts as markdown.PdfOptions init options($c);
+    def opts as doctree.PdfOptions init options($c);
     $opts.images = pictures($c, $book);
-    return pdf.render(footer($c, markdown.renderPdfDoc(markdown.parse($book), $opts)));
+    return pdf.render(footer($c, doctree.renderPdfDoc(markdown.parse($book), $opts)));
 }

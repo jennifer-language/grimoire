@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * An EPUB of the book, built from the same outline as the site.
@@ -74,7 +74,7 @@ func fail(message as string) {
 }
 
 func bytesOf(text as string) {
-    return convert.bytesFromString($text, "utf-8");
+    return convert.bytesFromString("utf-8", $text);
 }
 
 # --- the archive -----------------------------------------------------
@@ -98,7 +98,7 @@ func le32(n as int) {
 
 # `crc.compute` hands back the checksum big-endian; a zip field wants the number.
 func crcOf(data as bytes) {
-    def sum as bytes init crc.compute($data, "crc32");
+    def sum as bytes init crc.compute("crc32", $data);
     return ($sum[0] << 24) + ($sum[1] << 16) + ($sum[2] << 8) + $sum[3];
 }
 
@@ -409,8 +409,8 @@ img { max-width: 100%; }
 # gives the same answer every time and a different one for a different book.
 func identifier(title as string, lang as string) {
     def digest as string init encoding.toText(
-        hash.compute(bytesOf($title + "/" + $lang), "sha256"),
-        "hex");
+        "hex",
+        hash.compute("sha256", bytesOf($title + "/" + $lang)));
     return "urn:uuid:" + strings.substring($digest, 0, 8) + "-" +
         strings.substring($digest, 8, 12) + "-5" + strings.substring($digest, 13, 16) + "-a" +
         strings.substring($digest, 17, 20) + "-" + strings.substring($digest, 20, 32);
