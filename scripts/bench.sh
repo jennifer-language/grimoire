@@ -22,7 +22,7 @@
 #   pdf         `grimoire pdf`: the outline, one parse of the whole book, the
 #               layout, and the file. No HTML, no assets, no search index.
 #   full-jN     `grimoire build --pdf`, which is what a release does.
-#   modules     scripts/bench-md.j: markdown.parse, markdown.renderPdfDoc and
+#   modules     scripts/bench-md.j: markdown.parse, doctree.renderPdfDoc and
 #               pdf.render over the same corpus with no Grimoire around them, so
 #               that a change in the libraries can be told from one in the tool.
 #

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * White-box tests for `content.j`, run by `jennifer test src/content_test.j`.
@@ -134,9 +134,9 @@ func testAnOrdinaryTitleIsStillMarkdown() {
 # The cycle itself, at the node that closed it: an `item` reaches both renderers
 # and neither may hand it back to the other.
 func testANodeNeitherRendererKnowsDescendsInstead() {
-    def doc as markdown.Node init markdown.parse("1. A");
-    def blocks as list of markdown.Node init markdown.children($doc);
-    def item as markdown.Node init markdown.children($blocks[0])[0];
+    def doc as doctree.Node init markdown.parse("1. A");
+    def blocks as list of doctree.Node init doctree.children($doc);
+    def item as doctree.Node init doctree.children($blocks[0])[0];
     testing.assertEqual(renderSpan($item), "A");
     testing.assertEqual(renderBlock($item, false, false), "A");
 }
@@ -551,7 +551,7 @@ func testAPageWithoutCalloutsIsItsProse() {
 }
 
 # What a container's children are worth to the search index: separate words.
-# `markdown.text` concatenates a subtree with nothing between the parts, which is
+# `doctree.text` concatenates a subtree with nothing between the parts, which is
 # right inside a paragraph and wrong for a table - a manual's configuration table
 # went into the index as `KeyTypeDefaultMeaning`, where the first word of every
 # cell could never match at a word boundary.
@@ -848,10 +848,10 @@ func namedTypes() {
     ];
 }
 
-func typesIn(n as markdown.Node, found as map of string to int) {
+func typesIn(n as doctree.Node, found as map of string to int) {
     def out as map of string to int init $found;
-    $out[markdown.typeOf($n)] = 1;
-    for (def child in markdown.children($n)) {
+    $out[doctree.typeOf($n)] = 1;
+    for (def child in doctree.children($n)) {
         $out = typesIn($child, $out);
     }
     return $out;
@@ -879,10 +879,10 @@ func testEveryTypeTheParserProducesIsNamedHere() {
 func testBothRenderersReturnForEveryType() {
     def none as map of string to int;
     def found as map of string to int init typesIn(markdown.parse(everySyntax()), $none);
-    def seen as list of markdown.Node init nodesOf(markdown.parse(everySyntax()));
+    def seen as list of doctree.Node init nodesOf(markdown.parse(everySyntax()));
     def count as int init 0;
     for (def n in $seen) {
-        if (markdown.typeOf($n) == "document") {
+        if (doctree.typeOf($n) == "document") {
             continue;
         }
         renderSpan($n);
@@ -894,9 +894,9 @@ func testBothRenderersReturnForEveryType() {
     testing.assertTrue(len(maps.keys($found)) > 20);
 }
 
-func nodesOf(n as markdown.Node) {
-    def out as list of markdown.Node init [$n];
-    for (def child in markdown.children($n)) {
+func nodesOf(n as doctree.Node) {
+    def out as list of doctree.Node init [$n];
+    for (def child in doctree.children($n)) {
         for (def deeper in nodesOf($child)) {
             $out[] = $deeper;
         }

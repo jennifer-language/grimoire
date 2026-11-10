@@ -311,7 +311,7 @@ do not:
 
 One thing the printable build cannot do: running headers and a "page N of M"
 footer. `pdf.setHeader` / `setFooter` and the `%page%` / `%pages%` placeholders
-exist, but `markdown.renderPdf` returns bytes rather than a `pdf.Document`, so
+exist, but `doctree.renderPdf` returns bytes rather than a `pdf.Document`, so
 the document-level hooks are out of reach from the Markdown path. Having them
 would mean Grimoire laying the book out page by page itself.
 

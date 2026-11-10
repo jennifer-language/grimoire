@@ -16,7 +16,7 @@ Pick whichever fits:
 
 ## Requirements
 
-**Jennifer 0.25.0 or newer.** `build`, `pdf`, `init`, and `themes` run on both
+**Jennifer 0.26.0 or newer.** `build`, `pdf`, `init`, and `themes` run on both
 the default binary and `jennifer-tiny`; `serve` needs the default binary, since
 `jennifer-tiny` stubs `httpd`.
 
@@ -107,7 +107,7 @@ with a sidecar `.sha256`:
 | `grimoire-VERSION-1-any.pkg.tar.zst` | Arch Linux, with the `PKGBUILD` it was built from |
 | `grimoire-VERSION.tar.gz` | anywhere else: the runtime tree, to unpack and run in place |
 
-All of them need Jennifer 0.25.0 or later. Grimoire is architecture-independent
+All of them need Jennifer 0.26.0 or later. Grimoire is architecture-independent
 source, so one package of each kind serves every platform the interpreter runs
 on.
 

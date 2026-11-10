@@ -41,8 +41,9 @@ manual = "https://grimoire.jennifer-lang.dev/"
 [engines]
 # The floor every source file in this repository declares in its own header
 # pragma. Grimoire uses the read-only parameter borrow that arrived during the
-# 0.24 series and the module surface as it settled for 0.25.
-jennifer = ">=0.25.0"
+# 0.24 series, the module surface as it settled for 0.25, and the doctree
+# module (the document tree and PDF renderer split out of markdown) of 0.26.
+jennifer = ">=0.26.0"
 
 # No [decks] table: Grimoire depends on no other deck. Everything it imports -
 # args, html, markdown, pdf - is a system library that ships with the

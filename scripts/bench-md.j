@@ -1,7 +1,7 @@
 #!/usr/bin/env -S jennifer run
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * Time the `markdown` and `pdf` modules over a directory of Markdown, with no
@@ -13,7 +13,7 @@
  * result file; it is a separate program because the question it answers is a
  * different one. A `grimoire build` measures Grimoire: reading files, walking
  * the tree, highlighting, the search index, writing output. This measures the
- * three library calls underneath - `markdown.parse`, `markdown.renderPdfDoc`,
+ * three library calls underneath - `markdown.parse`, `doctree.renderPdfDoc`,
  * `pdf.render` - so a change in the modules can be told apart from a change in
  * the tool.
  *
@@ -38,6 +38,7 @@ use convert;
 use time;
 
 import "markdown.j" as markdown;
+import "doctree.j" as doctree;
 import "pdf.j" as pdf;
 
 # What separates two chapters in the assembled book, and what `pdfbook` uses. A
@@ -217,10 +218,10 @@ for (def rep in 1..$reps + 1) {
 
     if ($withPdf) {
         def at as int init now();
-        def tree as markdown.Node init markdown.parse($book);
+        def tree as doctree.Node init markdown.parse($book);
         record("md", $rep, "pdfparse_us", now() - $at);
         def laid as int init now();
-        def doc as pdf.Document init markdown.renderPdfDoc($tree, markdown.pdfDefaults());
+        def doc as pdf.Document init doctree.renderPdfDoc($tree, doctree.pdfDefaults());
         record("md", $rep, "pdflayout_us", now() - $laid);
         def emitted as int init now();
         def size as int init len(pdf.render($doc));

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * The Markdown-to-HTML renderer. It walks the `markdown` module's document tree
@@ -45,6 +45,7 @@ use lists;
 use maps;
 
 import "markdown.j" as markdown;
+import "doctree.j" as doctree;
 import "html.j" as html;
 import "./highlight.j" as highlight;
 import "./util.j" as util;
@@ -120,7 +121,7 @@ func href(url as string) {
 # Every accumulation below collects into a list and joins once. Appending to a
 # Jennifer string reallocates it, so a `$out = $out + piece` loop over a long
 # chapter is quadratic in the size of the output.
-func renderInline(nodes as list of markdown.Node) {
+func renderInline(nodes as list of doctree.Node) {
     def out as list of string;
     for (def n in $nodes) {
         $out[] = renderSpan($n);
@@ -140,18 +141,18 @@ func renderInline(nodes as list of markdown.Node) {
 # interpreter stops the build at ten thousand frames, with a message about
 # recursion and nothing about the book. A list `item` is such a type, reached
 # through an outline title that begins with an ordered-list marker.
-func contentOf(n as markdown.Node) {
-    def kids as list of markdown.Node init markdown.children($n);
+func contentOf(n as doctree.Node) {
+    def kids as list of doctree.Node init doctree.children($n);
     if (len($kids) == 0) {
-        return html.escape(markdown.text($n));
+        return html.escape(doctree.text($n));
     }
     return renderInline($kids);
 }
 
-func renderSpan(n as markdown.Node) {
-    match (markdown.typeOf($n)) {
-        when "text" { return html.escape(markdown.text($n)); }
-        when "codespan" { return "<code>" + html.escape(markdown.text($n)) + "</code>"; }
+func renderSpan(n as doctree.Node) {
+    match (doctree.typeOf($n)) {
+        when "text" { return html.escape(doctree.text($n)); }
+        when "codespan" { return "<code>" + html.escape(doctree.text($n)) + "</code>"; }
         when "strong" { return "<strong>" + contentOf($n) + "</strong>"; }
         when "emphasis" { return "<em>" + contentOf($n) + "</em>"; }
         # Each is the element the syntax means rather than the one it looks
@@ -162,25 +163,25 @@ func renderSpan(n as markdown.Node) {
         when "subscript" { return "<sub>" + contentOf($n) + "</sub>"; }
         when "superscript" { return "<sup>" + contentOf($n) + "</sup>"; }
         when "link" {
-            def title as string init markdown.attr($n, "title");
+            def title as string init doctree.attr($n, "title");
             def extra as string init classOf($n);
             if ($title != "") {
                 $extra = $extra + ' title="' + attrEsc($title) + '"';
             }
-            if (util.isExternal(markdown.attr($n, "href"))) {
+            if (util.isExternal(doctree.attr($n, "href"))) {
                 $extra = $extra + ' rel="noopener noreferrer"';
             }
-            return '<a href="' + attrEsc(href(markdown.attr($n, "href"))) + '"' + $extra + ">" +
+            return '<a href="' + attrEsc(href(doctree.attr($n, "href"))) + '"' + $extra + ">" +
                 contentOf($n) + "</a>";
         }
         when "image" {
-            def alt as string init attrEsc(markdown.text($n));
-            def title as string init markdown.attr($n, "title");
+            def alt as string init attrEsc(doctree.text($n));
+            def title as string init doctree.attr($n, "title");
             def extra as string init classOf($n);
             if ($title != "") {
                 $extra = $extra + ' title="' + attrEsc($title) + '"';
             }
-            return '<img src="' + attrEsc(href(markdown.attr($n, "url"))) + '" alt="' + $alt +
+            return '<img src="' + attrEsc(href(doctree.attr($n, "url"))) + '" alt="' + $alt +
                 '" loading="lazy"' + $extra + ">";
         }
         # A block that turned up in inline position - a nested list, or the
@@ -207,8 +208,8 @@ func renderSpan(n as markdown.Node) {
  * @return {string} the inline HTML
  */
 export func inline(text as string) {
-    def doc as markdown.Node init markdown.parse($text);
-    def kids as list of markdown.Node init markdown.children($doc);
+    def doc as doctree.Node init markdown.parse($text);
+    def kids as list of doctree.Node init doctree.children($doc);
     # A title is inline text, and `markdown.parse` reads blocks. When it made
     # anything but one paragraph - a list, because `1. Peripherals` opens one; a
     # heading, because `# ` does; a fence, a quote - the block reading is not what
@@ -217,10 +218,10 @@ export func inline(text as string) {
     # Numbered outlines are the reason this matters: `- [7. Tapes](tapes.md)` is
     # how a reference manual writes its outline, and read as a block it is a list
     # whose item text has lost the number.
-    if (len($kids) != 1 or markdown.typeOf($kids[0]) != "paragraph") {
+    if (len($kids) != 1 or doctree.typeOf($kids[0]) != "paragraph") {
         return html.escape($text);
     }
-    return renderInline(markdown.children($kids[0]));
+    return renderInline(doctree.children($kids[0]));
 }
 
 # --- block rendering -----------------------------------------------
@@ -228,29 +229,29 @@ export func inline(text as string) {
 # A task list item: the checkbox a reader cannot tick, because a page is not a
 # form. `disabled` is what makes that plain to a screen reader as well, and the
 # class is what the stylesheet hangs the missing bullet on.
-func renderTask(item as markdown.Node) {
+func renderTask(item as doctree.Node) {
     def box as string init '<input type="checkbox" disabled';
-    if (markdown.attr($item, "checked") == "true") {
+    if (doctree.attr($item, "checked") == "true") {
         $box = $box + " checked";
     }
     return '<li class="gr-task">' + $box + "> " +
-        renderInline(markdown.children($item)) + "</li>";
+        renderInline(doctree.children($item)) + "</li>";
 }
 
-func renderList(n as markdown.Node) {
+func renderList(n as doctree.Node) {
     def tag as string init "ul";
-    if (markdown.attr($n, "ordered") == "true") {
+    if (doctree.attr($n, "ordered") == "true") {
         $tag = "ol";
     }
     def out as list of string init ["<" + $tag + ">"];
     def tasks as bool init false;
-    for (def item in markdown.children($n)) {
-        if (markdown.attr($item, "task") == "true") {
+    for (def item in doctree.children($n)) {
+        if (doctree.attr($item, "task") == "true") {
             $out[] = renderTask($item);
             $tasks = true;
             continue;
         }
-        $out[] = "<li>" + renderInline(markdown.children($item)) + "</li>";
+        $out[] = "<li>" + renderInline(doctree.children($item)) + "</li>";
     }
     $out[] = "</" + $tag + ">";
     if ($tasks) {
@@ -264,42 +265,42 @@ func renderList(n as markdown.Node) {
 # A definition list: a term, and what it means. The parser hands the terms and
 # the descriptions back as siblings, in document order, so this is a walk rather
 # than a pairing.
-func renderDefinitions(n as markdown.Node) {
+func renderDefinitions(n as doctree.Node) {
     def out as list of string init ["<dl>"];
-    for (def child in markdown.children($n)) {
-        if (markdown.typeOf($child) == "def_term") {
-            $out[] = "<dt>" + renderInline(markdown.children($child)) + "</dt>";
+    for (def child in doctree.children($n)) {
+        if (doctree.typeOf($child) == "def_term") {
+            $out[] = "<dt>" + renderInline(doctree.children($child)) + "</dt>";
             continue;
         }
-        $out[] = "<dd>" + renderInline(markdown.children($child)) + "</dd>";
+        $out[] = "<dd>" + renderInline(doctree.children($child)) + "</dd>";
     }
     $out[] = "</dl>";
     return strings.join($out, "");
 }
 
-func renderRow(row as markdown.Node, cellTag as string) {
+func renderRow(row as doctree.Node, cellTag as string) {
     def out as list of string init ["<tr>"];
-    for (def cell in markdown.children($row)) {
+    for (def cell in doctree.children($row)) {
         # Only the two alignments the stylesheet has a rule for are emitted.
         # Testing for what is *wanted* rather than excluding what is not is what
         # keeps this quiet when the `markdown` module changes its mind about how
         # an unaligned cell is spelled: it reported "" once and reports "none"
         # now, and the exclusion list had put `data-align="none"` on every cell
         # of every table in the book.
-        def align as string init markdown.attr($cell, "align");
+        def align as string init doctree.attr($cell, "align");
         def attrs as string init "";
         if ($align == "right" or $align == "center") {
             $attrs = ' data-align="' + $align + '"';
         }
-        $out[] = "<" + $cellTag + $attrs + ">" + renderInline(markdown.children($cell)) +
+        $out[] = "<" + $cellTag + $attrs + ">" + renderInline(doctree.children($cell)) +
             "</" + $cellTag + ">";
     }
     $out[] = "</tr>";
     return strings.join($out, "");
 }
 
-func renderTable(n as markdown.Node) {
-    def rows as list of markdown.Node init markdown.children($n);
+func renderTable(n as doctree.Node) {
+    def rows as list of doctree.Node init doctree.children($n);
     if (len($rows) == 0) {
         return "";
     }
@@ -348,9 +349,9 @@ func titleOf(info as string) {
     return strings.substring($rest, 0, $stop);
 }
 
-func renderCode(n as markdown.Node, highlighting as bool) {
-    def lang as string init strings.trim(markdown.attr($n, "lang"));
-    def code as string init markdown.text($n);
+func renderCode(n as doctree.Node, highlighting as bool) {
+    def lang as string init strings.trim(doctree.attr($n, "lang"));
+    def code as string init doctree.text($n);
     def label as string init "";
     def classes as list of string;
     if ($lang != "") {
@@ -361,7 +362,7 @@ func renderCode(n as markdown.Node, highlighting as bool) {
     # is the one thing a reader needs that the code cannot say itself. It replaces
     # the language chip rather than joining it: both in one corner is noise, and a
     # file name already says what language it is.
-    def named as string init titleOf(markdown.attr($n, "info"));
+    def named as string init titleOf(doctree.attr($n, "info"));
     if ($named != "") {
         $label = '<span class="gr-lang">' + html.escape($named) + "</span>";
     }
@@ -388,9 +389,9 @@ func renderCode(n as markdown.Node, highlighting as bool) {
 # the marker carried a title (`> [!NOTE] Mind the gap`). A title is the author's
 # text, so it is used as written and marked so the sheet does not set it in the
 # small capitals a standing label gets.
-func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool) {
-    def kind as string init markdown.attr($n, "kind");
-    def title as string init markdown.attr($n, "title");
+func renderAdmonition(n as doctree.Node, highlighting as bool, rawHtml as bool) {
+    def kind as string init doctree.attr($n, "kind");
+    def title as string init doctree.attr($n, "title");
     def label as string init locale.admonitionLabel($kind);
     def labelClass as string init "gr-adm-label";
     if ($title != "") {
@@ -401,7 +402,7 @@ func renderAdmonition(n as markdown.Node, highlighting as bool, rawHtml as bool)
         '<div class="gr-adm gr-adm-' + attrEsc($kind) + '" role="note">',
         '<p class="' + $labelClass + '">' + html.escape($label) + "</p>"
     ];
-    for (def child in markdown.children($n)) {
+    for (def child in doctree.children($n)) {
         $out[] = renderBlock($child, $highlighting, $rawHtml);
     }
     $out[] = "</div>";
@@ -421,7 +422,7 @@ def const NESTS_BLOCKS as list of string init [
 ];
 
 # titlesIn collects the title of every callout at or below a node, in document
-# order. A title is an attribute rather than a child, so `markdown.text` walks
+# order. A title is an attribute rather than a child, so `doctree.text` walks
 # past it, and words printed on the page would be unfindable by the search that
 # indexes that page.
 #
@@ -429,17 +430,17 @@ def const NESTS_BLOCKS as list of string init [
 # that cannot hold a block: a paragraph's children are inline, a code block is
 # text. It visits the container nodes and nothing else, which is less of the tree
 # than the text walk beside it.
-func titlesIn(n as markdown.Node) {
-    def kind as string init markdown.typeOf($n);
+func titlesIn(n as doctree.Node) {
+    def kind as string init doctree.typeOf($n);
     def parts as list of string;
     if ($kind == "admonition") {
-        def title as string init markdown.attr($n, "title");
+        def title as string init doctree.attr($n, "title");
         if ($title != "") {
             $parts[] = $title;
         }
     }
     if (lists.contains(NESTS_BLOCKS, $kind)) {
-        for (def child in markdown.children($n)) {
+        for (def child in doctree.children($n)) {
             def inner as string init titlesIn($child);
             if ($inner != "") {
                 $parts[] = $inner;
@@ -452,7 +453,7 @@ func titlesIn(n as markdown.Node) {
 # The blocks whose children are separate pieces of prose rather than one run of
 # it: a cell is not the next cell, an item is not the next item.
 #
-# `markdown.text` concatenates a subtree with nothing between the parts, which is
+# `doctree.text` concatenates a subtree with nothing between the parts, which is
 # right inside a paragraph - `**bold**word` is one word - and wrong for every one
 # of these. A table went into the search index as `KeyTypeDefaultMeaning`, so the
 # first word of each cell could never match at a word boundary and the index was
@@ -472,12 +473,12 @@ def const JOINED as list of string init [
 
 # flatText is a block's prose for the search index: one run for a paragraph or a
 # leaf, and the children joined by a space for anything in `JOINED`.
-func flatText(n as markdown.Node) {
-    if (not lists.contains(JOINED, markdown.typeOf($n))) {
-        return markdown.text($n);
+func flatText(n as doctree.Node) {
+    if (not lists.contains(JOINED, doctree.typeOf($n))) {
+        return doctree.text($n);
     }
     def parts as list of string;
-    for (def child in markdown.children($n)) {
+    for (def child in doctree.children($n)) {
         def piece as string init flatText($child);
         if ($piece != "") {
             $parts[] = $piece;
@@ -493,7 +494,7 @@ func flatText(n as markdown.Node) {
 #
 # The titles lead, because the body is truncated to `searchBodyChars` and a title
 # at its own position could be cut off the end of the section it announces.
-func indexText(n as markdown.Node) {
+func indexText(n as doctree.Node) {
     def titles as string init titlesIn($n);
     if ($titles == "") {
         return flatText($n);
@@ -501,9 +502,9 @@ func indexText(n as markdown.Node) {
     return $titles + " " + flatText($n);
 }
 
-func renderQuote(n as markdown.Node, highlighting as bool, rawHtml as bool) {
+func renderQuote(n as doctree.Node, highlighting as bool, rawHtml as bool) {
     def out as list of string init ["<blockquote>"];
-    for (def child in markdown.children($n)) {
+    for (def child in doctree.children($n)) {
         $out[] = renderBlock($child, $highlighting, $rawHtml);
     }
     $out[] = "</blockquote>";
@@ -512,12 +513,12 @@ func renderQuote(n as markdown.Node, highlighting as bool, rawHtml as bool) {
 
 # renderBlock covers every block kind except a top-level heading, which the page
 # walk handles itself so it can attach the anchor id it assigned.
-func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
-    match (markdown.typeOf($n)) {
-        when "paragraph" { return "<p>" + renderInline(markdown.children($n)) + "</p>"; }
+func renderBlock(n as doctree.Node, highlighting as bool, rawHtml as bool) {
+    match (doctree.typeOf($n)) {
+        when "paragraph" { return "<p>" + renderInline(doctree.children($n)) + "</p>"; }
         when "heading" {
-            def level as string init convert.toString(markdown.level($n));
-            return "<h" + $level + ">" + renderInline(markdown.children($n)) + "</h" + $level + ">";
+            def level as string init convert.toString(doctree.level($n));
+            return "<h" + $level + ">" + renderInline(doctree.children($n)) + "</h" + $level + ">";
         }
         when "code" { return renderCode($n, $highlighting); }
         when "list" { return renderList($n); }
@@ -540,13 +541,13 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
         # escapes like any other text.
         when "html_block" {
             if ($rawHtml) {
-                return markdown.text($n);
+                return doctree.text($n);
             }
-            return "<p>" + html.escape(markdown.text($n)) + "</p>";
+            return "<p>" + html.escape(doctree.text($n)) + "</p>";
         }
         # A page-break directive is print-only and has nothing to draw here.
         when "page_break" { return ""; }
-        when "text" { return html.escape(markdown.text($n)); }
+        when "text" { return html.escape(doctree.text($n)); }
         when "codespan" { return renderSpan($n); }
         when "strong" { return renderSpan($n); }
         when "emphasis" { return renderSpan($n); }
@@ -563,8 +564,8 @@ func renderBlock(n as markdown.Node, highlighting as bool, rawHtml as bool) {
 # link - markup that runs. A class is styling, and styling is what the syntax is
 # for; anything else a book needs it can write as an HTML block, where the rule is
 # already `[html] rawHtml` and the author's own decision.
-func classOf(n as markdown.Node) {
-    def names as string init strings.trim(markdown.attr($n, "class"));
+func classOf(n as doctree.Node) {
+    def names as string init strings.trim(doctree.attr($n, "class"));
     if ($names == "") {
         return "";
     }
@@ -577,10 +578,10 @@ func anchorLink(id as string) {
         '" aria-hidden="true" tabindex="-1">#</a>';
 }
 
-func renderHeading(n as markdown.Node, id as string) {
-    def level as string init convert.toString(markdown.level($n));
+func renderHeading(n as doctree.Node, id as string) {
+    def level as string init convert.toString(doctree.level($n));
     return "<h" + $level + ' id="' + attrEsc($id) + '">' + anchorLink($id) +
-        renderInline(markdown.children($n)) + "</h" + $level + ">";
+        renderInline(doctree.children($n)) + "</h" + $level + ">";
 }
 
 # --- the page walk -------------------------------------------------
@@ -598,7 +599,7 @@ func renderHeading(n as markdown.Node, id as string) {
  * @throws {Error} kind "markdown" when the document is too deep or too large
  */
 export func render(md as string, highlighting as bool, rawHtml as bool) {
-    def doc as markdown.Node init markdown.parse($md);
+    def doc as doctree.Node init markdown.parse($md);
     def out as list of string;
     def headings as list of Heading;
     def sections as list of Section;
@@ -607,8 +608,8 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
     def anchor as string init "";
     def sectionHeading as string init "";
     def buffer as list of string;
-    for (def node in markdown.children($doc)) {
-        def kind as string init markdown.typeOf($node);
+    for (def node in doctree.children($doc)) {
+        def kind as string init doctree.typeOf($node);
         if ($kind != "heading") {
             $out[] = renderBlock($node, $highlighting, $rawHtml);
             # Raw markup and a rule are both structure rather than prose, so
@@ -622,7 +623,7 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
             }
             continue;
         }
-        def text as string init util.squeeze(markdown.text($node));
+        def text as string init util.squeeze(doctree.text($node));
         def base as string init util.slugify($text);
         def id as string init util.uniqueSlug($seen, $base);
         # Counted in place rather than through `util.remember`, which hands back a
@@ -643,7 +644,7 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
         #
         # It goes through `slugify` too: an id reaches an attribute and a URL
         # fragment, and a book that writes `{#my anchor}` means one word.
-        def named as string init strings.trim(markdown.attr($node, "id"));
+        def named as string init strings.trim(doctree.attr($node, "id"));
         if ($named != "") {
             $id = util.slugify($named);
             # Counted as well, or a later heading whose own slug happens to be
@@ -655,8 +656,8 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
                 $seen[$id] = 1;
             }
         }
-        $headings[] = Heading{level: markdown.level($node), text: $text, id: $id};
-        if ($title == "" and markdown.level($node) == 1) {
+        $headings[] = Heading{level: doctree.level($node), text: $text, id: $id};
+        if ($title == "" and doctree.level($node) == 1) {
             $title = $text;
         }
         # Close the section the previous heading opened before starting the next.

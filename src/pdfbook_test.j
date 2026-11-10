@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * White-box tests for `pdfbook.j`, run by `jennifer test src/pdfbook_test.j`.
@@ -298,9 +298,9 @@ func testPrintLineRewritesEveryLinkOnALine() {
 # bytes.
 func tinyPng() {
     return encoding.fromText(
+        "base64",
         "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEElEQVR4nGNgOMCAHQ0tCQDB" +
-            "1jAB4smq5AAAAABJRU5ErkJggg==",
-        "base64");
+            "1jAB4smq5AAAAABJRU5ErkJggg==");
 }
 
 func testImageTargetsReadsInOrder() {

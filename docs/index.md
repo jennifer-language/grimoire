@@ -122,7 +122,7 @@ default, and a `logo` or `favicon` given as a URL.
 
 ## Requirements
 
-Jennifer 0.25.0 or newer - or nothing at all beyond a container runtime.
+Jennifer 0.26.0 or newer - or nothing at all beyond a container runtime.
 [Installation](installation.md) has both paths, including which of the two
 interpreter binaries runs which commands.
 

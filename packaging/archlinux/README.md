@@ -98,8 +98,8 @@ can answer.
 ## The interpreter dependency
 
 Both depend on `jennifer` **unversioned**, on purpose. Grimoire needs Jennifer
-0.25.0 or later, but `jennifer-bin` and `jennifer-git` provide an unversioned
-`jennifer`, so `jennifer>=0.25.0` would be unsatisfiable and pacman would refuse
+0.26.0 or later, but `jennifer-bin` and `jennifer-git` provide an unversioned
+`jennifer`, so `jennifer>=0.26.0` would be unsatisfiable and pacman would refuse
 the package. The interpreter enforces the floor itself, at load time, from the
 `# pragma-jennifer-version` line in every source file. Add the version once the
 interpreter packages declare `provides=("jennifer=$pkgver")`.

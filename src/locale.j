@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 /**
  * The words Grimoire itself puts on a page, in English and ten other languages.
@@ -459,7 +459,7 @@ def const ADMONITIONS as map of string to string init {
  * What to call one kind of admonition, in the selected language. An unknown kind
  * is called by its own name rather than blank - the parser only produces the
  * five, so this is a guard rather than a path.
- * @param kind {string} the admonition kind, as `markdown.attr(n, "kind")` gives it
+ * @param kind {string} the admonition kind, as `doctree.attr(n, "kind")` gives it
  * @return {string} the label
  */
 export func admonitionLabel(kind as string) {
@@ -470,7 +470,7 @@ export func admonitionLabel(kind as string) {
 }
 
 /**
- * Every admonition label, keyed by kind - what `markdown.PdfOptions` wants, so
+ * Every admonition label, keyed by kind - what `doctree.PdfOptions` wants, so
  * the printable book calls a callout what the site calls it.
  * @return {map of string to string} the labels in the selected language
  */

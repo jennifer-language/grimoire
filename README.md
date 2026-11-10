@@ -60,7 +60,7 @@ bin/grimoire build --src docs --out docs-site
 
 ## Requirements
 
-Jennifer 0.25.0 or newer. `build`, `pdf`, `init`, and `themes` run on both the
+Jennifer 0.26.0 or newer. `build`, `pdf`, `init`, and `themes` run on both the
 default binary and `jennifer-tiny`; `serve` needs the default binary, since
 `jennifer-tiny` stubs `httpd`.
 
