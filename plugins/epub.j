@@ -51,6 +51,7 @@ use encoding;
 use binary;
 
 import "markdown.j" as markdown;
+import "doctree.j" as doctree;
 
 def const API as int init 1;
 def const MIMETYPE as string init "application/epub+zip";
@@ -188,6 +189,12 @@ def const OPS_NS as string init "http://www.idpf.org/2007/ops";
 def const DC_NS as string init "http://purl.org/dc/elements/1.1/";
 def const OPF_NS as string init "http://www.idpf.org/2007/opf";
 
+# The characters a heading id keeps: Grimoire's own `util.slugify`, mirrored as
+# the glossary plugin does, because a link to `page.md#heading` names the id the
+# site wrote, and the chapter has to carry the same one.
+def const SLUG_KEEP as string init "abcdefghijklmnopqrstuvwxyz0123456789-_";
+def const ASCII_MAX as int init 127;
+
 # A package document, a container: XML that nothing reads as prose, so it is
 # indented. Cheap, and it makes the file worth opening when something is wrong.
 func xmlDocument(root as xml.Value) {
@@ -207,9 +214,13 @@ func xhtmlDocument(root as xml.Value) {
 # refuses a content document that is not, and what it shows a reader then is not
 # a message any build could have explained - so the failure belongs here, where
 # the chapter that caused it can be named.
+#
+# Decoded with the XHTML namespace as the default: without it the body is in no
+# namespace, `xml.encode` writes `<body xmlns="">` inside the `<html>`, and
+# every chapter fails EPUBCheck (RSC-005).
 func bodyOf(body as string) {
     try {
-        return xml.decode("<body>" + $body + "</body>");
+        return xml.decode("<body>" + $body + "</body>", {"": XHTML_NS, "epub": OPS_NS});
     } catch (e) {
         fail("a chapter did not render as XML: " + $e.message);
     }
@@ -582,15 +593,104 @@ func navXhtml(lang as string, title as string, entries as json.Value) {
     return xhtmlPage($lang, $title, xml.append(xml.element("body"), $nav));
 }
 
+# --- heading ids -----------------------------------------------------
+
+/**
+ * A heading's id, the way Grimoire writes it on the site.
+ * @param text {string} the heading text
+ * @return {string} the id
+ */
+export func slugify(text as string) {
+    def lowered as string init strings.lower(strings.fold($text));
+    def out as list of string;
+    for (def ch in strings.chars($lowered)) {
+        if ($ch == " " or $ch == "\t" or $ch == "\n" or $ch == "\r") {
+            $out[] = "-";
+        } elseif (strings.contains(SLUG_KEEP, $ch)) {
+            $out[] = $ch;
+        } elseif (convert.toCodepoint($ch) > ASCII_MAX) {
+            $out[] = $ch;
+        }
+    }
+    if (len($out) == 0) {
+        return "section";
+    }
+    return strings.join($out, "");
+}
+
+# Runs of whitespace as one space, trimmed: the heading text `content.render`
+# slugifies (`util.squeeze`).
+func squeeze(s as string) {
+    def flat as string init strings.replace($s, "\t", " ");
+    $flat = strings.replace($flat, "\n", " ");
+    $flat = strings.replace($flat, "\r", " ");
+    def parts as list of string;
+    for (def part in strings.split($flat, " ")) {
+        if ($part != "") {
+            $parts[] = $part;
+        }
+    }
+    return strings.join($parts, " ");
+}
+
+/**
+ * A chapter's Markdown as XHTML, its headings carrying the ids the site gives
+ * them, so a link to `page.md#heading` lands in the EPUB as it does on the site.
+ *
+ * The same rule as `content.render`: every top-level heading, its text slugified
+ * and repeats numbered `-1`, `-2`; a `{#name}` names its own id, slugified too,
+ * and counted, so a later heading cannot be given it again.
+ * @param md {string} the chapter's Markdown
+ * @return {string} the rendered XHTML
+ */
+export func chapterXhtml(md as string) {
+    def doc as doctree.Node init markdown.parse($md);
+    def kids as list of doctree.Node;
+    def seen as map of string to int;
+    for (def node in $doc.children) {
+        if ($node.kind != "heading") {
+            $kids[] = $node;
+            continue;
+        }
+        def base as string init slugify(squeeze(doctree.text($node)));
+        def id as string init $base;
+        if (maps.has($seen, $base)) {
+            $id = $base + "-" + convert.toString($seen[$base]);
+        }
+        # Counted in place, as `content.render` does: a helper taking the map
+        # would copy it per heading.
+        if (maps.has($seen, $base)) {
+            $seen[$base] = $seen[$base] + 1;
+        } else {
+            $seen[$base] = 1;
+        }
+        def named as string init strings.trim(doctree.attr($node, "id"));
+        if ($named != "") {
+            $id = slugify($named);
+            if (maps.has($seen, $id)) {
+                $seen[$id] = $seen[$id] + 1;
+            } else {
+                $seen[$id] = 1;
+            }
+        }
+        def heading as doctree.Node init $node;
+        $heading.attrs["id"] = $id;
+        $kids[] = $heading;
+    }
+    $doc.children = $kids;
+    return doctree.render("xhtml", $doc);
+}
+
 # --- building the book -----------------------------------------------
 
 # One chapter, rendered: links to other chapters point at the files this archive
 # will hold, and pictures are carried in.
 #
-# `markdown.toXhtml` rather than `toHtml`: the same renderer, writing the well-
-# formed XML an EPUB content document has to be - void elements self-closed,
-# boolean attributes expanded. It replaced a regular expression here that closed
-# `<br>`, `<hr>` and `<img>` and knew about nothing else.
+# XHTML rather than HTML (`chapterXhtml`, over `markdown.parse`): the same
+# renderer, writing the well-formed XML an EPUB content document has to be -
+# void elements self-closed, boolean attributes expanded. It replaced a regular
+# expression here that closed `<br>`, `<hr>` and `<img>` and knew about nothing
+# else.
 #
 # Raw HTML in a chapter is escaped rather than passed through, which is the
 # renderer's default and the right one here: a book's hand-written `<div>` need
@@ -603,7 +703,7 @@ func chapterFile(
     sources as list of string,
     titles as map of string to string) {
     def src as string init json.asString($req, $at + "/src");
-    def body as string init markdown.toXhtml(json.asString($req, $at + "/content"));
+    def body as string init chapterXhtml(json.asString($req, $at + "/content"));
     $body = repictured(relinked($body, $src, $sources), $root, $src);
     def heading as string init $src;
     if (maps.has($titles, $src)) {

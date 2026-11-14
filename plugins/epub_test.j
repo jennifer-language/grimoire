@@ -115,6 +115,36 @@ func testAChapterIsAWellFormedXmlDocument() {
     testing.assertEqual(xml.tag(xml.decode($out)), "html");
 }
 
+# The chapter body is decoded in the XHTML namespace. Decoded in none, it was
+# encoded as `<body xmlns="">` inside the XHTML `<html>`, and EPUBCheck refused
+# every chapter (RSC-005).
+func testTheChapterBodyStaysInTheXhtmlNamespace() {
+    def out as string init document("en", "Intro", chapterXhtml("# T\n\nA *line*.\n"));
+    testing.assertFalse(strings.contains($out, 'xmlns=""'));
+    def page as xml.Value init xml.decode($out);
+    for (def kid in xml.children($page)) {
+        testing.assertEqual(xml.namespace($kid), XHTML_NS);
+    }
+}
+
+# A link to `page.md#heading` names the id the site wrote, so a chapter's
+# headings carry the same ids: the cases of `content_test.j`.
+func testHeadingsCarryTheIdsTheSiteGivesThem() {
+    testing.assertContains(chapterXhtml("## Getting Started\n"), '<h2 id="getting-started">');
+    def repeated as string init chapterXhtml("## Notes\n\n## Notes\n\n## Notes\n");
+    testing.assertContains($repeated, '<h2 id="notes">');
+    testing.assertContains($repeated, '<h2 id="notes-1">');
+    testing.assertContains($repeated, '<h2 id="notes-2">');
+    testing.assertContains(chapterXhtml('## Peripherals {#tapes}' + "\n"), '<h2 id="tapes">');
+    testing.assertContains(
+        chapterXhtml('## A {#Tapes.and.Drives}' + "\n"),
+        '<h2 id="tapesanddrives">');
+    def named as string init chapterXhtml('## A {#b}' + "\n\n## B\n");
+    testing.assertContains($named, '<h2 id="b">');
+    testing.assertContains($named, '<h2 id="b-1">');
+    testing.assertContains(chapterXhtml("# Größe   ändern\n"), '<h1 id="grosse-andern">');
+}
+
 # The navigation document is the one place `epub:type` is written, and its
 # prefix is declared on the `<html>` element. It used to be encoded and parsed
 # back as a bare `<body>` fragment, where the declaration is out of sight, and an

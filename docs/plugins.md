@@ -356,9 +356,11 @@ stylesheet = "assets/epub.css"  # optional; a default is built in
 
 It takes the Markdown from the request rather than the built HTML, so what it
 renders is what the book says. Links between chapters are rewritten to the files
-inside the archive, fragments included, and pictures are carried in. Nothing has
+inside the archive, fragments included, and headings carry the ids the site gives
+them, so a link to `page.md#heading` lands on the heading. Pictures are carried
+in. Nothing has
 to be installed: an EPUB is a zip of XHTML and two small XML files, and the
-interpreter ships everything that takes - `markdown.toXhtml` writes the chapters
+interpreter ships everything that takes - `doctree` writes the chapters
 as the well-formed XML a content document has to be, and the `xml` library builds
 the package and the navigation.
 
