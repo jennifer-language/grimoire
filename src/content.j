@@ -596,7 +596,7 @@ func renderHeading(n as doctree.Node, id as string) {
  * @param rawHtml {bool} whether a hand-written HTML block goes to the page
  *   verbatim; false escapes it, so the markup is shown rather than run
  * @return {Rendered} the rendered page
- * @throws {Error} kind "markdown" when the document is too deep or too large
+ * @throws {Error} kind "limit" when the document is too deep or too large
  */
 export func render(md as string, highlighting as bool, rawHtml as bool) {
     def doc as doctree.Node init markdown.parse($md);
