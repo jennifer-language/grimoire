@@ -24,7 +24,8 @@
 # twice, for the `RUN` that links and marks the launcher below and for the
 # entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
 # `#!/usr/bin/env jennifer` needs `env`.
-ARG JENNIFER_TAG=0.25.0
+# `dev` until 0.26.0, the floor in deck.toml, is released (see test.yml).
+ARG JENNIFER_TAG=dev
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
 # The registry shows `description` on the package page, so it says how to run the
