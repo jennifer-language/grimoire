@@ -39,8 +39,7 @@ use lists;
 use regex;
 
 import "docblock.j" as docblock;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # `{{#apiref path}}`, alone on its line. A marker inside a sentence is prose
 # about the syntax, which the chapter documenting this plugin is full of.
@@ -49,13 +48,6 @@ def const DIRECTIVE as string init '^[ \t]*\{\{#apiref[ \t]+([^}]+?)[ \t]*\}\}[ 
 # A directive with a backslash in front of it prints itself, which is how a book
 # documents the syntax.
 def const ESCAPED as string init '^([ \t]*)\\(\{\{#apiref.*)$';
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 func hashes(level as int) {
     return strings.repeat("#", $level);
@@ -225,7 +217,7 @@ func sourcesUnder(root as string) {
         return [$root];
     }
     if (not fs.isDir($root)) {
-        fail($root + ": no such file or directory");
+        kit.fail($root + ": no such file or directory");
     }
     def out as list of string;
     for (def st in fs.walk($root)) {
@@ -239,7 +231,7 @@ func sourcesUnder(root as string) {
         $out[] = $st.path;
     }
     if (len($out) == 0) {
-        fail($root + ": no Jennifer sources here");
+        kit.fail($root + ": no Jennifer sources here");
     }
     return lists.sort($out);
 }
@@ -294,40 +286,24 @@ export func expand(content as string, level as int, private as bool) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         def level as int init 2;
-        if (json.has($req, "/plugin/settings/depth")) {
-            $level = clamped(json.asInt($req, "/plugin/settings/depth"));
+        if (kit.hasSetting($req, "depth")) {
+            $level = clamped(kit.settingInt($req, "depth", 2));
         }
-        def private as bool init false;
-        if (json.has($req, "/plugin/settings/private")) {
-            $private = json.asBool($req, "/plugin/settings/private");
-        }
+        def private as bool init kit.settingBool($req, "private", false);
         def replies as list of string;
         for (def i in 0..json.length($req, "/chapters")) {
             def at as string init "/chapters/" + convert.toString($i);
             def content as string init json.asString($req, $at + "/content");
             def expanded as string init expand($content, $level, $private);
             if ($expanded != $content) {
-                $replies[] = '{"src":' + json.encode(json.asString($req, $at + "/src")) +
-                    ',"content":' + json.encode($expanded) + '}';
+                $replies[] = kit.chapterReply(json.asString($req, $at + "/src"), $expanded);
             }
         }
-        io.printf('{"api":%d,"chapters":[%s]}', API, strings.join($replies, ","));
+        io.printf("%s", kit.preprocessorReply($replies));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-apiref: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-apiref", $e.message);
     }
 }

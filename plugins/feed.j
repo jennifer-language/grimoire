@@ -27,7 +27,6 @@
  * @license LGPL-3.0-only
  */
 use io;
-use os;
 use fs;
 use path;
 use json;
@@ -35,8 +34,7 @@ use xml;
 use strings;
 use convert;
 use lists;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # Wide enough for a unix timestamp past the year 2286, so every sort key is the
 # same length and a text sort is a numeric one.
@@ -52,17 +50,10 @@ def struct Item {
     subject as string
 };
 
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
-
 # Nothing to publish is not a failure. The reply carries a warning instead, which
 # reaches the build's own warnings where a reader is already looking.
 func nothing(message as string) {
-    return '{"api":' + convert.toString(API) + ',"warnings":[' + json.encode($message) + ']}';
+    return kit.rendererReply([], [$message]);
 }
 
 func join(base as string, page as string) {
@@ -87,9 +78,8 @@ func sortKey(stamp as int, src as string) {
 # `git -C dir log -1` over one path. The three fields are asked for in one go and
 # split on a character a commit subject cannot contain.
 func lastCommit(dir as string, file as string) {
-    def result as os.Result;
-    try {
-        $result = os.run([
+    def result as kit.Ran init kit.runProgram(
+        [
             "git",
             "-C",
             $dir,
@@ -99,10 +89,8 @@ func lastCommit(dir as string, file as string) {
             "--format=%at|%ad|%s",
             "--",
             $file
-        ]);
-    } catch (e) {
-        return "";
-    }
+        ],
+        "");
     if ($result.exitCode != 0) {
         return "";
     }
@@ -112,12 +100,15 @@ func lastCommit(dir as string, file as string) {
 # Whether this is a checkout at all. A tarball is a perfectly good way to build a
 # book; it just has no history to publish.
 func isCheckout(dir as string) {
-    def result as os.Result;
-    try {
-        $result = os.run(["git", "-C", $dir, "rev-parse", "--is-inside-work-tree"]);
-    } catch (e) {
-        return false;
-    }
+    def result as kit.Ran init kit.runProgram(
+        [
+            "git",
+            "-C",
+            $dir,
+            "rev-parse",
+            "--is-inside-work-tree"
+        ],
+        "");
     return $result.exitCode == 0 and strings.trim($result.stdout) == "true";
 }
 
@@ -135,10 +126,7 @@ func isCheckout(dir as string) {
  * @throws {Error} kind "plugin" when the request is not one this can answer
  */
 export func feedFor(req as json.Value) {
-    def base as string init "";
-    if (json.has($req, "/plugin/settings/baseUrl")) {
-        $base = json.asString($req, "/plugin/settings/baseUrl");
-    }
+    def base as string init kit.settingText($req, "baseUrl", "");
     if ($base == "") {
         return "";
     }
@@ -146,14 +134,8 @@ export func feedFor(req as json.Value) {
     if (not isCheckout($root)) {
         return "";
     }
-    def limit as int init 20;
-    if (json.has($req, "/plugin/settings/limit")) {
-        $limit = json.asInt($req, "/plugin/settings/limit");
-    }
-    def output as string init "feed.xml";
-    if (json.has($req, "/plugin/settings/output")) {
-        $output = json.asString($req, "/plugin/settings/output");
-    }
+    def limit as int init kit.settingInt($req, "limit", 20);
+    def output as string init kit.settingText($req, "output", "feed.xml");
     def items as list of Item;
     def keys as list of string;
     def byKey as map of string to int;
@@ -280,45 +262,29 @@ func channel(req as json.Value, base as string, output as string, items as list 
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "renderer") {
-            fail("this is a renderer; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "renderer");
         def feed as string init feedFor($req);
         if ($feed == "") {
             io.printf("%s", nothing(whyNot($req)));
             return 0;
         }
-        def output as string init "feed.xml";
-        if (json.has($req, "/plugin/settings/output")) {
-            $output = json.asString($req, "/plugin/settings/output");
-        }
+        def output as string init kit.settingText($req, "output", "feed.xml");
         def target as string init path.join(json.asString($req, "/book/out"), $output);
         def dir as string init path.dir($target);
         if ($dir != "" and $dir != ".") {
             fs.mkdirAll($dir);
         }
         fs.writeString($target, $feed);
-        io.printf('{"api":%d,"written":[%s]}', API, json.encode($output));
+        io.printf("%s", kit.rendererReply([$output], []));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-feed: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-feed", $e.message);
     }
 }
 
 # Why there is no feed, in the words the build will print.
 func whyNot(req as json.Value) {
-    if (not json.has($req, "/plugin/settings/baseUrl") or
-        json.asString($req, "/plugin/settings/baseUrl") == "") {
+    if (kit.settingText($req, "baseUrl", "") == "") {
         return "no baseUrl configured, nothing written";
     }
     def root as string init json.asString($req, "/book/src");

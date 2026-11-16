@@ -30,8 +30,7 @@ use json;
 use strings;
 use convert;
 use maps;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # The characters a shortcode may hold, which is what makes `:not a code:` prose
 # and `:white_check_mark:` a name.
@@ -137,13 +136,6 @@ def const SHORTCODES as map of string to list of int init {
     "feather": [0x1FAB6]
 };
 
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
-
 /**
  * The character a list of codepoints stands for.
  * @param points {list of int} the codepoints, in order
@@ -172,13 +164,13 @@ export func table(req as json.Value) {
     for (def name in maps.keys(SHORTCODES)) {
         $out[$name] = characterOf(SHORTCODES[$name]);
     }
-    if (not json.has($req, "/plugin/settings/extra")) {
+    if (not kit.hasSetting($req, "extra")) {
         return $out;
     }
     for (def name in json.keys($req, "/plugin/settings/extra")) {
-        def at as string init "/plugin/settings/extra/" + $name;
+        def at as string init "/plugin/settings/extra/" + kit.pointerKey($name);
         if (json.typeOf(json.get($req, $at)) != "string") {
-            fail("the extra shortcode \"" + $name + "\" is not a piece of text");
+            kit.fail("the extra shortcode \"" + $name + "\" is not a piece of text");
         }
         $out[$name] = json.asString($req, $at);
     }
@@ -218,6 +210,10 @@ func codeAt(line as string, from as int) {
 # know is left exactly as written: a colon is punctuation long before it is
 # markup, and a book is full of them.
 func expandLine(line as string, codes as map of string to string) {
+    # A shortcode needs a colon, and most lines have none.
+    if (not strings.contains($line, ":")) {
+        return $line;
+    }
     def out as string init "";
     def i as int init 0;
     while ($i < len($line)) {
@@ -238,25 +234,6 @@ func expandLine(line as string, codes as map of string to string) {
     return $out;
 }
 
-# The fence a line opens or closes, or "".
-func fenceOf(line as string) {
-    def trimmed as string init strings.trim($line);
-    for (def mark in ["```", "~~~"]) {
-        if (not strings.startsWith($trimmed, $mark)) {
-            continue;
-        }
-        def run as int init 0;
-        for (def ch in strings.chars($trimmed)) {
-            if ($ch != strings.substring($mark, 0, 1)) {
-                break;
-            }
-            $run = $run + 1;
-        }
-        return strings.substring($trimmed, 0, $run);
-    }
-    return "";
-}
-
 /**
  * One chapter, with its shortcodes replaced.
  *
@@ -267,18 +244,11 @@ func fenceOf(line as string) {
  */
 export func expand(content as string, codes as map of string to string) {
     def out as list of string;
-    def fence as string init "";
-    for (def line in strings.split($content, "\n")) {
-        def mark as string init fenceOf($line);
-        if ($fence == "" and $mark != "") {
-            $fence = $mark;
-            $out[] = $line;
-            continue;
-        }
-        if ($fence != "") {
-            if ($mark == $fence) {
-                $fence = "";
-            }
+    def lines as list of string init strings.split($content, "\n");
+    def fenced as list of bool init kit.fencedLines($content);
+    for (def i in 0..len($lines)) {
+        def line as string init $lines[$i];
+        if ($fenced[$i]) {
             $out[] = $line;
             continue;
         }
@@ -296,12 +266,10 @@ func replyFor(req as json.Value) {
         def content as string init json.asString($req, $at + "/content");
         def out as string init expand($content, $codes);
         if ($out != $content) {
-            $replies[] = '{"src":' + json.encode(json.asString($req, $at + "/src")) +
-                ',"content":' + json.encode($out) + '}';
+            $replies[] = kit.chapterReply(json.asString($req, $at + "/src"), $out);
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }
 
 /**
@@ -311,22 +279,10 @@ func replyFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-emoji: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-emoji", $e.message);
     }
 }

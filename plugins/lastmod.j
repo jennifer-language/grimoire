@@ -22,12 +22,10 @@
  * @license LGPL-3.0-only
  */
 use io;
-use os;
 use json;
 use strings;
 use convert;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # strftime, because that is what git's `--date=format:` takes and what Jennifer's
 # own `time.format` takes. The date is asked of git already formatted, so there
@@ -35,22 +33,18 @@ def const API as int init 1;
 def const DEFAULT_FORMAT as string init "%Y-%m-%d";
 def const DEFAULT_LABEL as string init "Last updated";
 
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
-
 # Whether this is a checkout at all. A tarball is a perfectly good way to build a
 # book; it just has no history to date it by.
 func isCheckout(dir as string) {
-    def result as os.Result;
-    try {
-        $result = os.run(["git", "-C", $dir, "rev-parse", "--is-inside-work-tree"]);
-    } catch (e) {
-        return false;
-    }
+    def result as kit.Ran init kit.runProgram(
+        [
+            "git",
+            "-C",
+            $dir,
+            "rev-parse",
+            "--is-inside-work-tree"
+        ],
+        "");
     return $result.exitCode == 0 and strings.trim($result.stdout) == "true";
 }
 
@@ -66,9 +60,8 @@ func isCheckout(dir as string) {
  * @return {string} the date, or "" when git has nothing to say about the file
  */
 export func dateOf(dir as string, file as string, format as string) {
-    def result as os.Result;
-    try {
-        $result = os.run([
+    def result as kit.Ran init kit.runProgram(
+        [
             "git",
             "-C",
             $dir,
@@ -78,10 +71,8 @@ export func dateOf(dir as string, file as string, format as string) {
             "--format=%ad",
             "--",
             $file
-        ]);
-    } catch (e) {
-        return "";
-    }
+        ],
+        "");
     if ($result.exitCode != 0) {
         return "";
     }
@@ -112,17 +103,11 @@ export func stamped(content as string, label as string, date as string) {
 
 # The settings, with their defaults.
 func formatOf(req as json.Value) {
-    if (json.has($req, "/plugin/settings/format")) {
-        return json.asString($req, "/plugin/settings/format");
-    }
-    return DEFAULT_FORMAT;
+    return kit.settingText($req, "format", DEFAULT_FORMAT);
 }
 
 func labelOf(req as json.Value) {
-    if (json.has($req, "/plugin/settings/label")) {
-        return json.asString($req, "/plugin/settings/label");
-    }
-    return DEFAULT_LABEL;
+    return kit.settingText($req, "label", DEFAULT_LABEL);
 }
 
 /**
@@ -146,13 +131,11 @@ export func replyFor(req as json.Value) {
             def content as string init json.asString($req, $at + "/content");
             def out as string init stamped($content, $label, dateOf($root, $src, $format));
             if ($out != $content) {
-                $replies[] = '{"src":' + json.encode($src) + ',"content":' +
-                    json.encode($out) + '}';
+                $replies[] = kit.chapterReply($src, $out);
             }
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }
 
 /**
@@ -162,22 +145,10 @@ export func replyFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-lastmod: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-lastmod", $e.message);
     }
 }

@@ -3,9 +3,10 @@
 #
 # Grimoire is a program rather than a library, so nothing here is meant to be
 # imported by a consumer - the deck is how it is published and installed, not an
-# API. That still decides the layout: `src/` is the tree a consumer vendors and
-# every file in it is a module, `src/grimoire.j` is the entry module named after
-# the deck, and the launcher lives in `bin/` because a program with a shebang is
+# API. (`src/pluginkit.j`, the plugin kit, is copied into a plugin rather than
+# imported from the deck.) That still decides the layout: `src/` is the tree a consumer vendors and every
+# file in it is a module, `src/grimoire.j` is the entry module named after the
+# deck, and the launcher lives in `bin/` because a program with a shebang is
 # neither of those things.
 
 [package]

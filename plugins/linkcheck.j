@@ -36,8 +36,7 @@ use lists;
 use regex;
 
 import "http.j" as http;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # `href` and `src` both point at something that has to be there: a chapter, a
 # stylesheet, a picture.
@@ -57,13 +56,6 @@ def const CODE as string init '<code[^>]*>[^<]*</code>';
 
 # What a fragment can land on in a Grimoire page.
 def const ANCHOR as string init 'id="';
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 # A scheme, a protocol-relative URL, or an anchor for something that is not a
 # document: none of it resolves to a file in the site.
@@ -151,13 +143,12 @@ func stripped(html as string) {
 }
 
 # An external URL is remembered once, and only when it is going to be checked.
-func remember(seen as list of string, url as string, wanted as bool) {
+func remember(seen as list of string, url as string, wanted as bool) { # lint-disable: L205
     if (not $wanted or lists.contains($seen, $url)) {
         return $seen;
     }
-    def out as list of string init $seen;
-    $out[] = $url;
-    return $out;
+    $seen[] = $url;
+    return $seen;
 }
 
 # Why one link is dead, or "" when it is not. `own` is the page's own markup, so
@@ -196,7 +187,7 @@ func deadReason(page as string, dir as string, url as string, own as string) {
  */
 export func check(site as string, external as bool) {
     if (not fs.isDir($site)) {
-        fail("no site at " + $site);
+        kit.fail("no site at " + $site);
     }
     def findings as list of string;
     def externals as list of string;
@@ -237,25 +228,11 @@ export func check(site as string, external as bool) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "renderer") {
-            fail("this is a renderer; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
-        def external as bool init false;
-        if (json.has($req, "/plugin/settings/external")) {
-            $external = json.asBool($req, "/plugin/settings/external");
-        }
+        def req as json.Value init kit.request($request, "renderer");
+        def external as bool init kit.settingBool($req, "external", false);
         def findings as list of string init check(json.asString($req, "/book/out"), $external);
         if (len($findings) == 0) {
-            io.printf('{"api":%d}', API);
+            io.printf("%s", kit.rendererReply([], []));
             return 0;
         }
         for (def finding in $findings) {
@@ -264,7 +241,6 @@ export func run(request as string) {
         io.eprintf("grimoire-linkcheck: %d dead link(s)\n", len($findings));
         return 1;
     } catch (e) {
-        io.eprintf("grimoire-linkcheck: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-linkcheck", $e.message);
     }
 }

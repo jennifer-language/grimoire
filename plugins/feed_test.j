@@ -15,6 +15,7 @@
  * @license LGPL-3.0-only
  */
 use testing;
+use os;
 
 # A checkout with `commits` applied in order: each is a file, its text, and the
 # date to commit it on.

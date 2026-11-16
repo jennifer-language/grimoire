@@ -31,8 +31,7 @@ use strings;
 use convert;
 use lists;
 use maps;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # The characters a slug keeps, and the rule around them: this mirrors Grimoire's
 # own `util.slugify`, because the anchor has to be the one Grimoire wrote into
@@ -44,13 +43,6 @@ def const ASCII_MAX as int init 127;
 # A character that can be part of a word. A term matches only when what is
 # around it is not one of these, so "index" does not match inside "indexed".
 def const WORD as string init "abcdefghijklmnopqrstuvwxyz0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 /**
  * One glossary entry: the word to look for, and where its definition is.
@@ -143,7 +135,7 @@ export func termsIn(content as string, depth as int) {
 export func aliasesIn(file as string, defined as list of Term) {
     def out as list of Term;
     if (not fs.isFile($file)) {
-        fail("terms file not found: " + $file);
+        kit.fail("terms file not found: " + $file);
     }
     def anchors as map of string to string;
     for (def term in $defined) {
@@ -164,7 +156,7 @@ export func aliasesIn(file as string, defined as list of Term) {
             $wanted = strings.lower($alias);
         }
         if (not maps.has($anchors, $wanted)) {
-            fail("terms file: \"" + $alias + "\" points at \"" + $wanted +
+            kit.fail("terms file: \"" + $alias + "\" points at \"" + $wanted +
                 "\", which the glossary does not define");
         }
         $out[] = Term{word: $alias, anchor: $anchors[$wanted]};
@@ -340,19 +332,15 @@ func skippable(line as string) {
 export func link(content as string, terms as list of Term, target as string) {
     def lines as list of string init strings.split($content, "\n");
     def linked as map of string to int;
+    # Linking a term adds no line and no fence, so this holds for every term.
+    def fenced as list of bool init kit.fencedLines($content);
     for (def term in $terms) {
         if (maps.has($linked, $term.anchor)) {
             continue;
         }
-        def fenced as bool init false;
         for (def i in 0..len($lines)) {
             def line as string init $lines[$i];
-            def trimmed as string init strings.trim($line);
-            if (strings.startsWith($trimmed, "```") or strings.startsWith($trimmed, "~~~")) {
-                $fenced = not $fenced;
-                continue;
-            }
-            if ($fenced or $line == "" or skippable($line)) {
+            if ($fenced[$i] or $line == "" or skippable($line)) {
                 continue;
             }
             def at as int init wordIndex($line, $term.word);
@@ -378,41 +366,23 @@ export func link(content as string, terms as list of Term, target as string) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-glossary: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-glossary", $e.message);
     }
 }
 
 # The chapter that holds the definitions, as the settings name it.
 func chapterOf(req as json.Value) {
-    if (json.has($req, "/plugin/settings/chapter")) {
-        return json.asString($req, "/plugin/settings/chapter");
-    }
-    return "glossary.md";
+    return kit.settingText($req, "chapter", "glossary.md");
 }
 
 # The reply: every chapter the terms reached, and nothing else.
 func replyFor(req as json.Value) {
     def chapter as string init chapterOf($req);
-    def depth as int init 2;
-    if (json.has($req, "/plugin/settings/depth")) {
-        $depth = json.asInt($req, "/plugin/settings/depth");
-    }
+    def depth as int init kit.settingInt($req, "depth", 2);
     def source as string init "";
     for (def i in 0..json.length($req, "/chapters")) {
         def at as string init "/chapters/" + convert.toString($i);
@@ -421,12 +391,12 @@ func replyFor(req as json.Value) {
         }
     }
     if ($source == "") {
-        fail("no glossary chapter at " + $chapter + ": name one with `chapter`");
+        kit.fail("no glossary chapter at " + $chapter + ": name one with `chapter`");
     }
     def defined as list of Term init termsIn($source, $depth);
     def extra as list of Term;
-    if (json.has($req, "/plugin/settings/terms")) {
-        $extra = aliasesIn(json.asString($req, "/plugin/settings/terms"), $defined);
+    if (kit.hasSetting($req, "terms")) {
+        $extra = aliasesIn(kit.settingText($req, "terms", ""), $defined);
     }
     def terms as list of Term init ordered($defined, $extra);
     def replies as list of string;
@@ -439,9 +409,8 @@ func replyFor(req as json.Value) {
         def content as string init json.asString($req, $at + "/content");
         def out as string init link($content, $terms, linkTo($src, $chapter));
         if ($out != $content) {
-            $replies[] = '{"src":' + json.encode($src) + ',"content":' + json.encode($out) + '}';
+            $replies[] = kit.chapterReply($src, $out);
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }

@@ -30,19 +30,11 @@ use strings;
 use convert;
 use maps;
 use regex;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # `{{ name }}`, with the spaces optional. A name is a word, or words joined by
 # dots: `version`, `book.title`, `env.CI_COMMIT_TAG`.
 def const MACRO as string init '\{\{[ \t]*([A-Za-z][A-Za-z0-9_.]*)[ \t]*\}\}';
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 # One value from the settings table, as text. A number in a manifest is a number
 # and reaches a page as one; anything with a shape - a list, a table - is a
@@ -56,15 +48,9 @@ func textOf(req as json.Value, at as string, name as string) {
             return "true";
         }
         return "false"; }
-        else { fail("the value of \"" + $name + "\" is not a word or a number"); }
+        else { kit.fail("the value of \"" + $name + "\" is not a word or a number"); }
     }
     return "";
-}
-
-# A key as one segment of a pointer: a macro name may hold a dot, and a pointer
-# separates its segments with a slash, so only `~` and `/` need escaping here.
-func pointerKey(key as string) {
-    return strings.replace(strings.replace($key, "~", "~0"), "/", "~1");
 }
 
 /**
@@ -89,43 +75,19 @@ export func valuesOf(req as json.Value) {
         $authors[] = json.asString($req, "/book/authors/" + convert.toString($i));
     }
     $out["book.authors"] = strings.join($authors, ", ");
-    if (json.has($req, "/plugin/settings/vars")) {
+    if (kit.hasSetting($req, "vars")) {
         for (def name in json.keys($req, "/plugin/settings/vars")) {
-            $out[$name] = textOf($req, "/plugin/settings/vars/" + pointerKey($name), $name);
+            $out[$name] = textOf($req, "/plugin/settings/vars/" + kit.pointerKey($name), $name);
         }
     }
-    if (json.has($req, "/plugin/settings/env")) {
-        for (def i in 0..json.length($req, "/plugin/settings/env")) {
-            def name as string init json.asString(
-                $req,
-                "/plugin/settings/env/" + convert.toString($i));
-            def value as string init os.getEnv($name);
-            if ($value == "") {
-                fail("the environment variable " + $name + " is named in `env` but not set");
-            }
-            $out["env." + $name] = $value;
+    for (def name in kit.settingTexts($req, "env", [])) {
+        def value as string init os.getEnv($name);
+        if ($value == "") {
+            kit.fail("the environment variable " + $name + " is named in `env` but not set");
         }
+        $out["env." + $name] = $value;
     }
     return $out;
-}
-
-# The fence a line opens or closes, or "".
-func fenceOf(line as string) {
-    def trimmed as string init strings.trim($line);
-    for (def mark in ["```", "~~~"]) {
-        if (not strings.startsWith($trimmed, $mark)) {
-            continue;
-        }
-        def run as int init 0;
-        for (def ch in strings.chars($trimmed)) {
-            if ($ch != strings.substring($mark, 0, 1)) {
-                break;
-            }
-            $run = $run + 1;
-        }
-        return strings.substring($trimmed, 0, $run);
-    }
-    return "";
 }
 
 # One line, with every macro on it expanded. A backslash in front of one prints
@@ -146,7 +108,7 @@ func expandLine(
         def name as string init $m.groups[0];
         if (not maps.has($values, $name)) {
             if ($strict) {
-                fail($where + ": nothing is set for " + $m.text);
+                kit.fail($where + ": nothing is set for " + $m.text);
             }
             continue;
         }
@@ -174,18 +136,11 @@ export func expand(
     strict as bool,
     where as string) {
     def out as list of string;
-    def fence as string init "";
-    for (def line in strings.split($content, "\n")) {
-        def mark as string init fenceOf($line);
-        if ($fence == "" and $mark != "") {
-            $fence = $mark;
-            $out[] = $line;
-            continue;
-        }
-        if ($fence != "") {
-            if ($mark == $fence) {
-                $fence = "";
-            }
+    def lines as list of string init strings.split($content, "\n");
+    def fenced as list of bool init kit.fencedLines($content);
+    for (def i in 0..len($lines)) {
+        def line as string init $lines[$i];
+        if ($fenced[$i]) {
             $out[] = $line;
             continue;
         }
@@ -197,10 +152,7 @@ export func expand(
 # The reply: the chapters that carried a macro, and no others.
 func replyFor(req as json.Value) {
     def values as map of string to string init valuesOf($req);
-    def strict as bool init true;
-    if (json.has($req, "/plugin/settings/strict")) {
-        $strict = json.asBool($req, "/plugin/settings/strict");
-    }
+    def strict as bool init kit.settingBool($req, "strict", true);
     def replies as list of string;
     for (def i in 0..json.length($req, "/chapters")) {
         def at as string init "/chapters/" + convert.toString($i);
@@ -208,11 +160,10 @@ func replyFor(req as json.Value) {
         def content as string init json.asString($req, $at + "/content");
         def out as string init expand($content, $values, $strict, $src);
         if ($out != $content) {
-            $replies[] = '{"src":' + json.encode($src) + ',"content":' + json.encode($out) + '}';
+            $replies[] = kit.chapterReply($src, $out);
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }
 
 /**
@@ -222,22 +173,10 @@ func replyFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-macros: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-macros", $e.message);
     }
 }

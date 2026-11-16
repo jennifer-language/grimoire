@@ -30,19 +30,11 @@ use convert;
 use regex;
 
 import "html.j" as html;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # An image, alone on its line: `![alt](dest)`, with an optional title inside the
 # parentheses. A line with anything else on it is prose about a picture.
 def const IMAGE as string init '^!\[([^\]]*)\]\(([^)]+)\)$';
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 /**
  * One picture, as its Markdown gives it.
@@ -103,7 +95,7 @@ export func captionOf(picture as Picture, source as string) {
         return $picture.alt; }
         when "title" { return $picture.title; }
         when "alt" { return $picture.alt; }
-        else { fail("caption is \"" + $source + "\": it is `auto`, `title`, or `alt`"); }
+        else { kit.fail("caption is \"" + $source + "\": it is `auto`, `title`, or `alt`"); }
     }
     return "";
 }
@@ -124,25 +116,6 @@ func asHtml(picture as Picture, caption as string) {
         "<figcaption>" + html.escape($caption) + "</figcaption>\n</figure>";
 }
 
-# The fence a line opens or closes, or "".
-func fenceOf(line as string) {
-    def trimmed as string init strings.trim($line);
-    for (def mark in ["```", "~~~"]) {
-        if (not strings.startsWith($trimmed, $mark)) {
-            continue;
-        }
-        def run as int init 0;
-        for (def ch in strings.chars($trimmed)) {
-            if ($ch != strings.substring($mark, 0, 1)) {
-                break;
-            }
-            $run = $run + 1;
-        }
-        return strings.substring($trimmed, 0, $run);
-    }
-    return "";
-}
-
 /**
  * One chapter, with a caption under every picture that stands alone.
  *
@@ -157,18 +130,11 @@ func fenceOf(line as string) {
  */
 export func expand(content as string, source as string, markup as bool) {
     def out as list of string;
-    def fence as string init "";
-    for (def line in strings.split($content, "\n")) {
-        def mark as string init fenceOf($line);
-        if ($fence == "" and $mark != "") {
-            $fence = $mark;
-            $out[] = $line;
-            continue;
-        }
-        if ($fence != "") {
-            if ($mark == $fence) {
-                $fence = "";
-            }
+    def lines as list of string init strings.split($content, "\n");
+    def fenced as list of bool init kit.fencedLines($content);
+    for (def i in 0..len($lines)) {
+        def line as string init $lines[$i];
+        if ($fenced[$i]) {
             $out[] = $line;
             continue;
         }
@@ -194,26 +160,18 @@ export func expand(content as string, source as string, markup as bool) {
 
 # The reply: the chapters that gained a caption, and no others.
 func replyFor(req as json.Value) {
-    def source as string init "auto";
-    if (json.has($req, "/plugin/settings/caption")) {
-        $source = json.asString($req, "/plugin/settings/caption");
-    }
-    def markup as bool init false;
-    if (json.has($req, "/plugin/settings/html")) {
-        $markup = json.asBool($req, "/plugin/settings/html");
-    }
+    def source as string init kit.settingText($req, "caption", "auto");
+    def markup as bool init kit.settingBool($req, "html", false);
     def replies as list of string;
     for (def i in 0..json.length($req, "/chapters")) {
         def at as string init "/chapters/" + convert.toString($i);
         def content as string init json.asString($req, $at + "/content");
         def out as string init expand($content, $source, $markup);
         if ($out != $content) {
-            $replies[] = '{"src":' + json.encode(json.asString($req, $at + "/src")) +
-                ',"content":' + json.encode($out) + '}';
+            $replies[] = kit.chapterReply(json.asString($req, $at + "/src"), $out);
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }
 
 /**
@@ -223,22 +181,10 @@ func replyFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-figure: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-figure", $e.message);
     }
 }

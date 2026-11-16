@@ -35,9 +35,7 @@ use regex;
 use strings;
 use lists;
 use convert;
-
-# The contract version this speaks.
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # `{{#include path}}`, `{{#include path:from}}`, `{{#include path:from:to}}`.
 # The directive stands alone on its line: a marker inside a sentence is prose
@@ -50,13 +48,6 @@ def const DIRECTIVE as string init '^[ \t]*\{\{#include[ \t]+([^:}]+?)' + RANGE 
 # the backslash, which is how a book documents the syntax. The convention is
 # mdBook's, and a chapter about this plugin needs it.
 def const ESCAPED as string init '^([ \t]*)\\(\{\{#include.*)$';
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 /**
  * The requested range of a file, counting from 1 the way an editor does.
@@ -82,7 +73,7 @@ export func slice(file as string, text as string, lo as int, hi as int) {
         return strings.join($all, "\n");
     }
     if ($lo > len($all)) {
-        fail($file + ": line " + convert.toString($lo) + " is past the end of the file");
+        kit.fail($file + ": line " + convert.toString($lo) + " is past the end of the file");
     }
     def last as int init $hi;
     if ($last == 0 or $last > len($all)) {
@@ -107,10 +98,10 @@ export func slice(file as string, text as string, lo as int, hi as int) {
 export func resolve(root as string, wanted as string) {
     def target as string init path.clean(path.join($root, strings.trim($wanted)));
     if (not strings.startsWith($target, path.clean($root) + "/")) {
-        fail(strings.trim($wanted) + ": outside the book");
+        kit.fail(strings.trim($wanted) + ": outside the book");
     }
     if (not fs.isFile($target)) {
-        fail(strings.trim($wanted) + ": no such file");
+        kit.fail(strings.trim($wanted) + ": no such file");
     }
     return $target;
 }
@@ -162,12 +153,10 @@ func replyFor(req as json.Value) {
         def content as string init json.asString($req, $at + "/content");
         def expanded as string init expand($root, $content);
         if ($expanded != $content) {
-            $replies[] = '{"src":' + json.encode(json.asString($req, $at + "/src")) +
-                ',"content":' + json.encode($expanded) + '}';
+            $replies[] = kit.chapterReply(json.asString($req, $at + "/src"), $expanded);
         }
     }
-    return '{"api":' + convert.toString(API) + ',"chapters":[' +
-        strings.join($replies, ",") + ']}';
+    return kit.preprocessorReply($replies);
 }
 
 /**
@@ -177,22 +166,10 @@ func replyFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "preprocessor") {
-            fail("this is a preprocessor; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "preprocessor");
         io.printf("%s", replyFor($req));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-include: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-include", $e.message);
     }
 }

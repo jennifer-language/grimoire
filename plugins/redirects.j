@@ -34,24 +34,13 @@ use lists;
 use maps;
 
 import "html.j" as html;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # The stub says who wrote it. A build that is not `--clean` finds last build's
 # stubs still in place, and a plugin that refused to overwrite anything would
 # report every one of them as a collision from the second build on. This is what
 # tells one of ours from a file that is somebody else's.
 def const MARKER as string init '<meta name="generator" content="grimoire-redirects">';
-
-# Keys of the plugin's table that are Grimoire's, not a redirect.
-def const RESERVED as list of string init ["command", "args"];
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 /**
  * One redirect: where a reader asks, and where they are sent.
@@ -64,13 +53,6 @@ export def struct Move {
     from as string,
     target as string
 };
-
-# A key as one segment of a JSON pointer. A redirect's key is a path, and a
-# pointer separates its segments with the same character. RFC 6901 order: `~`
-# first, then `/`.
-func pointerKey(key as string) {
-    return strings.replace(strings.replace($key, "~", "~0"), "/", "~1");
-}
 
 # Path segments, with the empty ones dropped, so that `a//b` and `./a/b` mean
 # what they look like.
@@ -156,17 +138,11 @@ export func stub(move as Move, language as string) {
  */
 export func moves(req as json.Value) {
     def out as list of Move;
-    if (not json.has($req, "/plugin/settings")) {
-        return $out;
-    }
-    def names as list of string init lists.sort(json.keys($req, "/plugin/settings"));
-    for (def key in $names) {
-        if (lists.contains(RESERVED, $key)) {
-            continue;
-        }
-        def at as string init "/plugin/settings/" + pointerKey($key);
+    for (def key in lists.sort(kit.settingKeys($req))) {
+        def at as string init "/plugin/settings/" + kit.pointerKey($key);
         if (json.typeOf(json.get($req, $at)) != "string") {
-            fail("redirect \"" + $key + "\" is not a path: a redirect is one string to another");
+            kit.fail("redirect \"" + $key +
+                "\" is not a path: a redirect is one string to another");
         }
         $out[] = Move{from: $key, target: json.asString($req, $at)};
     }
@@ -256,24 +232,18 @@ export func write(req as json.Value) {
     return [strings.join($written, "\n"), strings.join($warnings, "\n")];
 }
 
-# The reply, as the contract spells it: two optional lists of strings.
+# The reply, as the contract spells it: two optional lists of strings, each
+# handed over here as lines.
 func reply(written as string, warnings as string) {
-    def parts as list of string init ['"api":' + convert.toString(API)];
+    def w as list of string;
     if ($written != "") {
-        def items as list of string;
-        for (def w in strings.split($written, "\n")) {
-            $items[] = json.encode($w);
-        }
-        $parts[] = '"written":[' + strings.join($items, ",") + ']';
+        $w = strings.split($written, "\n");
     }
+    def warned as list of string;
     if ($warnings != "") {
-        def items as list of string;
-        for (def w in strings.split($warnings, "\n")) {
-            $items[] = json.encode($w);
-        }
-        $parts[] = '"warnings":[' + strings.join($items, ",") + ']';
+        $warned = strings.split($warnings, "\n");
     }
-    return '{' + strings.join($parts, ",") + '}';
+    return kit.rendererReply($w, $warned);
 }
 
 /**
@@ -283,23 +253,11 @@ func reply(written as string, warnings as string) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "renderer") {
-            fail("this is a renderer; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
+        def req as json.Value init kit.request($request, "renderer");
         def result as list of string init write($req);
         io.printf("%s", reply($result[0], $result[1]));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-redirects: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-redirects", $e.message);
     }
 }

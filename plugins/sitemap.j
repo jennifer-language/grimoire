@@ -35,18 +35,10 @@ use json;
 use xml;
 use strings;
 use convert;
-
-def const API as int init 1;
+import "../src/pluginkit.j" as kit;
 
 # The namespace a sitemap has to declare to be one.
 def const SITEMAP_NS as string init "http://www.sitemaps.org/schemas/sitemap/0.9";
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 /**
  * The base and a page path, with exactly one slash between them.
@@ -111,16 +103,6 @@ export func robotsTxt(base as string) {
     return "User-agent: *\nAllow: /\nSitemap: " + join($base, "sitemap.xml") + "\n";
 }
 
-# The reply, as the contract spells it: what was written, and nothing else.
-func reply(written as list of string) {
-    def quoted as list of string;
-    for (def name in $written) {
-        $quoted[] = json.encode($name);
-    }
-    return '{"api":' + convert.toString(API) + ',"written":[' +
-        strings.join($quoted, ",") + ']}';
-}
-
 /**
  * Write the sitemap, and the robots file when there is none.
  * @param req {json.Value} the decoded request
@@ -149,30 +131,15 @@ export func write(req as json.Value, base as string) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "renderer") {
-            fail("this is a renderer; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
-        def base as string init "";
-        if (json.has($req, "/plugin/settings/baseUrl")) {
-            $base = json.asString($req, "/plugin/settings/baseUrl");
-        }
+        def req as json.Value init kit.request($request, "renderer");
+        def base as string init kit.settingText($req, "baseUrl", "");
         if ($base == "") {
-            io.printf('{"api":%d,"warnings":["no baseUrl configured, nothing written"]}', API);
+            io.printf("%s", kit.rendererReply([], ["no baseUrl configured, nothing written"]));
             return 0;
         }
-        io.printf("%s", reply(write($req, $base)));
+        io.printf("%s", kit.rendererReply(write($req, $base), []));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-sitemap: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-sitemap", $e.message);
     }
 }
