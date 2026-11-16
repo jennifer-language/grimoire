@@ -753,6 +753,12 @@ a:hover { color: var(--gr-accent-hover); }
 
 .gr-content p { margin: 0 0 16px; }
 .gr-content ul, .gr-content ol { margin: 0 0 16px; padding-left: 1.5em; }
+
+/* Display maths. A browser gives `<math display="block">` no margin, so a
+   formula would sit against the paragraphs around it; it gets the spacing of
+   a paragraph instead. A formula wider than the column scrolls rather than pushing
+   the page sideways. */
+.gr-content math[display="block"] { margin: 0 0 16px; overflow-x: auto; }
 .gr-content li { margin: 4px 0; }
 .gr-content li > ul, .gr-content li > ol { margin: 4px 0 0; }
 
