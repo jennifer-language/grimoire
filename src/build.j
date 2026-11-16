@@ -378,7 +378,42 @@ func copyAssets(c as config.Config) {
         $count = $count + 1;
     }
     # After the tree, so the two fixed names are the last word on their paths.
-    return $count + placeBrandFiles($c);
+    return $count + placeBrandFiles($c) + copyGenerated($c);
+}
+
+# copyGenerated mirrors the files preprocessors wrote into the site, under
+# `_generated/` - the path a chapter's link already names, because those files
+# are treated as lying there in the source tree.
+#
+# The directory is the build's own while a preprocessor runs (the source may not
+# have one, see `plugin.refuseGenerated`), so it is emptied first: a diagram
+# deleted from a chapter would otherwise stay published for ever under a build
+# that is not `--clean`, and every edit under `serve --watch` would leave
+# another file behind. A book with no preprocessor leaves the directory alone,
+# because there it can only be the author's.
+func copyGenerated(c as config.Config) {
+    def from as string init config.generatedDir($c);
+    if ($from == "") {
+        return 0;
+    }
+    def into as string init path.join($c.outDir, config.generatedName());
+    if (fs.exists($into)) {
+        fs.removeAll($into);
+    }
+    if (not fs.isDir($from)) {
+        return 0;
+    }
+    def count as int init 0;
+    for (def st in fs.walk($from)) {
+        if ($st.isDir) {
+            continue;
+        }
+        def target as string init path.join($into, relativeTo($from, $st.path));
+        fs.mkdirAll(path.dir($target));
+        fs.writeBytes($target, fs.readBytes($st.path));
+        $count = $count + 1;
+    }
+    return $count;
 }
 
 # redirect is the stand-in landing page for a book whose outline has no chapter
@@ -931,8 +966,10 @@ export func run(c as config.Config) {
     def pdfTasks as list of task of int;
     if ($c.pdf) {
         note($c, "  pdf     laying out " + $c.pdfOutput + " (alongside the site)");
+        # The chapters as the preprocessors above left them: the layout reads
+        # the same scratch tree the site does, which outlives this task.
         $pdfTasks[] = spawn {
-            return writePdf($c, $entries);
+            return layoutPdf($c, $entries);
         };
     }
     def jobs as int init workerCount($c, len($pages));
@@ -1020,17 +1057,24 @@ export func run(c as config.Config) {
  * @throws {Error} when the document cannot be laid out
  */
 export func writePdf(c as config.Config, entries as list of summary.Entry) {
+    # `grimoire pdf` builds the same book as `grimoire build`, so the chapters
+    # reach the layout through the same preprocessors.
+    $c.contentDir = plugin.preprocess($c, $entries, resolvePages($c, $entries));
+    defer plugin.discard($c, $c.contentDir);
+    return layoutPdf($c, $entries);
+}
+
+# layoutPdf writes the PDF from chapters already preprocessed: `run` hands it
+# the scratch tree its own preprocessors wrote, so a plugin runs once per build
+# rather than once for the site and again for the PDF.
+func layoutPdf(c as config.Config, entries as list of summary.Entry) {
     def target as string init path.join($c.outDir, $c.pdfOutput);
     def dir as string init path.dir($target);
     if ($dir != "" and $dir != ".") {
         fs.mkdirAll($dir);
     }
-    # `grimoire pdf` builds the same book as `grimoire build`, so the chapters
-    # reach the layout through the same preprocessors.
-    $c.contentDir = plugin.preprocess($c, $entries, resolvePages($c, $entries));
     def data as bytes init pdfbook.render($c, $entries);
     fs.writeBytes($target, $data);
-    plugin.discard($c, $c.contentDir);
     return len($data);
 }
 

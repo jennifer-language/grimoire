@@ -204,6 +204,7 @@ func testTextThatLooksLikeMarkupIsEscaped() {
         ["Ada & Grace"],
         [],
         [],
+        [],
         "");
     testing.assertContains($opf, "<dc:title>Tom &amp; Jerry</dc:title>");
     testing.assertContains($opf, "<dc:creator>Ada &amp; Grace</dc:creator>");
@@ -248,16 +249,46 @@ func testPicturesKeepTheirExtension() {
 
 func testPicturesAreFoundRelativeToTheirChapter() {
     def root as string init bookTree();
+    def trees as Trees init Trees{src: path.join($root, "src"), generated: ""};
     def found as list of Picture init pictures(
         '<img src="../img/logo.png">',
-        path.join($root, "src"),
+        $trees,
         "guide/syntax.md");
     testing.assertEqual(len($found), 1);
     testing.assertEqual($found[0].src, "img/logo.png");
     testing.assertEqual($found[0].name, "img-logo.png");
     testing.assertEqual(
-        repictured('<img src="../img/logo.png">', path.join($root, "src"), "guide/syntax.md"),
+        repictured('<img src="../img/logo.png">', $trees, "guide/syntax.md"),
         '<img src="img-logo.png">');
+    fs.removeAll($root);
+}
+
+# A picture a preprocessor generated is linked as `_generated/NAME/...` and lies
+# in the directory the request names as `book.generated`, not in the source.
+func testGeneratedPicturesAreCarriedIn() {
+    def root as string init bookTree();
+    fs.mkdirAll(path.join($root, "gen/mermaid"));
+    fs.writeString(path.join($root, "gen/mermaid/abc.svg"), "<svg/>");
+    def text as string init strings.replace(
+        strings.replace(
+            requestFor($root),
+            '"src":"guide/syntax.md","content":"# Syntax\n\n',
+            '"src":"guide/syntax.md","content":"# Syntax\n\n' +
+                '![d](../_generated/mermaid/abc.svg)\n\n'),
+        ',"out":' + json.encode(path.join($root, "out")),
+        ',"generated":' + json.encode(path.join($root, "gen")) +
+            ',"out":' + json.encode(path.join($root, "out")));
+    def archive as bytes init epubFor(json.decode($text));
+    testing.assertTrue(binary.contains($archive, bytesOf("OEBPS/_generated-mermaid-abc.svg")));
+    testing.assertTrue(binary.contains($archive, bytesOf('src="_generated-mermaid-abc.svg"')));
+    testing.assertTrue(binary.contains($archive, bytesOf("image/svg+xml")));
+    # Without `book.generated` the same link is a file the source does not have,
+    # and is left as written.
+    def older as bytes init epubFor(json.decode(strings.replace(
+        $text,
+        ',"generated":' + json.encode(path.join($root, "gen")),
+        "")));
+    testing.assertFalse(binary.contains($older, bytesOf("OEBPS/_generated-mermaid-abc.svg")));
     fs.removeAll($root);
 }
 
@@ -334,4 +365,59 @@ func testRunRefusesARequestItCannotAnswer() {
     testing.assertEqual(run(strings.replace(requestFor($root), '"renderer"', '"preprocessor"')), 1);
     testing.assertEqual(run(""), 1);
     fs.removeAll($root);
+}
+
+# --- MathML -----------------------------------------------------------
+
+def const MATH_INLINE as string init '<math xmlns="http://www.w3.org/1998/Math/MathML">' +
+    '<semantics><mi>a</mi><mo>&#42;</mo><mi>b</mi><mo>&lt;</mo>' +
+    '<annotation encoding="application/x-tex">a&#42;b &lt;</annotation></semantics></math>';
+
+def const MATH_BLOCK as string init
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' + "\n" +
+    '<semantics><mfrac><mi>a</mi><mi>b</mi></mfrac>' +
+    '<annotation encoding="application/x-tex">\frac{a}{b}</annotation></semantics></math>';
+
+# MathML goes into the content document as MathML, inline and as a block, and
+# the document is still one XML document. Any other raw HTML stays escaped.
+func testMathMlIsCarriedIn() {
+    def md as string init "# Maths\n\nLet " + MATH_INLINE + " hold, <b>not</b> this.\n\n" +
+        MATH_BLOCK + "\n\n<div>raw</div>\n";
+    def parts as Xhtml init chapterParts($md);
+    testing.assertTrue($parts.mathml);
+    testing.assertContains(
+        $parts.body,
+        "<p>Let <math xmlns=\"http://www.w3.org/1998/Math/MathML\">");
+    testing.assertContains($parts.body, "&lt;b&gt;not&lt;/b&gt;");
+    testing.assertContains($parts.body, "display=\"block\"");
+    testing.assertContains($parts.body, "&lt;div&gt;raw&lt;/div&gt;");
+    def page as string init document("en", "Maths", $parts.body);
+    def root as xml.Value init xml.decode($page);
+    testing.assertEqual(xml.tag($root), "html");
+    testing.assertContains($page, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"");
+    testing.assertFalse(chapterParts("# Plain\n\ntext\n").mathml);
+}
+
+# EPUB 3 asks a content document with MathML to say so in the package, and
+# only that one.
+func testAChapterWithMathMlIsMarkedInThePackage() {
+    def root as string init bookTree();
+    def text as string init strings.replace(
+        requestFor($root),
+        '"# Intro\n\nSee [syntax](guide/syntax.md).\n"',
+        json.encode("# Intro\n\n" + MATH_BLOCK + "\n"));
+    def archive as bytes init epubFor(json.decode($text));
+    testing.assertTrue(binary.contains(
+        $archive,
+        bytesOf('href="index.xhtml" media-type="application/xhtml+xml" properties="mathml"')));
+    testing.assertFalse(binary.contains(
+        $archive,
+        bytesOf('href="guide-syntax.xhtml" media-type="application/xhtml+xml" properties')));
+    fs.removeAll($root);
+}
+
+# A heading's id is made without its maths, as the site makes it.
+func testAHeadingIdLeavesTheMathsOut() {
+    def body as string init chapterXhtml("# Sum of " + MATH_INLINE + " terms\n");
+    testing.assertContains($body, 'id="sum-of-terms"');
 }

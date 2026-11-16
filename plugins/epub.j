@@ -52,8 +52,9 @@ use binary;
 
 import "markdown.j" as markdown;
 import "doctree.j" as doctree;
+import "../src/pluginkit.j" as kit;
+import "../src/mathml.j" as mathml;
 
-def const API as int init 1;
 def const MIMETYPE as string init "application/epub+zip";
 
 # Every entry carries the same date, so two builds of the same book are the same
@@ -66,13 +67,6 @@ def struct File {
     name as string,
     data as bytes
 };
-
-# A refusal, rather than an exit: `run` turns it into a status and a message on
-# stderr, and a test can catch it. `exit` inside a module would take the test
-# runner with it.
-func fail(message as string) {
-    throw Error{kind: "plugin", message: $message, file: "", line: 0, col: 0};
-}
 
 func bytesOf(text as string) {
     return convert.bytesFromString("utf-8", $text);
@@ -222,7 +216,7 @@ func bodyOf(body as string) {
     try {
         return xml.decode("<body>" + $body + "</body>", {"": XHTML_NS, "epub": OPS_NS});
     } catch (e) {
-        fail("a chapter did not render as XML: " + $e.message);
+        kit.fail("a chapter did not render as XML: " + $e.message);
     }
     return xml.element("body");
 }
@@ -331,12 +325,33 @@ def struct Picture {
     name as string
 };
 
+# Where a book's pictures are on disk: the source tree, and the directory that
+# stands in for `_generated/` under it - files a preprocessor wrote, which
+# Grimoire names in `book.generated` ("" when none ran).
+def struct Trees {
+    src as string,
+    generated as string
+};
+
+# The prefix of a target a preprocessor wrote.
+def const GENERATED as string init "_generated/";
+
+# The file a book-relative target names, whichever tree holds it.
+func located(trees as Trees, target as string) {
+    if ($trees.generated != "" and strings.startsWith($target, GENERATED)) {
+        return path.join(
+            $trees.generated,
+            strings.substring($target, len(GENERATED), len($target)));
+    }
+    return path.join($trees.src, $target);
+}
+
 # Images are copied in and their references rewritten, or the reader is handed a
 # book with holes in it. A picture that is not under the source directory, or
 # whose type has no media type here, is left alone: the reference then points
 # outside the archive, which is the author's own link and not this program's to
 # break.
-func pictures(html as string, root as string, src as string) {
+func pictures(html as string, trees as Trees, src as string) {
     def out as list of Picture;
     def dir as string init path.dir($src);
     for (def m in regex.findAll('<img[^>]+src="([^"]+)"', $html)) {
@@ -345,7 +360,7 @@ func pictures(html as string, root as string, src as string) {
             continue;
         }
         def target as string init path.clean(path.join($dir, $wanted));
-        if (mediaOf($target) == "" or not fs.isFile(path.join($root, $target))) {
+        if (mediaOf($target) == "" or not fs.isFile(located($trees, $target))) {
             continue;
         }
         $out[] = Picture{src: $target, name: pictureName($target)};
@@ -368,7 +383,7 @@ func pictureName(src as string) {
     return $out;
 }
 
-func repictured(html as string, root as string, src as string) {
+func repictured(html as string, trees as Trees, src as string) {
     def out as string init $html;
     def dir as string init path.dir($src);
     for (def m in regex.findAll('src="([^"]+)"', $html)) {
@@ -377,7 +392,7 @@ func repictured(html as string, root as string, src as string) {
             continue;
         }
         def target as string init path.clean(path.join($dir, $wanted));
-        if (mediaOf($target) == "" or not fs.isFile(path.join($root, $target))) {
+        if (mediaOf($target) == "" or not fs.isFile(located($trees, $target))) {
             continue;
         }
         $out = strings.replace($out, $m.text, 'src="' + pictureName($target) + '"');
@@ -485,6 +500,7 @@ func contentOpf(
     description as string,
     authors as list of string,
     chapters as list of File,
+    mathml as list of string,
     images as list of File,
     cover as string) {
     def manifest as xml.Value init xml.element("manifest");
@@ -496,7 +512,14 @@ func contentOpf(
     def n as int init 0;
     for (def f in $chapters) {
         def id as string init "ch" + convert.toString($n);
-        $manifest = xml.append($manifest, manifestItem($id, $f.name, "application/xhtml+xml", ""));
+        # EPUB 3 asks every content document that holds MathML to say so.
+        def properties as string init "";
+        if (lists.contains($mathml, $f.name)) {
+            $properties = "mathml";
+        }
+        $manifest = xml.append(
+            $manifest,
+            manifestItem($id, $f.name, "application/xhtml+xml", $properties));
         $spine = xml.append($spine, xml.setAttr(xml.element("itemref"), "idref", $id));
         $n = $n + 1;
     }
@@ -644,6 +667,26 @@ func squeeze(s as string) {
  * @return {string} the rendered XHTML
  */
 export func chapterXhtml(md as string) {
+    return chapterParts($md).body;
+}
+
+# A chapter's XHTML, and whether it carries MathML: the package has to say so
+# for each content document that does.
+def struct Xhtml {
+    body as string,
+    mathml as bool
+};
+
+# headingText is a heading as its id is made from: without its maths, as the
+# site makes it, so a link to `page.md#heading` lands in both editions.
+func headingText(node as doctree.Node) {
+    if (not mathml.holds($node)) {
+        return doctree.text($node);
+    }
+    return doctree.text(mathml.rewrite($node, "drop", 0).node);
+}
+
+func chapterParts(md as string) {
     def doc as doctree.Node init markdown.parse($md);
     def kids as list of doctree.Node;
     def seen as map of string to int;
@@ -652,7 +695,7 @@ export func chapterXhtml(md as string) {
             $kids[] = $node;
             continue;
         }
-        def base as string init slugify(squeeze(doctree.text($node)));
+        def base as string init slugify(squeeze(headingText($node)));
         def id as string init $base;
         if (maps.has($seen, $base)) {
             $id = $base + "-" + convert.toString($seen[$base]);
@@ -678,7 +721,19 @@ export func chapterXhtml(md as string) {
         $kids[] = $heading;
     }
     $doc.children = $kids;
-    return doctree.render("xhtml", $doc);
+    if (not mathml.holds($doc)) {
+        return Xhtml{body: doctree.render("xhtml", $doc), mathml: false};
+    }
+    # MathML goes through and nothing else does. Each element is swapped for a
+    # placeholder that renders as plain text, the chapter is rendered with all
+    # other raw HTML escaped as before, and the elements, checked by
+    # `mathml.accepted`, go back where their placeholders are.
+    def marked as mathml.Rewritten init mathml.rewrite($doc, "mark", 0);
+    def body as string init doctree.render("xhtml", $marked.node);
+    for (def n in 0..len($marked.taken)) {
+        $body = strings.replace($body, mathml.placeholder($n), $marked.taken[$n]);
+    }
+    return Xhtml{body: $body, mathml: true};
 }
 
 # --- building the book -----------------------------------------------
@@ -699,21 +754,30 @@ export func chapterXhtml(md as string) {
 func chapterFile(
     req as json.Value,
     at as string,
-    root as string,
+    trees as Trees,
     sources as list of string,
     titles as map of string to string) {
     def src as string init json.asString($req, $at + "/src");
-    def body as string init chapterXhtml(json.asString($req, $at + "/content"));
-    $body = repictured(relinked($body, $src, $sources), $root, $src);
+    def parts as Xhtml init chapterParts(json.asString($req, $at + "/content"));
+    def body as string init repictured(relinked($parts.body, $src, $sources), $trees, $src);
     def heading as string init $src;
     if (maps.has($titles, $src)) {
         $heading = $titles[$src];
     }
-    return File{
-        name: fileFor($src),
-        data: bytesOf(document(json.asString($req, "/book/language"), $heading, $body))
+    return Built{
+        file: File{
+            name: fileFor($src),
+            data: bytesOf(document(json.asString($req, "/book/language"), $heading, $body))
+        },
+        mathml: $parts.mathml
     };
 }
+
+# One chapter's content document, and whether it carries MathML.
+def struct Built {
+    file as File,
+    mathml as bool
+};
 
 # The titles the outline gives each chapter, which is where a book names them.
 func titlesOf(req as json.Value) {
@@ -740,14 +804,18 @@ func titlesOf(req as json.Value) {
  */
 export func epubFor(req as json.Value) {
     def root as string init json.asString($req, "/book/src");
+    # `book.generated` arrived with the `files` feature; an older Grimoire sends
+    # neither, and its books have no generated pictures to carry.
+    def trees as Trees init Trees{src: $root, generated: ""};
+    if (json.has($req, "/book/generated")) {
+        $trees.generated = json.asString($req, "/book/generated");
+    }
     def lang as string init json.asString($req, "/book/language");
     def css as string init CSS;
-    if (json.has($req, "/plugin/settings/stylesheet")) {
-        def sheet as string init path.join(
-            $root,
-            json.asString($req, "/plugin/settings/stylesheet"));
+    if (kit.hasSetting($req, "stylesheet")) {
+        def sheet as string init path.join($root, kit.settingText($req, "stylesheet", ""));
         if (not fs.isFile($sheet)) {
-            fail("stylesheet not found: " + $sheet);
+            kit.fail("stylesheet not found: " + $sheet);
         }
         $css = fs.readString($sheet);
     }
@@ -757,33 +825,38 @@ export func epubFor(req as json.Value) {
     }
     def titles as map of string to string init titlesOf($req);
     def chapters as list of File;
+    def mathml as list of string;
     def images as list of File;
     def seen as map of string to int;
     for (def i in 0..json.length($req, "/chapters")) {
         def at as string init "/chapters/" + convert.toString($i);
         def src as string init json.asString($req, $at + "/src");
         def body as string init markdown.toHtml(json.asString($req, $at + "/content"));
-        for (def picture in pictures($body, $root, $src)) {
+        for (def picture in pictures($body, $trees, $src)) {
             if (maps.has($seen, $picture.name)) {
                 continue;
             }
             $seen[$picture.name] = 1;
             $images[] = File{
                 name: $picture.name,
-                data: fs.readBytes(path.join($root, $picture.src))
+                data: fs.readBytes(located($trees, $picture.src))
             };
         }
-        $chapters[] = chapterFile($req, $at, $root, $sources, $titles);
+        def built as Built init chapterFile($req, $at, $trees, $sources, $titles);
+        $chapters[] = $built.file;
+        if ($built.mathml) {
+            $mathml[] = $built.file.name;
+        }
     }
     def coverName as string init "";
-    if (json.has($req, "/plugin/settings/cover")) {
-        def coverPath as string init json.asString($req, "/plugin/settings/cover");
+    if (kit.hasSetting($req, "cover")) {
+        def coverPath as string init kit.settingText($req, "cover", "");
         def coverFile as string init path.join($root, $coverPath);
         if (not fs.isFile($coverFile)) {
-            fail("cover not found: " + $coverFile);
+            kit.fail("cover not found: " + $coverFile);
         }
         if (mediaOf($coverPath) == "") {
-            fail("cover is not an image this can carry: " + $coverPath);
+            kit.fail("cover is not an image this can carry: " + $coverPath);
         }
         $coverName = pictureName($coverPath);
         if (not maps.has($seen, $coverName)) {
@@ -807,6 +880,7 @@ export func epubFor(req as json.Value) {
             json.asString($req, "/book/description"),
             $authors,
             $chapters,
+            $mathml,
             $images,
             $coverName))
     };
@@ -835,32 +909,17 @@ export func epubFor(req as json.Value) {
  */
 export func run(request as string) {
     try {
-        if (strings.trim($request) == "") {
-            fail("no request on stdin");
-        }
-        def req as json.Value init json.decode($request);
-        if (json.asInt($req, "/api") != API) {
-            fail("this plugin speaks api " + convert.toString(API) +
-                ", the request speaks " + convert.toString(json.asInt($req, "/api")));
-        }
-        if (json.asString($req, "/kind") != "renderer") {
-            fail("this is a renderer; the request asks for a " +
-                json.asString($req, "/kind"));
-        }
-        def output as string init "book.epub";
-        if (json.has($req, "/plugin/settings/output")) {
-            $output = json.asString($req, "/plugin/settings/output");
-        }
+        def req as json.Value init kit.request($request, "renderer");
+        def output as string init kit.settingText($req, "output", "book.epub");
         def epubPath as string init path.join(json.asString($req, "/book/out"), $output);
         def epubDir as string init path.dir($epubPath);
         if ($epubDir != "" and $epubDir != ".") {
             fs.mkdirAll($epubDir);
         }
         fs.writeBytes($epubPath, epubFor($req));
-        io.printf('{"api":%d,"written":[%s]}', API, json.encode($output));
+        io.printf("%s", kit.rendererReply([$output], []));
         return 0;
     } catch (e) {
-        io.eprintf("grimoire-epub: %s\n", $e.message);
-        return 1;
+        return kit.report("grimoire-epub", $e.message);
     }
 }

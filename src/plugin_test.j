@@ -117,7 +117,9 @@ func testTheRequestCarriesTheBookAndTheChapters() {
         "preprocessor",
         pagesOf(),
         pagesOf(),
-        sourcesOf());
+        sourcesOf(),
+        "",
+        "");
     def doc as json.Value init json.decode($body);
     testing.assertEqual(json.asInt($doc, "/api"), 1);
     testing.assertEqual(json.asString($doc, "/book/title"), "The Book");
@@ -150,7 +152,9 @@ func testTheRequestCarriesTheOutline() {
         "preprocessor",
         $entries,
         pagesOf(),
-        sourcesOf());
+        sourcesOf(),
+        "",
+        "");
     def doc as json.Value init json.decode($body);
     testing.assertEqual(json.length($doc, "/entries"), 2);
     testing.assertEqual(json.asString($doc, "/entries/0/kind"), summary.partKind());
@@ -169,9 +173,185 @@ func testTheRequestEscapesTheContent() {
         "preprocessor",
         $pages,
         $pages,
-        $sources);
+        $sources,
+        "",
+        "");
     def doc as json.Value init json.decode($body);
     testing.assertEqual(json.asString($doc, "/chapters/0/content"), $sources["index.md"]);
+}
+
+# --- generated files -------------------------------------------------
+
+# The feature is advertised in the request, so a plugin that needs it can refuse
+# an older Grimoire. A preprocessor is told where to write; a renderer writes
+# under `book.out` and is only told where the generated files are.
+func testTheRequestOffersTheFilesFeature() {
+    def pre as json.Value init json.decode(request(
+        config.defaults(),
+        specFor("x"),
+        "preprocessor",
+        pagesOf(),
+        pagesOf(),
+        sourcesOf(),
+        "/tmp/scratch/_generated/probe",
+        "/tmp/scratch/_generated"));
+    testing.assertEqual(json.asString($pre, "/features/0"), "files");
+    testing.assertEqual(json.asString($pre, "/features/1"), "mathml");
+    testing.assertEqual(json.asString($pre, "/plugin/files"), "/tmp/scratch/_generated/probe");
+    testing.assertEqual(json.asString($pre, "/book/generated"), "/tmp/scratch/_generated");
+    def post as json.Value init json.decode(request(
+        config.defaults(),
+        specFor("x"),
+        "renderer",
+        pagesOf(),
+        pagesOf(),
+        sourcesOf(),
+        "",
+        ""));
+    testing.assertEqual(json.asString($post, "/features/0"), "files");
+    testing.assertFalse(json.has($post, "/plugin/files"));
+    testing.assertEqual(json.asString($post, "/book/generated"), "");
+}
+
+# The shell line that reads `plugin.files` off a request into `$dir`, which is
+# enough for a path with no quote in it.
+def const FILES_OF_REQUEST as string init
+    'dir=$(printf "%s" "$req" | sed -n "s/.*\"files\":\"\([^\"]*\)\".*/\1/p")';
+
+# A shell plugin that lists its `plugin.files` directory into `seen`, writes a
+# picture there, and answers with an empty reply.
+func plugWritingFiles(seen as string) {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-plug-");
+    def file as string init path.join($dir, "plug.sh");
+    def script as list of string init [
+        '#!/bin/sh',
+        'req=$(cat)',
+        FILES_OF_REQUEST,
+        'printf "%s\n" "$dir" > ' + $seen,
+        'ls -A "$dir" >> ' + $seen,
+        'echo "<svg/>" > "$dir/pic.svg"',
+        'echo "{\"api\":1}"'
+    ];
+    fs.writeString($file, strings.join($script, "\n") + "\n");
+    os.run(["chmod", "+x", $file]);
+    return $file;
+}
+
+# Each preprocessor gets an empty directory of its own, as an absolute path in
+# the scratch tree, at the place `_generated/NAME` names under the book.
+func testAPreprocessorWritesIntoItsOwnDirectory() {
+    def root as string init book();
+    def seen as string init path.join(os.tempDir(), "grimoire-plugin-files.txt");
+    def c as config.Config init configWith($root, plugWritingFiles($seen));
+    def pages as list of summary.Entry init pagesOf();
+    def dir as string init preprocess($c, $pages, $pages);
+    def lines as list of string init strings.split(strings.trim(fs.readString($seen)), "\n");
+    # The path, and nothing listed after it: the directory was empty.
+    testing.assertEqual(len($lines), 1);
+    testing.assertEqual($lines[0], path.join($dir, "_generated/probe"));
+    testing.assertTrue(path.isAbs($lines[0]));
+    testing.assertTrue(fs.isFile(path.join($dir, "_generated/probe/pic.svg")));
+    $c.contentDir = $dir;
+    testing.assertEqual(config.generatedDir($c), path.join($dir, "_generated"));
+    discard($c, $dir);
+    fs.removeAll($root);
+    fs.removeAll($seen);
+}
+
+# `_generated` in the source would claim the paths a plugin's files are treated
+# as having, so a book that has one is refused before anything runs.
+func testASourceWithItsOwnGeneratedIsRefused() {
+    def root as string init book();
+    fs.mkdirAll(path.join($root, "_generated"));
+    def c as config.Config init configWith($root, plugAnswering('{"api":1}'));
+    def pages as list of summary.Entry init pagesOf();
+    def threw as bool init false;
+    try {
+        preprocess($c, $pages, $pages);
+    } catch (e) {
+        $threw = true;
+        testing.assertEqual($e.kind, "grimoire");
+        testing.assertContains($e.message, "_generated");
+        testing.assertContains($e.message, "reserved");
+    }
+    testing.assertTrue($threw);
+    fs.removeAll($root);
+}
+
+# A failed preprocessor takes the scratch tree with it: under `serve --watch` a
+# build that keeps failing would otherwise fill the temp directory.
+func testAFailedPreprocessorLeavesNoScratchTree() {
+    def root as string init book();
+    def seen as string init path.join(os.tempDir(), "grimoire-plugin-files-failed.txt");
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-plug-");
+    def file as string init path.join($dir, "plug.sh");
+    def script as list of string init [
+        '#!/bin/sh',
+        'req=$(cat)',
+        FILES_OF_REQUEST,
+        'printf "%s" "$dir" > ' + $seen,
+        'echo nope >&2',
+        'exit 1'
+    ];
+    fs.writeString($file, strings.join($script, "\n") + "\n");
+    os.run(["chmod", "+x", $file]);
+    def c as config.Config init configWith($root, $file);
+    def pages as list of summary.Entry init pagesOf();
+    def threw as bool init false;
+    try {
+        preprocess($c, $pages, $pages);
+    } catch (e) {
+        $threw = true;
+    }
+    testing.assertTrue($threw);
+    def files as string init strings.trim(fs.readString($seen));
+    testing.assertContains($files, "grimoire-content-");
+    testing.assertFalse(fs.exists($files));
+    testing.assertFalse(fs.exists(path.dir(path.dir($files))));
+    fs.removeAll($root);
+    fs.removeAll($seen);
+    fs.removeAll($dir);
+}
+
+# The table name becomes a directory, so one that would climb out of the
+# scratch tree, or nest, is refused.
+func testATableNameThatIsNoDirectoryNameIsRefused() {
+    def root as string init book();
+    def c as config.Config init configWith($root, plugAnswering('{"api":1}'));
+    $c.preprocessors[0].name = "..";
+    def pages as list of summary.Entry init pagesOf();
+    def threw as bool init false;
+    try {
+        preprocess($c, $pages, $pages);
+    } catch (e) {
+        $threw = true;
+        testing.assertContains($e.message, "directory name");
+    }
+    testing.assertTrue($threw);
+    fs.removeAll($root);
+}
+
+# A renderer is told where the generated files are, so an edition that carries
+# pictures in can find them; with no preprocessor there are none.
+func testARendererIsToldWhereGeneratedFilesAre() {
+    def root as string init book();
+    def seen as string init path.join(os.tempDir(), "grimoire-renderer-generated.json");
+    def c as config.Config init rendererConfig($root, plugRecording($seen, '{"api":1}'));
+    def pages as list of summary.Entry init pagesOf();
+    render($c, $pages, $pages);
+    testing.assertEqual(json.asString(json.decode(fs.readString($seen)), "/book/generated"), "");
+    def scratch as string init fs.makeTempDir(os.tempDir(), "grimoire-content-");
+    fs.writeString(path.join($scratch, "index.md"), "# One\n");
+    fs.mkdirAll(path.join($scratch, "deep"));
+    fs.writeString(path.join($scratch, "deep/two.md"), "# Two\n");
+    $c.contentDir = $scratch;
+    render($c, $pages, $pages);
+    testing.assertEqual(
+        json.asString(json.decode(fs.readString($seen)), "/book/generated"),
+        path.join($scratch, "_generated"));
+    fs.removeAll($scratch);
+    fs.removeAll($root);
+    fs.removeAll($seen);
 }
 
 # --- the reply -------------------------------------------------------

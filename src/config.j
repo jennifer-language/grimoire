@@ -19,6 +19,8 @@ use lists;
 use convert;
 use time;
 
+import "./pluginkit.j" as kit;
+
 /**
  * A resolved book configuration. The `book` fields describe the document, the
  * `html` fields the generated site, and the `pdf` fields the printable build.
@@ -401,6 +403,31 @@ export func contentDir(c as Config) {
         return $c.srcDir;
     }
     return $c.contentDir;
+}
+
+/**
+ * The name of the directory generated files are treated as lying in, under
+ * `src`: `_generated`.
+ * @return {string} the directory name
+ */
+export func generatedName() {
+    return kit.generatedName();
+}
+
+/**
+ * Where the files preprocessors generated for this build actually are: the
+ * `_generated` directory of the scratch tree, or "" when no preprocessor ran.
+ *
+ * A target under `_generated/` in a chapter is looked up here rather than under
+ * `src`, by the asset copy and the printable book alike.
+ * @param c {Config} the book configuration
+ * @return {string} the directory, or ""
+ */
+export func generatedDir(c as Config) {
+    if ($c.contentDir == "" or $c.contentDir == $c.srcDir) {
+        return "";
+    }
+    return $c.contentDir + "/" + kit.generatedName();
 }
 
 /**

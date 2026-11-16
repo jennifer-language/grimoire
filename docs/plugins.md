@@ -33,10 +33,10 @@ Set `command` for anything else, and `args` for arguments that come before the
 request:
 
 ```toml
-[preprocessor.mermaid]
-command = "./tools/mermaid-to-svg"
-args = ["--scale", "2"]
-theme = "dark"
+[preprocessor.diagrams]
+command = "./tools/draw-diagrams"
+args = ["--strict"]
+style = "dark"
 ```
 
 A `command` with a `/` in it is a path, used as written - which is how a book
@@ -113,24 +113,8 @@ reaches the network only when `external` is on.
 Each one has a book of its own under `examples/` in the Grimoire repository,
 small enough to read in one screen, which the pipeline builds on every push.
 
-**Two more are maintained separately**, because each drives a program that would
-otherwise have to be installed alongside Grimoire:
-
-| | | |
-| - | - | - |
-| [`grimoire-mermaid`](https://github.com/jennifer-language/grimoire-mermaid) | preprocessor | draws `mermaid` fences while the book is built (needs `mmdc`) |
-| [`grimoire-katex`](https://github.com/jennifer-language/grimoire-katex) | preprocessor | typesets `$$ ... $$` display maths to MathML (needs `katex`) |
-
-Both are Jennifer apps, so [jvc](https://github.com/jennifer-language/jvc)
-installs them and puts the command where Grimoire looks:
-
-```sh
-jvc app install https://github.com/jennifer-language/grimoire-mermaid
-```
-
-`--scope project` installs one beside a single book instead, at
-`bin/grimoire-mermaid`, which is then what `command` points at. Without jvc, a
-checkout and a path in `grimoire.toml` work the same way.
+For plugins written by users, see the
+[`grimoire-plugin` topic](https://github.com/topics/grimoire-plugin) on GitHub.
 
 ### `grimoire-include`
 
@@ -358,14 +342,15 @@ It takes the Markdown from the request rather than the built HTML, so what it
 renders is what the book says. Links between chapters are rewritten to the files
 inside the archive, fragments included, and headings carry the ids the site gives
 them, so a link to `page.md#heading` lands on the heading. Pictures are carried
-in. Nothing has
+in, the ones a preprocessor generated included. Nothing has
 to be installed: an EPUB is a zip of XHTML and two small XML files, and the
 interpreter ships everything that takes - `doctree` writes the chapters
 as the well-formed XML a content document has to be, and the `xml` library builds
 the package and the navigation.
 
 A chapter's own raw HTML is escaped rather than passed through, which is the one
-place the EPUB differs from the site. A hand-written `<div>` need only be valid
+place the EPUB differs from the site; [MathML](#mathml) is the exception, carried
+in as it is. A hand-written `<div>` need only be valid
 HTML5 to reach a page; an EPUB reader refuses a content document that is not
 valid XML, so every chapter is parsed back before it goes into the archive and a
 book that would produce one is a failed build rather than a file nothing opens.
@@ -459,10 +444,12 @@ without comment, which is what keeps a build that is not `--clean` quiet.
 The request arrives on stdin as a single JSON object:
 
 ```json
-{"api": 1,
+{"api": 1, "kind": "preprocessor", "features": ["files", "mathml"],
  "book": {"title": "...", "description": "...", "authors": ["Ada"],
-          "language": "en", "src": "docs", "out": "site"},
- "plugin": {"name": "include", "settings": {"theme": "dark"}},
+          "language": "en", "src": "docs", "out": "site",
+          "generated": "/tmp/grimoire-content-123/_generated"},
+ "plugin": {"name": "include", "settings": {"theme": "dark"},
+            "files": "/tmp/grimoire-content-123/_generated/include"},
  "entries": [{"kind": "page", "title": "Introduction", "src": "index.md",
               "out": "index.html", "level": 0, "number": "1"}],
  "chapters": [{"src": "index.md", "content": "# Introduction\n..."}]}
@@ -493,6 +480,9 @@ name.
 | `api` | the contract version, `1`. Refuse a request whose version you do not know, and Grimoire refuses a reply that does not claim its own |
 | `entries` | the whole outline, parts and separators included, so a plugin can see where a chapter sits |
 | `chapters` | every chapter the build resolved, in outline order |
+| `features` | what this build offers on top of api 1: `"files"` and `"mathml"`, see below |
+| `plugin.files` | a preprocessor's own directory for generated files, absolute and empty; a renderer gets none |
+| `book.generated` | the directory that stands in for `book.src/_generated`, absolute, or `""` when no preprocessor ran |
 | a preprocessor's reply | may be sparse: a chapter it does not mention is unchanged. Naming one the book does not have is an error |
 | a renderer's reply | `written` and `warnings`, both optional; the files themselves are the renderer's to write |
 | exit code | `0`, or the build stops |
@@ -507,6 +497,128 @@ Adding or reordering chapters is not part of this version. Only the `chapters`
 in a preprocessor's reply are read back, so a plugin changes what a chapter says,
 never which chapters exist.
 
+### Generated files
+
+A preprocessor that makes pictures, or anything else a chapter links to, writes
+them into `plugin.files`. Grimoire creates that directory, empty, before the
+plugin runs, inside the scratch tree it builds the rewritten book in, and treats
+every file there as if it lay under `book.src/_generated/NAME/`, where `NAME` is
+the plugin's table name (`plugin.name`). A chapter links to one with the path it
+would use for a file in the source:
+
+```markdown
+![Build flow](../_generated/diagrams/3f9c2a.svg)
+```
+
+from `guide/build.md`, or `_generated/diagrams/3f9c2a.svg` from a chapter at the
+top. From there it is a picture like any other:
+
+- the site gets a copy at the same path, `site/_generated/diagrams/3f9c2a.svg`;
+- the EPUB carries it in, reading it from `book.generated`;
+- the printable book draws it, or draws the PNG beside an SVG, see
+  [images in print](configuration.md#pdf);
+- `grimoire-linkcheck` sees it, because it checks the built site.
+
+The directory is new on every build and goes with the scratch tree, so nothing
+from an earlier build is left in it. A later preprocessor finds what an earlier
+one wrote under `book.generated`, and a renderer is told the same directory.
+
+`_generated` is reserved while any preprocessor is configured:
+
+- a book whose `src` already has a `_generated` file or directory stops the
+  build, and the fix is to rename it;
+- `_generated` in the site belongs to the build. It is emptied and refilled on
+  every build, so a picture a chapter no longer uses does not stay published,
+  with or without `--clean`.
+
+Name files after their content, a hash of what produced them, so a rebuild
+writes the same names and `--jobs` cannot change them. A table name has to be
+usable as a directory name.
+
+### The plugin kit
+
+A plugin written in Jennifer does not have to write any of the above itself.
+Grimoire ships `src/pluginkit.j`, the module its own plugins are built on. It is
+one file that imports only the standard library, so a plugin copies it into its
+own `src/` from the Grimoire release it needs (0.5.0 or later) and imports the
+copy. Refresh the copy when a later release changes it; the version a plugin
+needs is the one its request checks name. Depending on the whole
+`@jennifer/grimoire` deck would vendor all of Grimoire into every plugin, so
+that is not the way; a deck holding only the kit is planned.
+
+```jennifer
+import "./pluginkit.j" as kit;
+
+export func run(request as string) {
+    try {
+        def req as json.Value init kit.request($request, "preprocessor");
+        def replies as list of string;
+        # ... kit.chapterReply(src, content) for each chapter it changed
+        io.printf("%s", kit.preprocessorReply($replies));
+        return 0;
+    } catch (e) {
+        return kit.report("grimoire-NAME", $e.message);
+    }
+}
+```
+
+The plugins that ship import it as `../src/pluginkit.j`, since `plugins/` and
+`src/` lie side by side in every install. Errors are `Error` values of kind
+`"plugin"`, or `"limit"` for a reached cap.
+
+| Function | |
+| - | - |
+| `api()`, `features()`, `filesSince()` | the contract version, the features this Grimoire offers, the version that added `files` |
+| `requireFeature(req, name)` | refuse a request without a feature, naming the Grimoire version that added it |
+| `request(text, kind)` | decode a request and refuse an empty one, another api or the other kind |
+| `report(name, message)` | print `name: message` on stderr and return 1, for `run`'s `catch` |
+| `hasFeature(req, name)`, `requireFiles(req)` | whether a feature is offered; `plugin.files`, refusing a Grimoire before 0.5.0 |
+| `chapterReply(src, content)`, `preprocessorReply(chapters)`, `rendererReply(written, warnings)` | the replies |
+| `fail(message)`, `failAt(kind, chapter, line, message)`, `limit(message)` | throw; `failAt` starts the message `chapter:line: ` and fills `file` and `line` |
+| `settingText`, `settingBool`, `settingInt`, `settingNumber`, `settingTexts` `(req, key, fallback)` | a typed setting, refusing a value of another type |
+| `hasSetting(req, key)`, `settingKeys(req)`, `checkSettings(req, known)` | whether a key is set; the plugin's keys; refuse an unknown one. Grimoire's `command` and `args` are allowed and never listed |
+| `reservedKeys()`, `pointerKey(key)` | Grimoire's own keys; a key escaped for a JSON pointer |
+| `fencesIn(content)` | every fenced code block as a `Fence`: `first`, `last`, `closed`, `mark`, `size`, `width`, `indent`, `info`, `body` |
+| `fencedLines(content)` | per line, whether it belongs to a fence: the lines a rewrite leaves alone |
+| `openerOf(line)`, `closes(line, open)`, `languageOf(info)`, `chomp(line)` | the pieces: CommonMark openers and closers, the info string's first word, a line without its `\r` |
+| `generatedName()`, `generatedLink(chapter, plugin, file)` | `_generated`; a chapter-relative link to a generated file |
+| `contentName(parts, digits)` | a hex name from the sha256 of the parts |
+| `runProgram(argv, input)`, `firstLine(text)`, `missingProgram(program, why, install, setting)`, `onPath(command)` | run a program without throwing, as a `Ran` whose `message` is its first error line; the message for one that is not installed |
+| `work(jobs, worker, context, items)` | call `worker(context, item)` for every item, up to `jobs` at a time; results in item order, and the first failure in item order thrown again |
+
+Fences follow CommonMark at the top level of a chapter: three or more backticks
+or tildes, up to three columns in, closed by at least as many of the same
+character with nothing after them, a shorter fence inside a longer one being
+content, and an unclosed fence running to the end. A fence inside a block quote
+is not seen.
+
+### MathML
+
+A preprocessor that typesets maths writes MathML into the chapter: a `<math>`
+element in the MathML namespace, as an HTML block for display maths and inline in
+a paragraph for inline maths. Write the opening tag of a display element alone on
+its line, which is what makes Markdown read an HTML block, and put the rest of
+the element on the next line. In inline maths, write the characters Markdown
+would still read between the tags (`*`, `_`, `` ` ``, `[`, `]`, `\`) as numeric
+entities, `&#42;` and so on, so `a*b*c` is not emphasis.
+
+MathML is not raw HTML to Grimoire. An element is taken as MathML when it is
+well-formed XML, every element in it is in the MathML namespace, and no
+attribute can run or fetch anything (`on...`, `href`, `src`, `style`, or one in
+another namespace). Such an element goes through whatever `[html] rawHtml`
+says, inside list items too, and anything else is treated as before.
+
+| Edition | What MathML becomes |
+| - | - |
+| the site | the element, drawn by the browser in the text's own colour |
+| the EPUB | the element, and the chapter is marked `properties="mathml"` in the package, as EPUB 3 asks |
+| the printable book | the TeX source from `<annotation encoding="application/x-tex">` in monospace: in the line for inline maths, centred on its own lines for display maths |
+| the search index | nothing: an element's text is single letters and operators nobody searches for, and a heading's anchor and contents entry leave it out too |
+
+The request offers `mathml` in `features` from Grimoire 0.5.0; a plugin that
+writes MathML checks for it and refuses an older Grimoire, which would print the
+markup as text in the EPUB and drop it from the printable book.
+
 ## Versions
 
 The request carries `"api": 1`. Read it and refuse a number you do not know
@@ -514,6 +626,17 @@ rather than guessing at a shape; Grimoire refuses a reply that does not claim th
 same number. It changes when the request or the reply changes shape, not when
 Grimoire does, so a plugin that works with api 1 keeps working until that number
 moves.
+
+What only adds to the request is a **feature** instead, listed in `features`,
+and the number stays. A plugin that does not know a feature ignores it. One that
+needs it checks the list and refuses a request without it, naming the Grimoire
+version it needs, because an older Grimoire sends neither the list nor the
+fields behind it:
+
+| Feature | Since | Adds |
+| - | - | - |
+| `files` | 0.5.0 | `plugin.files` for a preprocessor and `book.generated` for both kinds; files under `_generated/` reach every edition |
+| `mathml` | 0.5.0 | a `<math>` element a chapter holds reaches every edition, see [MathML](#mathml) |
 
 ## Publishing one
 
@@ -533,6 +656,9 @@ src/NAME_test.j       the white-box overlay
 deck.toml             the manifest, if you publish it with jvc
 ```
 
+A plugin built on the [plugin kit](#the-plugin-kit) keeps its copy at
+`src/pluginkit.j`, beside its own module.
+
 That layout is also a Jennifer **app**, which is how
 [jvc](https://github.com/jennifer-language/jvc) installs a program: an unscoped
 `name` in `deck.toml` and `bin` pointing at the launcher.
@@ -547,6 +673,9 @@ Grimoire looks for when a book writes `[preprocessor.NAME]` with no `command`.
 Renaming the package renames the command and breaks that. An app is installed
 from its repository rather than from the registry, which indexes decks - trees of
 modules that are vendored and imported, never run.
+
+Give the repository the `grimoire-plugin` topic, so it shows up with the
+[other plugins written by users](https://github.com/topics/grimoire-plugin).
 
 Ship it with a README showing the `grimoire.toml` table that enables it and any
 keys of its own, the api version it speaks, a licence, and a note if it needs

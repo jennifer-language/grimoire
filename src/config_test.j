@@ -474,3 +474,16 @@ func testBothAuthorFormsAreEmptyWithNoAuthors() {
     testing.assertEqual(authorLine($c), "");
     testing.assertEqual(authorCredit($c), "");
 }
+
+# Generated files live in the scratch tree, so there are none without one, and
+# `srcDir` itself is never mistaken for it.
+func testGeneratedDirIsInTheScratchTreeOnly() {
+    def c as Config init defaults();
+    $c.srcDir = "docs";
+    testing.assertEqual(generatedDir($c), "");
+    $c.contentDir = "docs";
+    testing.assertEqual(generatedDir($c), "");
+    $c.contentDir = "/tmp/grimoire-content-1";
+    testing.assertEqual(generatedDir($c), "/tmp/grimoire-content-1/_generated");
+    testing.assertEqual(generatedName(), "_generated");
+}

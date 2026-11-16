@@ -28,6 +28,8 @@ src/
   search.j          the search index
   agents.j          llms.txt and the JSON index, for a reader that is a program
   plugin.j          the plugin contract: run a program over the book
+  pluginkit.j       the plugin side of it, for every plugin written in Jennifer
+  mathml.j          MathML in a chapter, for the site, the EPUB, print and search
   pdfbook.j         the printable build
   serve.j           the local preview server
   util.j            slugs, paths, text helpers
@@ -148,9 +150,11 @@ calling out:
   write; the block is then escaped and shown rather than run.
 
   Inline HTML needs no setting and never did. The parser hands `a <b>bold</b> c`
-  back as a single text node, so the inline path escapes it like any other text -
+  back as tags and text, and the inline path escapes both like any other text -
   which is why `rawHtml` is threaded through three functions rather than through
-  the whole renderer.
+  the whole renderer. A MathML element, inline or a block, is the exception:
+  `mathml.j` checks it (all MathML, nothing that runs or fetches) and it goes
+  through whatever `rawHtml` says.
 - A **`page_break`** renders as nothing. It is a directive for the printable
   build, and has nothing to draw on a web page.
 
@@ -244,7 +248,8 @@ Print differs from the site in three deliberate ways:
 - **Raw HTML is dropped**, by the layout. A hand-written block has no rendering
   on paper, and left in place the Jennifer introduction's inline SVG wordmark
   typesets as a page and a half of path data before the reader reaches a
-  sentence.
+  sentence. MathML is the exception: `mathml.j` swaps each element for the TeX
+  source it carries, in monospace, before the layout sees the book.
 - **Links are resolved for paper.** A cross-reference is not clickable in print,
   so it reads as its label alone, while an external URL keeps its address in
   parentheses.
@@ -324,13 +329,21 @@ is how they are distributed, not a shortcut around the extension point - and
 `scripts/test.sh` and the pipeline treat them as Grimoire's own code, because
 they are released together and break together.
 
-Two are maintained in their own repositories instead: `grimoire-mermaid` and
-`grimoire-katex` each drive a program (`mmdc`, `katex`) that nobody has
-installed by default, and a plugin that is useless without a tool does not
-belong in an install that promises to need none. Both are Jennifer *apps* -
-`jvc app install <url>` puts the command where Grimoire looks - which is the
-same shape jvc itself ships in, and the reason is the same: a program is
-installed and run, a deck is vendored and imported.
+What they share is `src/pluginkit.j`, which each imports as
+`../src/pluginkit.j`: reading and checking the request, the replies, errors,
+typed settings, CommonMark fences, and running other programs. Grimoire's own
+`plugin.j` takes the api version, the feature list and its `PATH` lookup from
+it too, so the two ends of the contract cannot drift apart. The kit imports only
+the standard library, because a plugin published on its own carries a copy of
+that one file, which has to work alone; that is why `plugin.j` imports the kit
+and never the other way round.
+
+A plugin that drives a program nobody has installed by default lives in its own
+repository instead, as a user plugin, because a plugin that is useless without
+a tool does not belong in an install that promises to need none. It is a
+Jennifer *app* - `jvc app install <url>` puts the command where Grimoire looks -
+which is the same shape jvc itself ships in, and the reason is the same: a
+program is installed and run, a deck is vendored and imported.
 
 ## Building this repository
 

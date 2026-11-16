@@ -828,6 +828,63 @@ func testCopyAssetsSkipsItsOwnOutput() {
     testing.assertFalse(fs.isDir(path.join($root, "docs/site/site")));
 }
 
+# --- generated files -------------------------------------------------
+
+# A preprocessor's files are treated as lying under `src/_generated/`, so the
+# asset pass puts them at that path in the site, beside everything else.
+func testCopyAssetsCopiesGeneratedFiles() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init nestedConfig($root);
+    def scratch as string init fs.makeTempDir(os.tempDir(), "grimoire-content-");
+    fs.mkdirAll(path.join($scratch, "_generated/mermaid"));
+    fs.writeString(path.join($scratch, "_generated/mermaid/abc.svg"), "<svg/>");
+    fs.writeString(path.join($scratch, "_generated/mermaid/abc.png"), "png");
+    $c.contentDir = $scratch;
+    testing.assertEqual(copyAssets($c), 3);
+    testing.assertEqual(
+        fs.readString(path.join($root, "docs/site/_generated/mermaid/abc.svg")),
+        "<svg/>");
+    testing.assertTrue(fs.isFile(path.join($root, "docs/site/_generated/mermaid/abc.png")));
+    fs.removeAll($scratch);
+    fs.removeAll($root);
+}
+
+# The site's `_generated` is the build's own while a preprocessor runs, so a
+# file the last build generated and this one did not is gone: a diagram deleted
+# from a chapter, or every edit under `serve --watch`, would otherwise leave
+# files behind.
+func testGeneratedFilesFromALastBuildDoNotStay() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init nestedConfig($root);
+    fs.mkdirAll(path.join($root, "docs/site/_generated/mermaid"));
+    fs.writeString(path.join($root, "docs/site/_generated/mermaid/old.svg"), "<svg/>");
+    def scratch as string init fs.makeTempDir(os.tempDir(), "grimoire-content-");
+    fs.mkdirAll(path.join($scratch, "_generated/mermaid"));
+    fs.writeString(path.join($scratch, "_generated/mermaid/new.svg"), "<svg/>");
+    $c.contentDir = $scratch;
+    copyAssets($c);
+    testing.assertFalse(fs.exists(path.join($root, "docs/site/_generated/mermaid/old.svg")));
+    testing.assertTrue(fs.isFile(path.join($root, "docs/site/_generated/mermaid/new.svg")));
+    # A preprocessor that generated nothing still clears what an earlier one left.
+    fs.removeAll(path.join($scratch, "_generated"));
+    copyAssets($c);
+    testing.assertFalse(fs.exists(path.join($root, "docs/site/_generated")));
+    fs.removeAll($scratch);
+    fs.removeAll($root);
+}
+
+# Without a preprocessor `_generated` is an ordinary name, and whatever the
+# output holds under it is left alone.
+func testWithoutAPreprocessorTheSitesGeneratedIsLeftAlone() {
+    def root as string init bookWithNestedOutput();
+    def c as config.Config init nestedConfig($root);
+    fs.mkdirAll(path.join($root, "docs/site/_generated"));
+    fs.writeString(path.join($root, "docs/site/_generated/keep.txt"), "mine");
+    testing.assertEqual(copyAssets($c), 1);
+    testing.assertEqual(fs.readString(path.join($root, "docs/site/_generated/keep.txt")), "mine");
+    fs.removeAll($root);
+}
+
 # Twice, because the failure was cumulative: the count doubled and the tree grew
 # a level with each run, so a single call could not have shown it.
 func testCopyAssetsIsStableAcrossRuns() {

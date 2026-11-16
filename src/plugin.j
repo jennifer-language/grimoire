@@ -27,10 +27,10 @@
  * The request arrives on stdin as one JSON object and the reply is read from
  * stdout:
  *
- *     {"api": 1,
+ *     {"api": 1, "kind": "preprocessor", "features": ["files"],
  *      "book": {"title": ..., "description": ..., "authors": [...],
- *               "language": ..., "src": ..., "out": ...},
- *      "plugin": {"name": "include", "settings": { ... }},
+ *               "language": ..., "src": ..., "out": ..., "generated": ...},
+ *      "plugin": {"name": "include", "settings": { ... }, "files": ...},
  *      "entries": [{"kind": "page", "title": ..., "src": ..., "out": ...,
  *                   "level": 0, "number": ...}, ...],
  *      "chapters": [{"src": "index.md", "content": "# ..."}, ...]}
@@ -45,7 +45,11 @@
  *
  * The rewritten book is materialised into a scratch directory and the build
  * reads chapters from there. Assets, images, and the logo keep coming from the
- * source tree, so a plugin only ever sees, and only ever affects, Markdown.
+ * source tree. The one exception is the `files` feature: each preprocessor is
+ * handed an empty directory of its own, `_generated/NAME/` inside that scratch
+ * tree, and what it writes there is treated as if it lay at the same path under
+ * `book.src`. That is how a plugin that draws pictures gets them into the site,
+ * the EPUB and the printable book without writing into the author's tree.
  * @module plugin
  * @author mplx <jennifer@mplx.dev>
  * @license LGPL-3.0-only
@@ -61,13 +65,11 @@ use convert;
 use meta;
 
 import "./config.j" as config;
+import "./pluginkit.j" as kit;
 import "./summary.j" as summary;
 
-# The version the request carries and the reply is checked against. A plugin
-# written for a later Grimoire can refuse an older one by reading it, and this
-# one refuses a reply that does not claim the same number rather than guessing
-# at a shape it does not know.
-def const API as int init 1;
+# The api version and the features come from the plugin kit, which plugins
+# written in Jennifer import too, so the two sides cannot disagree about them.
 
 # fail raises a build error that names the plugin, because "exit 1" on its own
 # sends the reader to the wrong repository.
@@ -99,13 +101,20 @@ func jsonChapter(src as string, content as string) {
 # request builds the JSON handed to one plugin. The text is assembled rather
 # than built as a `json.Value` because the payload is a fixed shape with one
 # opaque hole in it - `settings` is already JSON, straight from the config.
+#
+# `files` is the directory this plugin may write into, and only a preprocessor
+# gets one: a renderer writes its own output under `book.out`. `generated` is
+# the directory standing in for `book.src/_generated`, "" when no preprocessor
+# ran, so a later plugin can find what an earlier one wrote.
 func request(
     c as config.Config,
     spec as config.Plugin,
     kind as string,
     entries as list of summary.Entry,
     pages as list of summary.Entry,
-    sources as map of string to string) {
+    sources as map of string to string,
+    files as string,
+    generated as string) {
     def outline as list of string;
     for (def e in $entries) {
         $outline[] = jsonEntry($e);
@@ -118,16 +127,26 @@ func request(
     for (def name in $c.authors) {
         $authors[] = json.encode($name);
     }
-    return '{"api":' + convert.toString(API) +
+    def features as list of string;
+    for (def f in kit.features()) {
+        $features[] = json.encode($f);
+    }
+    def own as string init "";
+    if ($kind == "preprocessor") {
+        $own = ',"files":' + json.encode($files);
+    }
+    return '{"api":' + convert.toString(kit.api()) +
         ',"kind":' + json.encode($kind) +
+        ',"features":[' + strings.join($features, ",") + ']' +
         ',"book":{"title":' + json.encode($c.title) +
         ',"description":' + json.encode($c.description) +
         ',"authors":[' + strings.join($authors, ",") + ']' +
         ',"language":' + json.encode($c.language) +
         ',"src":' + json.encode($c.srcDir) +
-        ',"out":' + json.encode($c.outDir) + '}' +
+        ',"out":' + json.encode($c.outDir) +
+        ',"generated":' + json.encode($generated) + '}' +
         ',"plugin":{"name":' + json.encode($spec.name) +
-        ',"settings":' + $spec.settings + '}' +
+        ',"settings":' + $spec.settings + $own + '}' +
         ',"entries":[' + strings.join($outline, ",") + ']' +
         ',"chapters":[' + strings.join($chapters, ",") + ']}';
 }
@@ -146,12 +165,12 @@ func merge(
     if (json.typeOf($doc) != "map" or not json.has($doc, "/api")) {
         fail($kind, $spec.name, "reply is not an object with an `api` field");
     }
-    if (json.asInt($doc, "/api") != API) {
+    if (json.asInt($doc, "/api") != kit.api()) {
         fail(
             $kind,
             $spec.name,
             "reply speaks api " + convert.toString(json.asInt($doc, "/api")) +
-                ", this build speaks " + convert.toString(API));
+                ", this build speaks " + convert.toString(kit.api()));
     }
     if (not json.has($doc, "/chapters")) {
         return $out;
@@ -201,31 +220,6 @@ export def struct Resolved {
     path as string,
     origin as string
 };
-
-# The first executable of this name on `PATH`, or "". `os.run` does this lookup
-# itself and says nothing about it, which is the point of doing it again here:
-# a reader deciding whether to build a book wants the path before it runs, not
-# the error afterwards.
-func onPath(command as string) {
-    def raw as string init os.getEnv("PATH");
-    if ($raw == "") {
-        return "";
-    }
-    for (def dir in strings.split($raw, ":")) {
-        if ($dir == "") {
-            continue;
-        }
-        def candidate as string init path.join($dir, $command);
-        if (not fs.isFile($candidate)) {
-            continue;
-        }
-        if (fs.stat($candidate).mode & 0o111 == 0) {
-            continue;
-        }
-        return $candidate;
-    }
-    return "";
-}
 
 # Whether a path is inside the directory the build runs in, which is the tree a
 # reader can review by reading the book's own repository.
@@ -283,7 +277,10 @@ export func resolved(c as config.Config, kind as string, spec as config.Plugin) 
         $out.origin = SHIPS;
         return $out;
     }
-    def found as string init onPath($spec.command);
+    # `os.run` does this lookup itself and says nothing about it, which is the
+    # point of doing it again here: a reader deciding whether to build a book
+    # wants the path before it runs, not the error afterwards.
+    def found as string init kit.onPath($spec.command);
     if ($found != "") {
         $out.path = $found;
         $out.origin = ON_PATH;
@@ -423,11 +420,24 @@ func runOne(c as config.Config, kind as string, spec as config.Plugin, body as s
     return $result.stdout;
 }
 
-# scratch writes the rewritten book to a fresh directory and returns it. Every
-# chapter is written, not only the rewritten ones, so the directory is a complete
-# source tree and the rest of the build needs to know nothing about plugins.
-func scratch(pages as list of summary.Entry, sources as map of string to string) {
+# scratchRoot makes the directory a preprocessed book is written to, as an
+# absolute path: it is handed to plugins as `plugin.files`, and a plugin runs
+# with the build's working directory, not this one.
+func scratchRoot() {
     def root as string init fs.makeTempDir(os.tempDir(), "grimoire-content-");
+    if (not path.isAbs($root)) {
+        $root = path.join(os.cwd(), $root);
+    }
+    return path.clean($root);
+}
+
+# writeChapters writes the rewritten book into the scratch tree. Every chapter
+# is written, not only the rewritten ones, so the directory is a complete source
+# tree and the rest of the build needs to know nothing about plugins.
+func writeChapters(
+    root as string,
+    pages as list of summary.Entry,
+    sources as map of string to string) {
     for (def p in $pages) {
         def target as string init path.join($root, $p.src);
         def dir as string init path.dir($target);
@@ -436,12 +446,43 @@ func scratch(pages as list of summary.Entry, sources as map of string to string)
         }
         fs.writeString($target, $sources[$p.src]);
     }
-    return $root;
+}
+
+# refuseGenerated stops a build whose source already has the directory that
+# preprocessors' files stand in for. Merging the two would let a plugin's output
+# and the author's file claim one path, and which one a reader got would depend
+# on the order of a copy; refusing says so before anything runs.
+func refuseGenerated(c as config.Config) {
+    def taken as string init path.join($c.srcDir, config.generatedName());
+    if (fs.exists($taken)) {
+        fail(
+            "preprocessor",
+            $c.preprocessors[0].name,
+            $taken + " exists, but `" + config.generatedName() +
+                "` is reserved for the files preprocessors generate; rename it");
+    }
+}
+
+# filesFor is the directory one preprocessor writes into, created empty. The
+# table name becomes a directory, so it has to be one path component: a quoted
+# TOML key can hold a `/` or be `..`.
+func filesFor(root as string, spec as config.Plugin) {
+    if ($spec.name == "" or $spec.name == "." or $spec.name == ".." or
+        strings.contains($spec.name, "/") or strings.contains($spec.name, "\\")) {
+        fail("preprocessor", $spec.name, "the table name has to be usable as a directory name");
+    }
+    def dir as string init path.join($root, path.join(config.generatedName(), $spec.name));
+    fs.mkdirAll($dir);
+    return $dir;
 }
 
 /**
  * Run every configured preprocessor over the book.
  *
+ * The scratch tree is made first, so each preprocessor can be handed an empty
+ * directory of its own inside it (`plugin.files`). A preprocessor that fails
+ * takes the tree with it, so a stopped build leaves nothing in the temp
+ * directory.
  * @param c {config.Config} the book configuration
  * @param entries {list of summary.Entry} the whole outline, parts included
  * @param pages {list of summary.Entry} the chapters the build resolved, in
@@ -449,7 +490,8 @@ func scratch(pages as list of summary.Entry, sources as map of string to string)
  * @return {string} the directory chapters are to be read from: a scratch tree
  *   when a plugin ran, `srcDir` when none is configured
  * @throws {Error} kind "grimoire" when a plugin is missing, exits non-zero, or
- *   answers with something this version cannot read
+ *   answers with something this version cannot read, and when the source has a
+ *   `_generated` entry of its own
  */
 export func preprocess(
     c as config.Config,
@@ -464,19 +506,25 @@ export func preprocess(
             $c.preprocessors[0].name,
             "this interpreter cannot run programs; preprocessors need the default `jennifer`");
     }
+    refuseGenerated($c);
     def sources as map of string to string;
     for (def p in $pages) {
         $sources[$p.src] = fs.readString(path.join($c.srcDir, $p.src));
     }
+    def root as string init scratchRoot();
+    errdefer fs.removeAll($root);
+    def generated as string init path.join($root, config.generatedName());
     for (def spec in $c.preprocessors) {
+        def files as string init filesFor($root, $spec);
         def reply as string init runOne(
             $c,
             "preprocessor",
             $spec,
-            request($c, $spec, "preprocessor", $entries, $pages, $sources));
+            request($c, $spec, "preprocessor", $entries, $pages, $sources, $files, $generated));
         $sources = merge("preprocessor", $spec, $sources, $reply);
     }
-    return scratch($pages, $sources);
+    writeChapters($root, $pages, $sources);
+    return $root;
 }
 
 # reported reads a renderer's reply: what it wrote, and anything it wants the
@@ -488,12 +536,12 @@ func reported(kind as string, spec as config.Plugin, reply as string, key as str
     if (json.typeOf($doc) != "map" or not json.has($doc, "/api")) {
         fail($kind, $spec.name, "reply is not an object with an `api` field");
     }
-    if (json.asInt($doc, "/api") != API) {
+    if (json.asInt($doc, "/api") != kit.api()) {
         fail(
             $kind,
             $spec.name,
             "reply speaks api " + convert.toString(json.asInt($doc, "/api")) +
-                ", this build speaks " + convert.toString(API));
+                ", this build speaks " + convert.toString(kit.api()));
     }
     if (not json.has($doc, "/" + $key)) {
         return $out;
@@ -550,12 +598,14 @@ export func render(
     for (def p in $pages) {
         $sources[$p.src] = fs.readString(path.join(config.contentDir($c), $p.src));
     }
+    # What the preprocessors generated, for an edition that carries pictures in.
+    def generated as string init config.generatedDir($c);
     for (def spec in $c.renderers) {
         def reply as string init runOne(
             $c,
             "renderer",
             $spec,
-            request($c, $spec, "renderer", $entries, $pages, $sources));
+            request($c, $spec, "renderer", $entries, $pages, $sources, "", $generated));
         $out[] = Rendered{
             name: $spec.name,
             written: reported("renderer", $spec, $reply, "written"),
