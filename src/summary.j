@@ -139,16 +139,15 @@ func linkParts(text as string) {
 # nextNumber advances the dotted section counter to `level` and renders it. The
 # counter list is threaded through the caller because a Jennifer value is copied,
 # not shared - so the updated counters come back alongside the rendered number.
-func advance(counters as list of int, level as int) {
-    def c as list of int init $counters;
-    while (len($c) > $level + 1) {
-        $c = lists.pop($c);
+func advance(counters as list of int, level as int) { # lint-disable: L205
+    while (len($counters) > $level + 1) {
+        $counters = lists.pop($counters);
     }
-    while (len($c) < $level + 1) {
-        $c[] = 0;
+    while (len($counters) < $level + 1) {
+        $counters[] = 0;
     }
-    $c[$level] = $c[$level] + 1;
-    return $c;
+    $counters[$level] = $counters[$level] + 1;
+    return $counters;
 }
 
 func renderNumber(counters as list of int) {
