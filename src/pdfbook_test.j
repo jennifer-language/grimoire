@@ -368,6 +368,65 @@ func testPicturesNamesInReadingOrder() {
     testing.assertEqual($imgs["first.png"].name, "img1");
 }
 
+# An SVG is not drawable, but a PNG of the same name beside it is drawn in its
+# place, keyed by the SVG target the document writes - so the layout puts the
+# picture where the chapter put the vector.
+func testAnSvgIsDrawnFromThePngBesideIt() {
+    def root as string init fs.makeTempDir(os.tempDir(), "grimoire-pdf-sibling-");
+    fs.mkdirAll(path.join($root, "art"));
+    fs.writeString(path.join($root, "art/flow.svg"), "<svg></svg>");
+    fs.writeBytes(path.join($root, "art/flow.png"), tinyPng());
+    fs.writeString(path.join($root, "art/alone.svg"), "<svg></svg>");
+    def c as config.Config init book();
+    $c.srcDir = $root;
+    def imgs as map of string to pdf.Image init pictures(
+        $c,
+        "![f](art/flow.svg)
+
+![a](art/alone.svg)
+");
+    testing.assertEqual(len(maps.keys($imgs)), 1);
+    testing.assertTrue(maps.has($imgs, "art/flow.svg"));
+    testing.assertEqual($imgs["art/flow.svg"].width, 8);
+    testing.assertEqual(rasterFor($c, "art/alone.svg"), "");
+    testing.assertEqual(rasterFor($c, "art/flow.svg"), path.join($root, "art/flow.png"));
+    # Only an SVG has a sibling: a missing PNG is not looked for under another
+    # name, and a format the layout cannot draw stays its alt text.
+    testing.assertEqual(rasterFor($c, "art/flow.gif"), "");
+    fs.removeAll($root);
+}
+
+# A target under `_generated/` is a file a preprocessor wrote, so it is read
+# from the scratch tree rather than from the source, and the sibling rule holds
+# there too.
+func testGeneratedPicturesAreReadFromTheScratchTree() {
+    def src as string init fs.makeTempDir(os.tempDir(), "grimoire-pdf-src-");
+    def scratch as string init fs.makeTempDir(os.tempDir(), "grimoire-content-");
+    fs.mkdirAll(path.join($scratch, "_generated/mermaid"));
+    fs.writeString(path.join($scratch, "_generated/mermaid/abc.svg"), "<svg></svg>");
+    fs.writeBytes(path.join($scratch, "_generated/mermaid/abc.png"), tinyPng());
+    fs.writeBytes(path.join($scratch, "_generated/mermaid/raw.png"), tinyPng());
+    def c as config.Config init book();
+    $c.srcDir = $src;
+    $c.contentDir = $scratch;
+    def imgs as map of string to pdf.Image init pictures(
+        $c,
+        "![d](_generated/mermaid/abc.svg)
+
+![r](_generated/mermaid/raw.png)
+");
+    testing.assertEqual(len(maps.keys($imgs)), 2);
+    testing.assertTrue(maps.has($imgs, "_generated/mermaid/abc.svg"));
+    testing.assertTrue(maps.has($imgs, "_generated/mermaid/raw.png"));
+    # Without a scratch tree the same target is the author's file, and there is
+    # none.
+    $c.contentDir = "";
+    testing.assertEqual(len(maps.keys(pictures($c, "![d](_generated/mermaid/abc.svg)
+"))), 0);
+    fs.removeAll($src);
+    fs.removeAll($scratch);
+}
+
 # --- prepare ---------------------------------------------------------
 
 func testPrepareDemotesHeadings() {
@@ -750,4 +809,41 @@ func testCombineIgnoresASeparatorOutsideAPart() {
     def headings as list of string init headingsOf(combine(partsConfig($root), $entries));
     testing.assertEqual($headings[0], "# Intro");
     testing.assertEqual($headings[1], "# Appendix");
+}
+
+# --- MathML -----------------------------------------------------------
+
+# Print has no MathML, and raw HTML would vanish without a word, so maths is
+# printed as the TeX it carries: inline as a code span in the line, display
+# centred on lines of its own.
+func testMathsIsPrintedAsItsTex() {
+    def md as string init "Let " +
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>x</mi>' +
+        '<annotation encoding="application/x-tex">x&#95;1</annotation></semantics></math>' +
+        " be.\n\n" +
+        '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' + "\n" +
+        '<semantics><mi>y</mi><annotation encoding="application/x-tex">y = 2</annotation>' +
+        "</semantics></math>\n";
+    def opts as doctree.PdfOptions init options(book());
+    def doc as doctree.Node init printable(markdown.parse($md), $opts);
+    def para as doctree.Node init $doc.children[0];
+    testing.assertEqual($para.children[1].kind, "codespan");
+    testing.assertEqual($para.children[1].text, "x_1");
+    def display as doctree.Node init $doc.children[1];
+    testing.assertEqual($display.kind, "paragraph");
+    testing.assertTrue(strings.endsWith(
+        $display.children[0].text,
+        convert.fromCodepoint(0xA0) + " y = 2"));
+    testing.assertTrue(strings.startsWith(
+        $display.children[0].text,
+        strings.repeat(convert.fromCodepoint(0xA0), 3)));
+    # And the whole book still lays out.
+    testing.assertTrue(len(pdf.render(doctree.renderPdfDoc($doc, $opts))) > 0);
+}
+
+# A book without maths is handed to the layout exactly as it was parsed.
+func testABookWithoutMathsIsUntouched() {
+    def doc as doctree.Node init markdown.parse("plain <b>html</b>\n\n<div>x</div>\n");
+    def opts as doctree.PdfOptions init options(book());
+    testing.assertEqual(printable($doc, $opts), $doc);
 }

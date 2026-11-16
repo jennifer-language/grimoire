@@ -27,6 +27,7 @@ use fs;
 use path;
 use time;
 use encoding;
+use math;
 
 import "markdown.j" as markdown;
 import "doctree.j" as doctree;
@@ -37,6 +38,7 @@ import "./palette.j" as palette;
 import "./theme.j" as theme;
 import "./summary.j" as summary;
 import "./util.j" as util;
+import "./mathml.j" as mathml;
 
 # How far the page-number footer sits from the bottom edge, in points. Inside the
 # 48-point page margin, so it never collides with the text block above it.
@@ -947,9 +949,9 @@ func footer(c as config.Config, doc as pdf.Document) {
 # The layout draws a picture when it is handed the bytes, keyed by the target
 # exactly as the combined document writes it - which is what the resolution in
 # `prepare` is for - and falls back to the bracketed alt text for anything it was
-# not given. So an SVG, a file that is not there, and a picture on another host
-# all cost nothing here: they are simply not in the map, and the reader gets the
-# caption instead of a hole.
+# not given. So an SVG with no PNG beside it, a file that is not there, and a
+# picture on another host all cost nothing here: they are simply not in the map,
+# and the reader gets the caption instead of a hole.
 #
 # Nothing is fetched. A build makes no network request, and an image on another
 # host is not a file this can read.
@@ -967,6 +969,40 @@ func drawable(url as string) {
         }
     }
     return false;
+}
+
+# bookFile is where a book-relative target is on disk: under `_generated/` it is
+# a file a preprocessor wrote into the scratch tree, anywhere else a file in the
+# source tree.
+func bookFile(c as config.Config, url as string) {
+    def generated as string init config.generatedDir($c);
+    def prefix as string init config.generatedName() + "/";
+    def clean as string init path.clean($url);
+    if ($generated != "" and strings.startsWith($clean, $prefix)) {
+        return path.join($generated, strings.substring($clean, len($prefix), len($clean)));
+    }
+    return path.join($c.srcDir, $clean);
+}
+
+# rasterFor is the file the printable book draws for a target, or "" for none.
+# A PNG or a JPEG is drawn as itself. An SVG is not something the layout can
+# draw, so a PNG of the same name beside it is drawn in its place: a book that
+# ships a diagram both ways - a drawing tool's export, or a preprocessor that
+# writes both - gets the picture on paper and the vector on the site.
+func rasterFor(c as config.Config, url as string) {
+    if (drawable($url)) {
+        return bookFile($c, $url);
+    }
+    if (not strings.endsWith(strings.lower($url), ".svg")) {
+        return "";
+    }
+    def sibling as string init bookFile(
+        $c,
+        strings.substring($url, 0, len($url) - len(".svg")) + ".png");
+    if (not fs.isFile($sibling)) {
+        return "";
+    }
+    return $sibling;
 }
 
 # imageTargets lists every image target in the book, in reading order and without
@@ -1003,11 +1039,13 @@ func pictures(c as config.Config, md as string) {
     def out as map of string to pdf.Image init {};
     def n as int init 0;
     for (def url in imageTargets($md)) {
-        if (maps.has($out, $url) or util.isExternal($url) or
-            strings.startsWith($url, "/") or not drawable($url)) {
+        if (maps.has($out, $url) or util.isExternal($url) or strings.startsWith($url, "/")) {
             continue;
         }
-        def file as string init path.join($c.srcDir, $url);
+        def file as string init rasterFor($c, $url);
+        if ($file == "") {
+            continue;
+        }
         if (not fs.isFile($file)) {
             if ($c.verbose) {
                 io.printf("  image %s is not in the source tree\n", $url);
@@ -1042,5 +1080,21 @@ export func render(c as config.Config, entries as list of summary.Entry) {
     def book as string init combine($c, $entries);
     def opts as doctree.PdfOptions init options($c);
     $opts.images = pictures($c, $book);
-    return pdf.render(footer($c, doctree.renderPdfDoc(markdown.parse($book), $opts)));
+    return pdf.render(footer(
+        $c,
+        doctree.renderPdfDoc(printable(markdown.parse($book), $opts), $opts)));
+}
+
+# printable is the parsed book with its maths made printable. The layout draws
+# text, not MathML, and drops raw HTML without a word, so each element becomes
+# the TeX source it carries, in monospace: a code span inline, and centred lines
+# for display maths. A book without maths is handed back untouched.
+func printable(doc as doctree.Node, opts as doctree.PdfOptions) {
+    if (not mathml.holds($doc)) {
+        return $doc;
+    }
+    def column as float init convert.toFloat($opts.pageWidth - 2 * $opts.margin);
+    def glyph as float init pdf.measureText($opts.monoFont, $opts.bodySize, "0");
+    def chars as int init math.floor($column / $glyph);
+    return mathml.rewrite($doc, "tex", $chars).node;
 }

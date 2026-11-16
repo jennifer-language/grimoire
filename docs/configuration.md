@@ -103,6 +103,11 @@ Markdown, dotfiles included. Three things are never copied, whatever `src` is:
 | version control metadata | `.git`, `.hg`, `.svn`, `.bzr`, `.jj`, `.sl` - never a book's asset, and a published `.git` is the whole history and any credential in its config. `.github` is not version control and is copied |
 | the manifest this build read | `grimoire.toml` is Grimoire's input, not the book's content |
 
+Files a preprocessor generates are copied too, under `_generated/` in the site
+(see [generated files](plugins.md#generated-files)). While a preprocessor is
+configured that name is the build's: a `_generated` in `src` stops the build,
+and the site's `_generated` is replaced on every build.
+
 Anything else in a repository root - a `Makefile`, a `node_modules`, a directory
 of spikes - is published, because `src = "."` says the book is the repository. A
 book that wants a subset should say so with a directory.
@@ -206,7 +211,7 @@ and a reader who reloaded at the wrong moment would get a 404 rather than a page
 | `theme` | string | `"grimoire"` | one of the [eleven themes](themes.md); an unknown name falls back to `grimoire` |
 | `mode` | string | `"auto"` | the colour mode a first-time reader gets: `auto`, `light`, `dark` |
 | `uiLanguage` | string | from `book.language` | the language Grimoire's own words are printed in, when it differs from the book's |
-| `rawHtml` | bool | `true` | emit a hand-written HTML block from the Markdown as written; `false` escapes it |
+| `rawHtml` | bool | `true` | emit a hand-written HTML block from the Markdown as written; `false` escapes it. [MathML](plugins.md#mathml) is drawn either way |
 | `navPosition` | string | `"left"` | which side the book-contents sidebar sits on: `left`, `right`, `off` |
 | `tocPosition` | string | `"right"` | which side the on-this-page column sits on: `left`, `right`, `off` |
 | `tocDepth` | int | `3` | deepest heading level in the per-page contents; clamped to 1-6 |
@@ -278,12 +283,13 @@ That is what every comparable generator does, and it is the point of writing
 such a block: the author is reaching past Markdown on purpose, in a file they
 control, the same way `[html] footer` reaches past it in `grimoire.toml`.
 
-It is also the **only** thing on a page that is not escaped. Prose, headings,
-code spans, code blocks and attribute values all go through the escaper, and
-every link target goes through a URL gate that removes a `javascript:` scheme in
-any casing, entity-encoded, and a `data:` URL with it. Inline HTML is not an
-exception either - `a <b>bold</b> c` inside a paragraph is escaped and shown,
-because the Markdown parser hands it back as text rather than as markup.
+It is also the **only** thing on a page that is not escaped, apart from
+[MathML](plugins.md#mathml), which is checked rather than trusted. Prose,
+headings, code spans, code blocks and attribute values all go through the
+escaper, and every link target goes through a URL gate that removes a
+`javascript:` scheme in any casing, entity-encoded, and a `data:` URL with it.
+Inline HTML is not an exception either - `a <b>bold</b> c` inside a paragraph is
+escaped and shown.
 
 So the setting is about one case, and it is a real one:
 
@@ -686,9 +692,13 @@ same screenshot in half that. It only has the last word on a picture narrower
 than the text column, because a wider one is scaled down to the column whatever
 its dpi - so raising it is how a small diagram stops filling the measure, and
 lowering it is how one stops being a postage stamp. A value below 1 falls back to
-96. Everything else keeps its alt text: an image inline in a sentence, a format
-the PDF cannot carry, a file that is not in the source tree, and a picture on
-another host, which is not fetched.
+96. An SVG cannot be drawn, so **a PNG of the same name beside it is drawn
+instead**: `![Flow](art/flow.svg)` prints `art/flow.png` when there is one, which
+is how a book shows a vector on the site and a picture on paper from one link. A
+file a preprocessor generated is looked for where it was written, with the same
+rule. Everything else keeps its alt text: an image inline in a sentence, an SVG
+with no PNG beside it, a format the PDF cannot carry, a file that is not in the
+source tree, and a picture on another host, which is not fetched.
 
 `exclude` names chapters that belong on the site but not on paper. Each entry is
 a source path relative to `src`; one ending in `/` excludes everything beneath
