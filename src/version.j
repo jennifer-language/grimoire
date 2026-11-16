@@ -27,7 +27,7 @@
 # The number, in one place. Bump it here, in `deck.toml`, and in
 # `packaging/archlinux/PKGBUILD` (`_tag` and `pkgver`), then tag - CI fails the
 # tag if the four disagree.
-def const NUMBER as string init "0.4.0";
+def const NUMBER as string init "0.5.0";
 
 /**
  * The version on its own, as `deck.toml` and a release tag spell it.
