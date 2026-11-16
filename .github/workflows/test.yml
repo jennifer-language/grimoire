@@ -33,10 +33,9 @@ permissions:
 env:
   # The interpreter every job runs in: an exact Jennifer release, the newest, so
   # a new one - patch or minor - is a change made here on purpose rather than
-  # one that arrives with `latest`. `Dockerfile` and `pages.yml` pin the same.
-  # Until 0.26.0 (the `[engines]` floor) is released this is `dev`, the image
-  # built from Jennifer's main branch; switch all four back to "0.26.0" then.
-  JENNIFER_TAG: "dev"
+  # one that arrives with `latest`. `Dockerfile`, `pages.yml` and
+  # `scripts/ci-git-image.sh` pin the same.
+  JENNIFER_TAG: "0.26.0"
 
 jobs:
   # The version numbers, as their own callable workflow. It used to be a block
