@@ -903,3 +903,69 @@ func nodesOf(n as doctree.Node) {
     }
     return $out;
 }
+
+# --- MathML -----------------------------------------------------------
+
+def const MATH_OPEN as string init '<math xmlns="http://www.w3.org/1998/Math/MathML">';
+
+def const MATH_INLINE as string init MATH_OPEN + '<semantics><mrow><mi>a</mi><mo>&#42;</mo>' +
+    '<mi>b</mi><mo>&#42;</mo><mi>c</mi></mrow>' +
+    '<annotation encoding="application/x-tex">a&#42;b&#42;c</annotation></semantics></math>';
+
+def const MATH_BLOCK as string init
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' + "\n" +
+    '<semantics><msub><mi>x</mi><mn>1</mn></msub>' +
+    '<annotation encoding="application/x-tex">x&#95;1</annotation></semantics></math>';
+
+# Inline maths reaches the page as markup, and the asterisks the preprocessor
+# wrote as entities are text, never emphasis. Every other inline tag on the line
+# is still escaped.
+func testInlineMathMlReachesThePage() {
+    def r as Rendered init render("Let " + MATH_INLINE + " and <b>no</b>.\n", false, true);
+    testing.assertContains($r.html, "<p>Let " + MATH_OPEN + "<semantics><mrow><mi>a</mi>");
+    testing.assertContains($r.html, "<mo>*</mo>");
+    testing.assertContains($r.html, "a*b*c</annotation></semantics></math> and &lt;b&gt;no");
+    testing.assertFalse(strings.contains($r.html, "<em>"));
+}
+
+# MathML is checked rather than trusted, so it is drawn whatever `rawHtml` says,
+# and a block that is not MathML keeps the rule it always had.
+func testMathMlIsDrawnWithRawHtmlOff() {
+    def md as string init "x " + MATH_INLINE + "\n\n" + MATH_BLOCK + "\n\n<div>raw</div>\n";
+    def r as Rendered init render($md, false, false);
+    testing.assertContains($r.html, MATH_OPEN + "<semantics><mrow>");
+    testing.assertContains($r.html, MATH_BLOCK);
+    testing.assertContains($r.html, "&lt;div&gt;raw&lt;/div&gt;");
+}
+
+# Something shaped like MathML that is not - another namespace, a handler on an
+# element - is inline HTML and escaped, as before.
+func testWhatIsNotMathMlStaysEscaped() {
+    def evil as string init MATH_OPEN + '<mi onclick="x()">a</mi></math>';
+    def r as Rendered init render("x " + $evil + "\n", false, true);
+    testing.assertContains($r.html, "&lt;math");
+    testing.assertFalse(strings.contains($r.html, "onclick=\"x()\">"));
+}
+
+# The index and the contents list read a chapter without its maths: `a b c` is
+# not what anybody searches for, and a heading's anchor stays its words.
+func testMathsIsLeftOutOfTheIndexAndTheAnchors() {
+    def md as string init "# Sum of " + MATH_INLINE + " terms\n\nThe value " + MATH_INLINE +
+        " is small.\n\n" + MATH_BLOCK + "\n";
+    def r as Rendered init render($md, false, true);
+    testing.assertEqual($r.headings[0].text, "Sum of terms");
+    testing.assertEqual($r.headings[0].id, "sum-of-terms");
+    testing.assertEqual($r.sections[0].text, "The value is small.");
+}
+
+# A list item renders its blocks inline, where an HTML block is escaped; a
+# MathML block is drawn there too.
+func testMathMlInAListItemIsDrawn() {
+    def r as Rendered init render(
+        "- item\n\n  " +
+            strings.replace(MATH_BLOCK, "\n", "\n  ") + "\n\n- <div>x</div>\n",
+        false,
+        true);
+    testing.assertContains($r.html, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=");
+    testing.assertContains($r.html, "&lt;div&gt;x&lt;/div&gt;");
+}

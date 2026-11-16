@@ -102,6 +102,14 @@ link. A class is styling, which is what the syntax is for; anything else a book
 needs it writes as an HTML block, where `[html] rawHtml` and the author's own
 judgement already apply.
 
+## Maths
+
+Maths is MathML: a `<math>` element in the MathML namespace, written by hand or by
+a preprocessor that typesets TeX. It is not treated as raw HTML. The site and the
+EPUB carry it, the printable book prints the TeX source the element carries in
+its annotation, and the search index leaves it out; see
+[MathML](plugins.md#mathml) for the rules an element has to meet.
+
 ## Code blocks
 
 A fence can name the file its code came from:

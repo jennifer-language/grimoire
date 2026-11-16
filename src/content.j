@@ -16,8 +16,9 @@
  * local attribute escaper (attribute values), and every link goes through
  * `html.safeUrl`, so a hostile document cannot inject markup or a
  * `javascript:` href - in any casing, entity-encoded, or as a `data:` URL.
- * Inline HTML is covered by the same rule without any effort: the parser hands
- * `a <b>bold</b> c` back as one text node, so it is escaped like any other text.
+ * Inline HTML is covered by the same rule: the parser hands `a <b>bold</b> c`
+ * back as `html_inline` tags and text, and the inline path escapes both. The one
+ * exception is a MathML element, which `mathml.j` checks and lets through.
  *
  * A hand-written HTML **block** is the single exception, and the only thing
  * `rawHtml` controls. On, which is the default and what every comparable
@@ -50,6 +51,7 @@ import "html.j" as html;
 import "./highlight.j" as highlight;
 import "./util.j" as util;
 import "./locale.j" as locale;
+import "./mathml.j" as mathml;
 
 /**
  * One heading of a page, as the contents list needs it.
@@ -121,10 +123,25 @@ func href(url as string) {
 # Every accumulation below collects into a list and joins once. Appending to a
 # Jennifer string reallocates it, so a `$out = $out + piece` loop over a long
 # chapter is quadratic in the size of the output.
+#
+# An inline `<math>` element is the one piece of inline HTML that reaches the
+# page as markup: the parser hands it back as a run of tags and text, and
+# `mathml.runs` puts the run back together only when it is MathML and nothing
+# else. Every other tag is text, escaped like any other.
 func renderInline(nodes as list of doctree.Node) {
     def out as list of string;
-    for (def n in $nodes) {
-        $out[] = renderSpan($n);
+    def maths as list of mathml.Run init mathml.runs($nodes);
+    def r as int init 0;
+    def i as int init 0;
+    while ($i < len($nodes)) {
+        if ($r < len($maths) and $maths[$r].first == $i) {
+            $out[] = $maths[$r].markup;
+            $i = $maths[$r].last + 1;
+            $r = $r + 1;
+            continue;
+        }
+        $out[] = renderSpan($nodes[$i]);
+        $i = $i + 1;
     }
     return strings.join($out, "");
 }
@@ -196,6 +213,16 @@ func renderSpan(n as doctree.Node) {
         when "code" { return renderCode($n, false); }
         when "quote" { return renderQuote($n, false, false); }
         when "heading" { return renderBlock($n, false, false); }
+        # An HTML block in a list item is escaped like inline HTML, unless it
+        # is one MathML element, which reaches the page here as it does at the
+        # top level.
+        when "html_block" {
+            def maths as string init mathml.blockMarkup($n);
+            if ($maths != "") {
+                return $maths;
+            }
+            return contentOf($n);
+        }
         else { return contentOf($n); }
     }
 }
@@ -502,6 +529,17 @@ func indexText(n as doctree.Node) {
     return $titles + " " + flatText($n);
 }
 
+# searchable is a block as the search index and the contents list read it: with
+# its maths taken out. An element's text is a run of single letters and
+# operators (`a b x 2`), which nobody searches for and no heading should be
+# listed as. A block without maths is handed back untouched.
+func searchable(n as doctree.Node) {
+    if (not mathml.holds($n)) {
+        return $n;
+    }
+    return mathml.rewrite($n, "drop", 0).node;
+}
+
 func renderQuote(n as doctree.Node, highlighting as bool, rawHtml as bool) {
     def out as list of string init ["<blockquote>"];
     for (def child in doctree.children($n)) {
@@ -537,9 +575,17 @@ func renderBlock(n as doctree.Node, highlighting as bool, rawHtml as bool) {
         # vendored README. Then the markup is shown rather than run.
         #
         # Only a *block* can be raw. Inline HTML never reaches here: the parser
-        # hands `a <b>bold</b> c` back as one text node, which the inline path
+        # hands `a <b>bold</b> c` back as tags and text, which the inline path
         # escapes like any other text.
+        #
+        # A block that is one MathML element is not raw HTML in that sense: it
+        # is checked (`mathml.accepted`) and reaches the page whatever `rawHtml`
+        # says, the way inline maths does.
         when "html_block" {
+            def maths as string init mathml.blockMarkup($n);
+            if ($maths != "") {
+                return $maths;
+            }
             if ($rawHtml) {
                 return doctree.text($n);
             }
@@ -617,13 +663,13 @@ export func render(md as string, highlighting as bool, rawHtml as bool) {
             if ($kind == "html_block" or $kind == "thematic_break") {
                 continue;
             }
-            def flat as string init util.squeeze(indexText($node));
+            def flat as string init util.squeeze(indexText(searchable($node)));
             if ($flat != "") {
                 $buffer[] = $flat;
             }
             continue;
         }
-        def text as string init util.squeeze(doctree.text($node));
+        def text as string init util.squeeze(doctree.text(searchable($node)));
         def base as string init util.slugify($text);
         def id as string init util.uniqueSlug($seen, $base);
         # Counted in place rather than through `util.remember`, which hands back a
