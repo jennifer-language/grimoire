@@ -24,8 +24,7 @@
 # twice, for the `RUN` that links and marks the launcher below and for the
 # entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
 # `#!/usr/bin/env jennifer` needs `env`.
-# `dev` until 0.26.0, the floor in deck.toml, is released (see test.yml).
-ARG JENNIFER_TAG=dev
+ARG JENNIFER_TAG=0.26.0
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
 # The registry shows `description` on the package page, so it says how to run the
@@ -77,9 +76,17 @@ COPY packaging/docker-entrypoint.sh /opt/grimoire/bin/docker-entrypoint.sh
 # makes a build from an export - a tarball, a context assembled by a tool that
 # drops the bit - fail at build time rather than at `docker run` with "permission
 # denied" and no entrypoint.
+#
+# fontconfig and DejaVu come in the same step. A plugin that measures or draws
+# text (a diagram renderer, a typesetter) asks fontconfig for a font, and without
+# it has to be pointed at a font file in every book; DejaVu is also the face the
+# printable book uses, so a diagram and the page around it match. About 4 MB.
 USER root
 RUN ln -s bin/grimoire /opt/grimoire/grimoire \
- && chmod +x /opt/grimoire/bin/docker-entrypoint.sh
+ && chmod +x /opt/grimoire/bin/docker-entrypoint.sh \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
 USER jennifer
 
 # The base image sets WORKDIR /work and mounts the user's code there; keep that
