@@ -19,8 +19,13 @@ docker build -t grimoire .
 
 `Dockerfile` copies whatever is here to `/opt/grimoire-plugins`, where the
 entrypoint links the ones `GRIMOIRE_PLUGINS` names onto `PATH`. A plugin
-directory is expected to hold its launcher at `grimoire-NAME/grimoire-NAME`, and
-may carry a `NEEDS` file listing the commands it needs, which the entrypoint
-checks and warns about.
+directory holds its launcher at `grimoire-NAME/grimoire-NAME`, or at
+`grimoire-NAME/bin/grimoire-NAME` as a Jennifer app laid out for
+`jvc app install` does, so such a repository can be cloned here as it is. It may
+carry a `NEEDS` file listing the commands it needs, which the entrypoint checks
+and warns about; the image does not install them.
+
+A Jennifer plugin with `[decks]` needs its `vendor/` filled before the build
+(`jvc install` inside its directory), because the image runs no jvc.
 
 Nothing here is tracked by git beyond this file.
