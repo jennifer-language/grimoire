@@ -206,8 +206,7 @@ one by naming it in `grimoire.toml`, exactly as it does on your machine, and the
 workflow needs no input for it.
 
 A plugin that needs a program the image does not have - `grimoire-feed` and
-`grimoire-lastmod` need `git`, `grimoire-mermaid` needs `mmdc` - needs an image
-that has it. Build one from Grimoire's, as
+`grimoire-lastmod` need `git` - needs an image that has it. Build one from Grimoire's, as
 [Installation](installation.md#plugins-in-the-image) shows, push it to a
 registry, and name it:
 

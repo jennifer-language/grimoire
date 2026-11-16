@@ -237,7 +237,7 @@ over it should ask twice.
 
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
-    -e GRIMOIRE_PLUGINS=mermaid \
+    -e GRIMOIRE_PLUGINS=NAME \
     -v "$PWD:/work" ghcr.io/jennifer-language/grimoire build
 ```
 
@@ -249,7 +249,7 @@ of your own:
 ```dockerfile
 FROM ghcr.io/jennifer-language/grimoire
 USER root
-COPY grimoire-mermaid /opt/grimoire-plugins/grimoire-mermaid
+COPY grimoire-NAME /opt/grimoire-plugins/grimoire-NAME
 USER jennifer
 ```
 
@@ -261,9 +261,8 @@ directory named here.
 
 **Some plugins need a program the image has not got**, and say so at startup
 when a `NEEDS` file names it. `grimoire-feed` and `grimoire-lastmod` date
-chapters from `git log`, and the base image carries no git; `grimoire-mermaid`
-needs `mmdc` and `grimoire-katex` needs `katex`. Add what you use in a layer of
-your own:
+chapters from `git log`, and the base image carries no git. Add what you use in
+a layer of your own:
 
 ```dockerfile
 FROM ghcr.io/jennifer-language/grimoire

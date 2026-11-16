@@ -13,7 +13,7 @@ nothing enabled at the container level.
 To carry somebody else's plugin, put its directory here before building:
 
 ```sh
-git clone https://github.com/jennifer-language/grimoire-mermaid plugins-src/grimoire-mermaid
+git clone https://github.com/you/grimoire-NAME plugins-src/grimoire-NAME
 docker build -t grimoire .
 ```
 
