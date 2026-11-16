@@ -40,7 +40,7 @@ nothing imports them at run time.
 and the checksum filled in, and the built package itself. To install a release:
 
 ```sh
-sudo pacman -U grimoire-0.4.0-1-any.pkg.tar.zst
+sudo pacman -U grimoire-0.5.0-1-any.pkg.tar.zst
 ```
 
 or build it from that published `PKGBUILD`:

@@ -63,12 +63,12 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.4.0
+    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.5.0
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.4.0
+      image: ghcr.io/jennifer-language/grimoire:0.5.0
 ```
 
-`0.4.0` is a Grimoire release: use the newest one, in both places. 0.4.0 is the
+`0.5.0` is a Grimoire release: use the newest one, in both places. 0.4.0 is the
 first release that carries `docs-pages.yml`, so it is the oldest that `uses`
 can name. [Pinning](#pinning) says why both lines name a version rather than
 `main` and `latest`.
@@ -183,7 +183,7 @@ the published address, custom or not.
 
 ```yaml
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.4.0
+      image: ghcr.io/jennifer-language/grimoire:0.5.0
       directory: manual
 ```
 
@@ -211,7 +211,7 @@ A plugin that needs a program the image does not have - `grimoire-feed` and
 registry, and name it:
 
 ```yaml
-      image: ghcr.io/you/grimoire-with-git:0.4.0
+      image: ghcr.io/you/grimoire-with-git:0.5.0
 ```
 
 **The image has to be public.** The workflow pulls it without logging in.
@@ -221,7 +221,7 @@ the full history, so `git log` sees every commit.
 
 ### Generating pages before the build
 
-`prepare` (Grimoire 0.4.1 and later) is a shell script, run with
+`prepare` (Grimoire 0.5.0 and later) is a shell script, run with
 `bash -euxo pipefail` on the runner before each build, in the checkout that
 build reads. It is for a book that is partly
 generated - an API reference built from the sources, a chapter assembled from
@@ -289,9 +289,9 @@ on:
 jobs:
   pages:
     # permissions as above
-    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.4.0
+    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.5.0
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.4.0
+      image: ghcr.io/jennifer-language/grimoire:0.5.0
       dev: true
 ```
 
@@ -313,7 +313,7 @@ image. That is how Grimoire publishes this manual - with the code it describes,
 at the revision being published:
 
 ```yaml
-      image: ghcr.io/jennifer-language/jennifer:0.25.0
+      image: ghcr.io/jennifer-language/jennifer:0.26.0
       launcher: bin/grimoire
       args: --pdf
 ```

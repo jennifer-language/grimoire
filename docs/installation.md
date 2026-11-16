@@ -34,7 +34,7 @@ jvc app install https://github.com/jennifer-language/grimoire
 ```
 
 ```
-installed grimoire 0.4.0
+installed grimoire 0.5.0
   from:    https://github.com/jennifer-language/grimoire
   app:     /home/you/.local/share/jvc/apps/grimoire (209 file(s))
   command: /home/you/.local/bin/grimoire
@@ -115,13 +115,13 @@ on.
 both together lets apt check the dependency between them:
 
 ```sh
-sudo apt install ./jennifer_0.25.0_amd64.deb ./grimoire_0.4.0_all.deb
+sudo apt install ./jennifer_0.26.0_amd64.deb ./grimoire_0.5.0_all.deb
 ```
 
 **Arch Linux.** The package, or the published `PKGBUILD` to build it yourself:
 
 ```sh
-sudo pacman -U grimoire-0.4.0-1-any.pkg.tar.zst
+sudo pacman -U grimoire-0.5.0-1-any.pkg.tar.zst
 ```
 
 The Arch package depends on `jennifer` without a version, because the
@@ -139,8 +139,8 @@ plugins that ship with Grimoire are installed beside it, in
 **Anywhere else.** The tarball is the same tree, without the packaging:
 
 ```sh
-tar xzf grimoire-0.4.0.tar.gz
-ln -s "$PWD/grimoire-0.4.0/bin/grimoire" ~/.local/bin/grimoire
+tar xzf grimoire-0.5.0.tar.gz
+ln -s "$PWD/grimoire-0.5.0/bin/grimoire" ~/.local/bin/grimoire
 ```
 
 It is reproducible - rebuilding a release tag yields the same bytes - so the
@@ -184,7 +184,7 @@ want a shell in there instead.
 | Tag | What it is |
 | --- | ---------- |
 | `latest` | the newest release - what the commands above pull |
-| `0.4.0` | one release, unchanging |
+| `0.5.0` | one release, unchanging |
 | `0.4` | the newest release of that line |
 | `dev` | the tip of the default branch, unreleased; `main` is the same image |
 
@@ -276,7 +276,7 @@ USER jennifer
 
 The interpreter image plus a bind mount runs the checkout directly, which is the
 fastest way to test a change to Grimoire without building anything. Name the
-release, `:0.25.0`, rather than leaving the tag off, so the interpreter changes
+release, `:0.26.0`, rather than leaving the tag off, so the interpreter changes
 only when you say so. Not the `:static` variant: it is distroless, with
 no `/usr/bin/env` to start a plugin with.
 
@@ -284,11 +284,11 @@ no `/usr/bin/env` to start a plugin with.
 # From the Grimoire checkout: build the book mounted at /work.
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/work" \
-    ghcr.io/jennifer-language/jennifer:0.25.0 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.26.0 run bin/grimoire build --pdf
 
 podman run --rm --userns=keep-id \
     -v "$PWD:/work:Z" \
-    ghcr.io/jennifer-language/jennifer:0.25.0 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.26.0 run bin/grimoire build --pdf
 ```
 
 The launcher is handed to the interpreter rather than executed, because the
@@ -299,7 +299,7 @@ To build a book that lives somewhere else, mount both:
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/grimoire" -v "/path/to/my-book:/work" \
-    ghcr.io/jennifer-language/jennifer:0.25.0 run /grimoire/bin/grimoire build
+    ghcr.io/jennifer-language/jennifer:0.26.0 run /grimoire/bin/grimoire build
 ```
 
 ### Why the two flags differ
@@ -352,7 +352,7 @@ The entrypoint is a shell script, because something has to read
 have to solve differently - plugins are processes, so a distroless image could
 not run one anyway.
 
-`JENNIFER_TAG` defaults to `0.25.0`, the newest Jennifer release, so a new one
+`JENNIFER_TAG` defaults to `0.26.0`, the newest Jennifer release, so a new one
 is a change made on purpose rather than one that arrives with `latest`. The distroless `:static` variant is no base for this
 image, because both the `RUN` that installs the launcher and the entrypoint need
 a shell.
