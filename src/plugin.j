@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Preprocessors: programs that rewrite the book's Markdown before it is
@@ -234,7 +234,8 @@ func within(here as string, target as string) {
  *
  * A name with a separator in it is a path and is used as written: that is how a
  * book points at a plugin it keeps in its own repository. A bare name is looked
- * for beside Grimoire first and left to `PATH` otherwise.
+ * for beside Grimoire first and left to `PATH` otherwise; a table that sets no
+ * `command` tries `grimoire-NAME`, then `cantrip-NAME` (`candidates`).
  *
  * Looking beside Grimoire is what keeps the plugins that ship out of `/usr/bin`.
  * They would work there, but `grimoire` and `grimoire-include` share a prefix,
@@ -271,21 +272,41 @@ export func resolved(c as config.Config, kind as string, spec as config.Plugin) 
         }
         return $out;
     }
-    def shipped as string init path.join(path.dir($c.appDir), path.join(SHIPPED, $spec.command));
-    if (fs.isFile($shipped)) {
-        $out.path = $shipped;
-        $out.origin = SHIPS;
-        return $out;
-    }
-    # `os.run` does this lookup itself and says nothing about it, which is the
-    # point of doing it again here: a reader deciding whether to build a book
-    # wants the path before it runs, not the error afterwards.
-    def found as string init kit.onPath($spec.command);
-    if ($found != "") {
-        $out.path = $found;
-        $out.origin = ON_PATH;
+    for (def command in candidates($spec)) {
+        def shipped as string init path.join(path.dir($c.appDir), path.join(SHIPPED, $command));
+        if (fs.isFile($shipped)) {
+            $out.path = $shipped;
+            $out.origin = SHIPS;
+            return $out;
+        }
+        # `os.run` does this lookup itself and says nothing about it, which is the
+        # point of doing it again here: a reader deciding whether to build a book
+        # wants the path before it runs, not the error afterwards.
+        def found as string init kit.onPath($command);
+        if ($found != "") {
+            $out.path = $found;
+            $out.origin = ON_PATH;
+            return $out;
+        }
     }
     return $out;
+}
+
+/**
+ * The bare names a plugin answers to, in the order they are tried.
+ *
+ * A table that sets no `command` runs `grimoire-NAME`, and when there is no such
+ * program, `cantrip-NAME`: Cantrip's preprocessors speak the same contract, so
+ * `[preprocessor.NAME]` finds one written for Cantrip. A `command` the table
+ * sets is tried alone.
+ * @param spec {config.Plugin} the table as `grimoire.toml` wrote it
+ * @return {list of string} one or two commands
+ */
+export func candidates(spec as config.Plugin) {
+    if ($spec.command == "grimoire-" + $spec.name) {
+        return [$spec.command, "cantrip-" + $spec.name];
+    }
+    return [$spec.command];
 }
 
 /**

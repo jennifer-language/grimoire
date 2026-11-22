@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `plugin.j`, run by `jennifer test src/plugin_test.j`.
@@ -590,6 +590,30 @@ func testABareNameIsFoundBesideGrimoire() {
     testing.assertEqual(resolved($c, "preprocessor", specFor("grimoire-probe")).path, $shipped);
     # Anything it does not ship is left to `PATH`, where this one is not either.
     testing.assertEqual(resolved($c, "preprocessor", specFor("grimoire-elsewhere")).path, "");
+    fs.removeAll($app);
+}
+
+# A table that sets no `command` also answers to `cantrip-NAME`, the prefix
+# Cantrip's plugins use; one that sets a command is tried alone.
+func testADefaultCommandAlsoFindsACantripPlugin() {
+    def none as list of string;
+    def spec as config.Plugin init config.Plugin{
+        name: "probe",
+        command: "grimoire-probe",
+        args: $none,
+        settings: '{}'
+    };
+    testing.assertEqual(candidates($spec), ["grimoire-probe", "cantrip-probe"]);
+    def app as string init fs.makeTempDir(os.tempDir(), "grimoire-app-");
+    fs.mkdirAll(path.join($app, "plugins"));
+    def other as string init path.join($app, "plugins/cantrip-probe");
+    fs.writeString($other, "#!/bin/sh\n");
+    def c as config.Config init config.defaults();
+    $c.appDir = path.join($app, "src");
+    testing.assertEqual(resolved($c, "preprocessor", $spec).path, $other);
+    $spec.command = "grimoire-other";
+    testing.assertEqual(candidates($spec), ["grimoire-other"]);
+    testing.assertEqual(resolved($c, "preprocessor", $spec).path, "");
     fs.removeAll($app);
 }
 

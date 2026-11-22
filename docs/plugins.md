@@ -27,7 +27,11 @@ Name it in `grimoire.toml`. An empty table is enough:
 That runs `grimoire-include`: a plugin is an executable named `grimoire-NAME`,
 looked for beside Grimoire - in the `plugins/` directory of wherever it is
 installed - and then on `PATH`. The prefix is what makes one findable and its
-name readable in a configuration file.
+name readable in a configuration file. When there is no `grimoire-NAME`, the
+same places are searched for `cantrip-NAME`:
+[Cantrip](https://cantrip.jennifer-lang.dev/plugins.html) speaks this contract
+too, so a preprocessor written for its slide decks runs over a book, and the
+other way round.
 
 Set `command` for anything else, and `args` for arguments that come before the
 request:
@@ -670,6 +674,8 @@ jvc app install https://github.com/you/grimoire-NAME --scope project  # beside o
 
 The command an install leaves behind is the package name, and that is the name
 Grimoire looks for when a book writes `[preprocessor.NAME]` with no `command`.
+Name a preprocessor `grimoire-NAME` or `cantrip-NAME`: each tool tries its own
+prefix first and the other's second, so either name works in both.
 Renaming the package renames the command and breaks that. An app is installed
 from its repository rather than from the registry, which indexes decks - trees of
 modules that are vendored and imported, never run.
