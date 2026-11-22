@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Shared helpers for Grimoire: heading slugs, URL and path rewriting, text
@@ -11,7 +11,6 @@
  * @license LGPL-3.0-only
  */
 use strings;
-use lists;
 use maps;
 use convert;
 
@@ -117,10 +116,10 @@ export func htmlPath(src as string) {
     def p as string init strings.replace($src, "\\", "/");
     def cut as int init len($p) - 3;
     if (strings.endsWith(strings.lower($p), ".md")) {
-        $p = strings.substring($p, 0, $cut);
+        $p = $p[..$cut];
     }
     if ($p == "README" or strings.endsWith($p, "/README")) {
-        $p = strings.substring($p, 0, len($p) - 6) + "index";
+        $p = $p[..len($p) - 6] + "index";
     }
     return $p + ".html";
 }
@@ -169,7 +168,7 @@ export func cleanPath(path as string) {
             continue;
         }
         if ($seg == ".." and len($parts) > 0 and $parts[len($parts) - 1] != "..") {
-            $parts = lists.pop($parts);
+            $parts = $parts[..len($parts) - 1];
             continue;
         }
         $parts[] = $seg;
@@ -195,7 +194,7 @@ export func dirOf(path as string) {
     if ($idx < 0) {
         return "";
     }
-    return strings.substring($path, 0, $idx);
+    return $path[..$idx];
 }
 
 /**
@@ -209,7 +208,7 @@ export func splitFragment(url as string) {
     if ($at < 0) {
         return [$url, ""];
     }
-    return [strings.substring($url, 0, $at), strings.substring($url, $at, len($url))];
+    return [$url[..$at], $url[$at..len($url)]];
 }
 
 /**
@@ -246,12 +245,12 @@ export func truncate(s as string, limit as int) {
     if (len($s) <= $limit) {
         return $s;
     }
-    def cut as string init strings.substring($s, 0, $limit);
+    def cut as string init $s[..$limit];
     def parts as list of string init strings.split($cut, " ");
     if (len($parts) < 2) {
         return $cut;
     }
-    def kept as string init strings.join(lists.pop($parts), " ");
+    def kept as string init strings.join($parts[..len($parts) - 1], " ");
     # Only honour the word boundary when it leaves a usable snippet; a single
     # enormous token would otherwise truncate to almost nothing.
     if (len($kept) > $limit // 2) {

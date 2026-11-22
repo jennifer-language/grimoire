@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The local preview server behind `grimoire serve`: a static file server over
@@ -72,7 +72,7 @@ func token(root as string) {
 func pageFile(root as string, urlPath as string) {
     def rel as string init $urlPath;
     if (strings.startsWith($rel, "/")) {
-        $rel = strings.substring($rel, 1, len($rel));
+        $rel = $rel[1..len($rel)];
     }
     if ($rel == "" or strings.endsWith($rel, "/")) {
         $rel = $rel + "index.html";
@@ -114,8 +114,8 @@ func inject(page as string) {
         return $page + $script;
     }
     def at as int init len($page) - len($parts[len($parts) - 1]) - len(BODY_CLOSE);
-    return strings.substring($page, 0, $at) + $script +
-        strings.substring($page, $at, len($page));
+    return $page[..$at] + $script +
+        $page[$at..len($page)];
 }
 
 # answer handles one request: the reload endpoint, then an HTML page that needs
@@ -167,7 +167,7 @@ func displayUrl(addr as string) {
     if (strings.startsWith($host, ":")) {
         $host = "localhost" + $host;
     } elseif (strings.startsWith($host, "0.0.0.0:")) {
-        $host = "localhost" + strings.substring($host, 7, len($host));
+        $host = "localhost" + $host[7..len($host)];
     }
     return "http://" + $host + "/";
 }

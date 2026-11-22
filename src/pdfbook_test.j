@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `pdfbook.j`, run by `jennifer test src/pdfbook_test.j`.
@@ -836,7 +836,7 @@ func testMathsIsPrintedAsItsTex() {
         convert.fromCodepoint(0xA0) + " y = 2"));
     testing.assertTrue(strings.startsWith(
         $display.children[0].text,
-        strings.repeat(convert.fromCodepoint(0xA0), 3)));
+        strings.replicate(convert.fromCodepoint(0xA0), 3)));
     # And the whole book still lays out.
     testing.assertTrue(len(pdf.render(doctree.renderPdfDoc($doc, $opts))) > 0);
 }

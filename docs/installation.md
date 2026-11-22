@@ -16,7 +16,7 @@ Pick whichever fits:
 
 ## Requirements
 
-**Jennifer 0.26.0 or newer.** `build`, `pdf`, `init`, and `themes` run on both
+**Jennifer 0.27.0 or newer.** `build`, `pdf`, `init`, and `themes` run on both
 the default binary and `jennifer-tiny`; `serve` needs the default binary, since
 `jennifer-tiny` stubs `httpd`.
 
@@ -107,7 +107,7 @@ with a sidecar `.sha256`:
 | `grimoire-VERSION-1-any.pkg.tar.zst` | Arch Linux, with the `PKGBUILD` it was built from |
 | `grimoire-VERSION.tar.gz` | anywhere else: the runtime tree, to unpack and run in place |
 
-All of them need Jennifer 0.26.0 or later. Grimoire is architecture-independent
+All of them need Jennifer 0.27.0 or later. Grimoire is architecture-independent
 source, so one package of each kind serves every platform the interpreter runs
 on.
 
@@ -115,7 +115,7 @@ on.
 both together lets apt check the dependency between them:
 
 ```sh
-sudo apt install ./jennifer_0.26.0_amd64.deb ./grimoire_0.5.0_all.deb
+sudo apt install ./jennifer_0.27.0_amd64.deb ./grimoire_0.5.0_all.deb
 ```
 
 **Arch Linux.** The package, or the published `PKGBUILD` to build it yourself:
@@ -276,7 +276,7 @@ USER jennifer
 
 The interpreter image plus a bind mount runs the checkout directly, which is the
 fastest way to test a change to Grimoire without building anything. Name the
-release, `:0.26.0`, rather than leaving the tag off, so the interpreter changes
+release, `:0.27.0`, rather than leaving the tag off, so the interpreter changes
 only when you say so. Not the `:static` variant: it is distroless, with
 no `/usr/bin/env` to start a plugin with.
 
@@ -284,11 +284,11 @@ no `/usr/bin/env` to start a plugin with.
 # From the Grimoire checkout: build the book mounted at /work.
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/work" \
-    ghcr.io/jennifer-language/jennifer:0.26.0 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.27.0 run bin/grimoire build --pdf
 
 podman run --rm --userns=keep-id \
     -v "$PWD:/work:Z" \
-    ghcr.io/jennifer-language/jennifer:0.26.0 run bin/grimoire build --pdf
+    ghcr.io/jennifer-language/jennifer:0.27.0 run bin/grimoire build --pdf
 ```
 
 The launcher is handed to the interpreter rather than executed, because the
@@ -299,7 +299,7 @@ To build a book that lives somewhere else, mount both:
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
     -v "$PWD:/grimoire" -v "/path/to/my-book:/work" \
-    ghcr.io/jennifer-language/jennifer:0.26.0 run /grimoire/bin/grimoire build
+    ghcr.io/jennifer-language/jennifer:0.27.0 run /grimoire/bin/grimoire build
 ```
 
 ### Why the two flags differ
@@ -352,7 +352,7 @@ The entrypoint is a shell script, because something has to read
 have to solve differently - plugins are processes, so a distroless image could
 not run one anyway.
 
-`JENNIFER_TAG` defaults to `0.26.0`, the newest Jennifer release, so a new one
+`JENNIFER_TAG` defaults to `0.27.0`, the newest Jennifer release, so a new one
 is a change made on purpose rather than one that arrives with `latest`. The distroless `:static` variant is no base for this
 image, because both the `RUN` that installs the launcher and the entrypoint need
 a shell.

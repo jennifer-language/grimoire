@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `feed.j`, run by `jennifer test feed_test.j`.
@@ -213,7 +213,7 @@ func testLastBuildDateIsTheNewestItem() {
         '{"baseUrl":"https://x.dev/"}'));
     def feed as string init feedFor($req);
     def at as int init strings.indexOf($feed, "<lastBuildDate>");
-    testing.assertContains(strings.substring($feed, $at, $at + 60), "Jan 2026");
+    testing.assertContains($feed[$at..$at + 60], "Jan 2026");
     fs.removeAll($root);
 }
 

@@ -313,7 +313,7 @@ image. That is how Grimoire publishes this manual - with the code it describes,
 at the revision being published:
 
 ```yaml
-      image: ghcr.io/jennifer-language/jennifer:0.26.0
+      image: ghcr.io/jennifer-language/jennifer:0.27.0
       launcher: bin/grimoire
       args: --pdf
 ```

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The book outline: a `SUMMARY.md` parser in the mdBook shape (part headings,
@@ -99,7 +99,7 @@ func indentOf(line as string) {
 func stripMarker(text as string) {
     if (strings.startsWith($text, "- ") or strings.startsWith($text, "* ") or
         strings.startsWith($text, "+ ")) {
-        return strings.trim(strings.substring($text, 2, len($text)));
+        return strings.trim($text[2..len($text)]);
     }
     def digits as int init 0;
     for (def ch in strings.chars($text)) {
@@ -109,8 +109,8 @@ func stripMarker(text as string) {
             break;
         }
     }
-    if ($digits > 0 and strings.startsWith(strings.substring($text, $digits, len($text)), ". ")) {
-        return strings.trim(strings.substring($text, $digits + 2, len($text)));
+    if ($digits > 0 and strings.startsWith($text[$digits..len($text)], ". ")) {
+        return strings.trim($text[$digits + 2..len($text)]);
     }
     return "";
 }
@@ -127,12 +127,12 @@ func linkParts(text as string) {
     if ($mid < 0) {
         return $empty;
     }
-    def close as int init strings.indexOf(strings.substring($text, $mid, len($text)), ")");
+    def close as int init strings.indexOf($text[$mid..len($text)], ")");
     if ($close < 0) {
         return $empty;
     }
-    def title as string init strings.substring($text, 1, $mid);
-    def target as string init strings.substring($text, $mid + 2, $mid + $close);
+    def title as string init $text[1..$mid];
+    def target as string init $text[$mid + 2..$mid + $close];
     return [strings.trim($title), strings.trim($target)];
 }
 
@@ -141,7 +141,7 @@ func linkParts(text as string) {
 # not shared - so the updated counters come back alongside the rendered number.
 func advance(counters as list of int, level as int) { # lint-disable: L205
     while (len($counters) > $level + 1) {
-        $counters = lists.pop($counters);
+        $counters = $counters[..len($counters) - 1];
     }
     while (len($counters) < $level + 1) {
         $counters[] = 0;
@@ -181,7 +181,7 @@ func isHeading(trimmed as string, hashes as int) {
     if ($hashes == len($trimmed)) {
         return true;
     }
-    def next as string init strings.substring($trimmed, $hashes, $hashes + 1);
+    def next as string init $trimmed[$hashes..$hashes + 1];
     return $next == " " or $next == "\t";
 }
 
@@ -194,9 +194,9 @@ func isHeading(trimmed as string, hashes as int) {
 # as "C and F" - in the sidebar and, through `pdfbook.combine`, in the printed
 # outline as well. A hash inside the text has nothing to do with the syntax.
 func headingText(trimmed as string, hashes as int) {
-    def body as string init strings.trim(strings.substring($trimmed, $hashes, len($trimmed)));
+    def body as string init strings.trim($trimmed[$hashes..len($trimmed)]);
     def cut as int init len($body);
-    while ($cut > 0 and strings.substring($body, $cut - 1, $cut) == "#") {
+    while ($cut > 0 and $body[$cut - 1..$cut] == "#") {
         $cut = $cut - 1;
     }
     if ($cut == len($body)) {
@@ -205,11 +205,11 @@ func headingText(trimmed as string, hashes as int) {
     if ($cut == 0) {
         return "";
     }
-    def before as string init strings.substring($body, $cut - 1, $cut);
+    def before as string init $body[$cut - 1..$cut];
     if ($before != " " and $before != "\t") {
         return $body;
     }
-    return strings.trim(strings.substring($body, 0, $cut));
+    return strings.trim($body[..$cut]);
 }
 
 /**
@@ -303,7 +303,7 @@ func markdownFiles(dir as string) {
         if ($st.isDir) {
             continue;
         }
-        def rel as string init strings.substring($st.path, $prefix, len($st.path));
+        def rel as string init $st.path[$prefix..len($st.path)];
         if (strings.lower(path.ext($rel)) != ".md") {
             continue;
         }
@@ -330,8 +330,8 @@ func titleFor(rel as string) {
     if ($words == "") {
         return $rel;
     }
-    def head as string init strings.upper(strings.substring($words, 0, 1));
-    return $head + strings.substring($words, 1, len($words));
+    def head as string init strings.upper($words[..1]);
+    return $head + $words[1..len($words)];
 }
 
 # indexFirst sorts a directory's own landing page ahead of its siblings, so an

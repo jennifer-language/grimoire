@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Keyword extraction for the `keywords` meta tag: what a page is about, in ten
@@ -166,7 +166,7 @@ func scoreable(term as string) {
     if (len($term) < MIN_LENGTH) {
         return false;
     }
-    def first as string init strings.substring($term, 0, 1);
+    def first as string init $term[..1];
     if ($first >= UNSEGMENTED) {
         return false;
     }
@@ -202,7 +202,7 @@ func foldPlurals(scores as map of string to int) {
         if (not strings.endsWith($term, "s") or len($term) <= MIN_LENGTH) {
             continue;
         }
-        def single as string init strings.substring($term, 0, len($term) - 1);
+        def single as string init $term[..len($term) - 1];
         if (maps.has($scores, $single)) {
             $folded[$term] = $scores[$term];
         }
@@ -243,7 +243,7 @@ func ranked(scores as map of string to int) {
     def out as list of string;
     for (def key in lists.sort($keys)) {
         def at as int init strings.indexOf($key, ":");
-        $out[] = strings.substring($key, $at + 1, len($key));
+        $out[] = $key[$at + 1..len($key)];
     }
     return $out;
 }

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 # pragma-jennifer-capability: net
 
 /**
@@ -83,7 +83,7 @@ func target(url as string) {
     if ($at < 0) {
         return $url;
     }
-    return strings.substring($url, 0, $at);
+    return $url[..$at];
 }
 
 func fragment(url as string) {
@@ -91,7 +91,7 @@ func fragment(url as string) {
     if ($at < 0) {
         return "";
     }
-    return strings.substring($url, $at + 1, len($url));
+    return $url[$at + 1..len($url)];
 }
 
 # --- the network, only when asked ------------------------------------

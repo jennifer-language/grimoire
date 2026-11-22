@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Reference chapters written from Jennifer docblocks.
@@ -50,7 +50,7 @@ def const DIRECTIVE as string init '^[ \t]*\{\{#apiref[ \t]+([^}]+?)[ \t]*\}\}[ 
 def const ESCAPED as string init '^([ \t]*)\\(\{\{#apiref.*)$';
 
 func hashes(level as int) {
-    return strings.repeat("#", $level);
+    return strings.replicate("#", $level);
 }
 
 # A heading level is clamped rather than allowed to run past six, where Markdown
@@ -180,7 +180,7 @@ func fileSection(file as string, level as int, private as bool) {
     def out as list of string;
     def name as string init path.base($file);
     if (strings.endsWith($name, ".j")) {
-        $name = strings.substring($name, 0, len($name) - 2);
+        $name = $name[..len($name) - 2];
     }
     $out[] = hashes($level) + " `" + $name + "`";
     for (def p in prose($doc.module.summary, $doc.module.description)) {

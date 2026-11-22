@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The Markdown-to-HTML renderer. It walks the `markdown` module's document tree
@@ -368,12 +368,12 @@ func titleOf(info as string) {
     if ($at < 0) {
         return "";
     }
-    def rest as string init strings.substring($info, $at + 7, len($info));
+    def rest as string init $info[$at + 7..len($info)];
     def stop as int init strings.indexOf($rest, '"');
     if ($stop < 0) {
         return "";
     }
-    return strings.substring($rest, 0, $stop);
+    return $rest[..$stop];
 }
 
 func renderCode(n as doctree.Node, highlighting as bool) {

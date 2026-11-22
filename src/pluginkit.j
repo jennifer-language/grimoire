@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The plugin kit: what a Grimoire plugin written in Jennifer needs from the
@@ -515,7 +515,7 @@ def struct Leading {
  */
 export func chomp(line as string) {
     if (strings.endsWith($line, "\r")) {
-        return strings.substring($line, 0, len($line) - 1);
+        return $line[..len($line) - 1];
     }
     return $line;
 }
@@ -528,7 +528,7 @@ func leading(line as string) {
     def n as int init 0;
     def head as string init $line;
     if (len($head) > 4) {
-        $head = strings.substring($line, 0, 4);
+        $head = $line[..4];
     }
     for (def ch in strings.chars($head)) {
         if ($ch == " ") {
@@ -591,11 +591,11 @@ export func openerOf(line as string) {
     if ($lead.width > 3) {
         return $none;
     }
-    def rest as string init strings.substring($text, $lead.chars, len($text));
+    def rest as string init $text[$lead.chars..len($text)];
     if ($rest == "") {
         return $none;
     }
-    def mark as string init strings.substring($rest, 0, 1);
+    def mark as string init $rest[..1];
     if ($mark != "`" and $mark != "~") {
         return $none;
     }
@@ -603,14 +603,14 @@ export func openerOf(line as string) {
     if ($size < 3) {
         return $none;
     }
-    def info as string init strings.trim(strings.substring($rest, $size, len($rest)));
+    def info as string init strings.trim($rest[$size..len($rest)]);
     if ($mark == "`" and strings.contains($info, "`")) {
         return $none;
     }
     $none.mark = $mark;
     $none.size = $size;
     $none.width = $lead.width;
-    $none.indent = strings.substring($text, 0, $lead.chars);
+    $none.indent = $text[..$lead.chars];
     $none.info = $info;
     return $none;
 }
@@ -628,12 +628,12 @@ export func closes(line as string, open as Fence) {
     if ($lead.width > 3) {
         return false;
     }
-    def rest as string init strings.substring($text, $lead.chars, len($text));
+    def rest as string init $text[$lead.chars..len($text)];
     def size as int init runOf($rest, $open.mark);
     if ($size < $open.size) {
         return false;
     }
-    return strings.trim(strings.substring($rest, $size, len($rest))) == "";
+    return strings.trim($rest[$size..len($rest)]) == "";
 }
 
 /**
@@ -656,7 +656,7 @@ func unindent(line as string, width as int) {
     def n as int init 0;
     def head as string init $text;
     if (len($head) > $width) {
-        $head = strings.substring($text, 0, $width);
+        $head = $text[..$width];
     }
     for (def ch in strings.chars($head)) {
         if ($ch != " ") {
@@ -664,7 +664,7 @@ func unindent(line as string, width as int) {
         }
         $n = $n + 1;
     }
-    return strings.substring($text, $n, len($text));
+    return $text[$n..len($text)];
 }
 
 /**
@@ -760,7 +760,7 @@ export func generatedName() {
  * @return {string} the link, such as `../_generated/mermaid/ab12.svg`
  */
 export func generatedLink(chapter as string, plugin as string, file as string) {
-    def up as string init strings.repeat("../", strings.count($chapter, "/"));
+    def up as string init strings.replicate("../", strings.count($chapter, "/"));
     return $up + GENERATED + "/" + $plugin + "/" + $file;
 }
 
@@ -779,8 +779,8 @@ export func contentName(parts as list of string, digits as int) {
     }
     def digest as string init encoding.toText(
         "hex",
-        hash.compute("sha256", convert.bytesFromString("utf-8", strings.join($parts, "\n"))));
-    return strings.substring($digest, 0, $digits);
+        hash.compute("sha256", encoding.encode("utf-8", strings.join($parts, "\n"))));
+    return $digest[..$digits];
 }
 
 # --- other programs ---------------------------------------------------

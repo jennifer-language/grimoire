@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `search.j`, run by `jennifer test src/search_test.j`.
@@ -27,7 +27,7 @@ func sample() {
 def const ASSIGN as string init "window.grimoireIndex = ";
 
 func decodeIndex(js as string) {
-    return json.decode(strings.substring($js, len(ASSIGN), len($js) - 2));
+    return json.decode($js[len(ASSIGN)..len($js) - 2]);
 }
 
 # --- record ----------------------------------------------------------

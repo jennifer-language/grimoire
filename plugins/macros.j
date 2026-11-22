@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Values a book writes once and uses everywhere.
@@ -100,8 +100,8 @@ func expandLine(
     def out as string init "";
     def at as int init 0;
     for (def m in regex.findAll(MACRO, $line)) {
-        if ($m.start > 0 and strings.substring($line, $m.start - 1, $m.start) == "\\") {
-            $out = $out + strings.substring($line, $at, $m.start - 1) + $m.text;
+        if ($m.start > 0 and $line[$m.start - 1..$m.start] == "\\") {
+            $out = $out + $line[$at..$m.start - 1] + $m.text;
             $at = $m.end;
             continue;
         }
@@ -112,10 +112,10 @@ func expandLine(
             }
             continue;
         }
-        $out = $out + strings.substring($line, $at, $m.start) + $values[$name];
+        $out = $out + $line[$at..$m.start] + $values[$name];
         $at = $m.end;
     }
-    return $out + strings.substring($line, $at, len($line));
+    return $out + $line[$at..len($line)];
 }
 
 /**

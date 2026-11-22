@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `assets.j`, run by `jennifer test src/assets_test.j`.
@@ -84,11 +84,8 @@ func testRuntimeIsStable() {
 # that, and would then be one edit away from meaning nothing.
 func drawerSource() {
     def js as string init runtime();
-    def rest as string init strings.substring(
-        $js,
-        strings.indexOf($js, "function initDrawer"),
-        len($js));
-    return strings.substring($rest, 0, strings.indexOf($rest, "function initCopy"));
+    def rest as string init $js[strings.indexOf($js, "function initDrawer")..len($js)];
+    return $rest[..strings.indexOf($rest, "function initCopy")];
 }
 
 # The slice, before anything is concluded from it. An indexOf that missed would

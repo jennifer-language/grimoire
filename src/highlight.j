@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Build-time syntax highlighting for Jennifer code blocks.
@@ -143,7 +143,7 @@ func classifyWord(word as string, next as string) {
     }
     # A constant is UPPER_CASE; a name that is all caps and has no lowercase is
     # one by the language's own naming rule.
-    if (isUpper(strings.substring($word, 0, 1)) and strings.upper($word) == $word) {
+    if (isUpper($word[..1]) and strings.upper($word) == $word) {
         return "symbol";
     }
     if ($next == "(") {

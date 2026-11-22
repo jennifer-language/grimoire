@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The theme model and the stylesheet generator. A `Theme` is a pair of
@@ -196,8 +196,8 @@ func hexDigit(ch as string) {
 }
 
 func hexPair(hex as string, at as int) {
-    def hi as int init hexDigit(strings.substring($hex, $at, $at + 1));
-    def lo as int init hexDigit(strings.substring($hex, $at + 1, $at + 2));
+    def hi as int init hexDigit($hex[$at..$at + 1]);
+    def lo as int init hexDigit($hex[$at + 1..$at + 2]);
     if ($hi < 0 or $lo < 0) {
         return -1;
     }

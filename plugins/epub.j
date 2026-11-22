@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * An EPUB of the book, built from the same outline as the site.
@@ -69,7 +69,7 @@ def struct File {
 };
 
 func bytesOf(text as string) {
-    return convert.bytesFromString("utf-8", $text);
+    return encoding.encode("utf-8", $text);
 }
 
 # --- the archive -----------------------------------------------------
@@ -258,7 +258,7 @@ func xhtmlPage(lang as string, title as string, body as xml.Value) {
 func fileFor(src as string) {
     def flat as string init strings.replace($src, "/", "-");
     if (strings.endsWith($flat, ".md")) {
-        $flat = strings.substring($flat, 0, len($flat) - 3);
+        $flat = $flat[..len($flat) - 3];
     }
     def out as string;
     for (def ch in strings.chars(strings.lower($flat))) {
@@ -339,9 +339,7 @@ def const GENERATED as string init "_generated/";
 # The file a book-relative target names, whichever tree holds it.
 func located(trees as Trees, target as string) {
     if ($trees.generated != "" and strings.startsWith($target, GENERATED)) {
-        return path.join(
-            $trees.generated,
-            strings.substring($target, len(GENERATED), len($target)));
+        return path.join($trees.generated, $target[len(GENERATED)..len($target)]);
     }
     return path.join($trees.src, $target);
 }
@@ -437,9 +435,9 @@ func identifier(title as string, lang as string) {
     def digest as string init encoding.toText(
         "hex",
         hash.compute("sha256", bytesOf($title + "/" + $lang)));
-    return "urn:uuid:" + strings.substring($digest, 0, 8) + "-" +
-        strings.substring($digest, 8, 12) + "-5" + strings.substring($digest, 13, 16) + "-a" +
-        strings.substring($digest, 17, 20) + "-" + strings.substring($digest, 20, 32);
+    return "urn:uuid:" + $digest[..8] + "-" +
+        $digest[8..12] + "-5" + $digest[13..16] + "-a" +
+        $digest[17..20] + "-" + $digest[20..32];
 }
 
 # One `<item>` of the manifest: what is in the archive, and what it is.

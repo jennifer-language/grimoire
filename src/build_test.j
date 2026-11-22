@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `build.j`, run by `jennifer test src/build_test.j`.
@@ -45,7 +45,7 @@ func sized(sizes as list of int) {
     while ($i < len($sizes)) {
         fs.writeString(
             path.join($root, "ch" + convert.toString($i) + ".md"),
-            strings.repeat("x", $sizes[$i] * 1024));
+            strings.replicate("x", $sizes[$i] * 1024));
         $i = $i + 1;
     }
     return $root;

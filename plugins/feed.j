@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 # pragma-jennifer-capability: exec
 
 /**
@@ -178,7 +178,7 @@ func itemFor(root as string, src as string, title as string, base as string, out
     }
     # A commit subject may contain the separator; only the first two fields are
     # split off.
-    def subject as string init strings.join(lists.tail($parts, len($parts) - 2), "|");
+    def subject as string init strings.join($parts[len($parts) - (len($parts) - 2)..], "|");
     return Item{
         key: sortKey(convert.toInt($parts[0]), $src),
         title: $title,

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The words that carry no subject, in nine languages.
@@ -1431,7 +1431,7 @@ func base(lang as string) {
     if ($at < 0) {
         return strings.lower($lang);
     }
-    return strings.lower(strings.substring($lang, 0, $at));
+    return strings.lower($lang[..$at]);
 }
 
 # catalog is the list for one base tag, empty for a language with no list -

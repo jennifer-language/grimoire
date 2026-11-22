@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The build itself: read the outline, render every chapter, write the site, and
@@ -340,11 +340,11 @@ func relativeTo(root as string, target as string) {
         $prefix = $prefix + "/";
     }
     if (strings.startsWith($slashed, $prefix)) {
-        return strings.substring($slashed, len($prefix), len($slashed));
+        return $slashed[len($prefix)..len($slashed)];
     }
     # `./x` and `x` name one file; a walk of `.` yields the second form.
     if (strings.startsWith($slashed, "./")) {
-        return strings.substring($slashed, 2, len($slashed));
+        return $slashed[2..len($slashed)];
     }
     return $slashed;
 }
@@ -544,7 +544,7 @@ func resolveMark(c as config.Config) {
     }
     # Drop anything before the root element: an XML prolog or a DOCTYPE is legal
     # in a standalone file but not inside an HTML document.
-    return layout.svgBrand(stripScripts(strings.substring($markup, $at, len($markup))));
+    return layout.svgBrand(stripScripts($markup[$at..len($markup)]));
 }
 
 # stripScripts removes every `<script>...</script>` from inlined markup.
@@ -562,20 +562,20 @@ func stripScripts(markup as string) {
         if ($start < 0) {
             return $out;
         }
-        def rest as string init strings.substring($out, $start, len($out));
+        def rest as string init $out[$start..len($out)];
         def close as int init strings.indexOf(strings.lower($rest), "</script");
         if ($close < 0) {
-            return strings.substring($out, 0, $start);
+            return $out[..$start];
         }
-        def tail as string init strings.substring($rest, $close, len($rest));
+        def tail as string init $rest[$close..len($rest)];
         def bracket as int init strings.indexOf($tail, ">");
         # An end tag that never closes its bracket is not an end tag; the rest of
         # the markup is script, and none of it belongs on the page.
         if ($bracket < 0) {
-            return strings.substring($out, 0, $start);
+            return $out[..$start];
         }
-        $out = strings.substring($out, 0, $start) +
-            strings.substring($tail, $bracket + 1, len($tail));
+        $out = $out[..$start] +
+            $tail[$bracket + 1..len($tail)];
         $guard = $guard + 1;
     }
     return $out;

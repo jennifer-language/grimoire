@@ -24,7 +24,7 @@
 # twice, for the `RUN` that links and marks the launcher below and for the
 # entrypoint script that reads GRIMOIRE_PLUGINS, and a plugin's
 # `#!/usr/bin/env jennifer` needs `env`.
-ARG JENNIFER_TAG=0.26.0
+ARG JENNIFER_TAG=0.27.0
 FROM ghcr.io/jennifer-language/jennifer:${JENNIFER_TAG}
 
 # The registry shows `description` on the package page, so it says how to run the

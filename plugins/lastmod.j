@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 # pragma-jennifer-capability: exec
 
 /**
@@ -96,7 +96,7 @@ export func stamped(content as string, label as string, date as string) {
     }
     def body as string init $content;
     while (strings.endsWith($body, "\n")) {
-        $body = strings.substring($body, 0, len($body) - 1);
+        $body = $body[..len($body) - 1];
     }
     return $body + "\n\n*" + $label + ": " + $date + "*\n";
 }

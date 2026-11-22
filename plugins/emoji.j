@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * `:rocket:` in a chapter, the character in the page.
@@ -183,7 +183,7 @@ func wordAt(line as string, i as int) {
     if ($i < 0 or $i >= len($line)) {
         return false;
     }
-    return strings.contains(WORD, strings.substring($line, $i, $i + 1));
+    return strings.contains(WORD, $line[$i..$i + 1]);
 }
 
 # The shortcode that starts at `from`, or "": the colon, a name, a colon, and a
@@ -191,19 +191,19 @@ func wordAt(line as string, i as int) {
 func codeAt(line as string, from as int) {
     def stop as int init $from + 1;
     while ($stop < len($line) and
-        strings.contains(CODE, strings.substring($line, $stop, $stop + 1))) {
+        strings.contains(CODE, $line[$stop..$stop + 1])) {
         $stop = $stop + 1;
     }
     if ($stop >= len($line) or $stop == $from + 1) {
         return "";
     }
-    if (strings.substring($line, $stop, $stop + 1) != ":") {
+    if ($line[$stop..$stop + 1] != ":") {
         return "";
     }
     if (wordAt($line, $from - 1) or wordAt($line, $stop + 1)) {
         return "";
     }
-    return strings.substring($line, $from + 1, $stop);
+    return $line[$from + 1..$stop];
 }
 
 # One line, with every shortcode the table knows replaced. A name it does not
@@ -217,8 +217,8 @@ func expandLine(line as string, codes as map of string to string) {
     def out as string init "";
     def i as int init 0;
     while ($i < len($line)) {
-        if (strings.substring($line, $i, $i + 1) != ":") {
-            $out = $out + strings.substring($line, $i, $i + 1);
+        if ($line[$i..$i + 1] != ":") {
+            $out = $out + $line[$i..$i + 1];
             $i = $i + 1;
             continue;
         }

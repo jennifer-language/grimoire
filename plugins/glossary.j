@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The first use of a glossary term on a page, linked to its definition.
@@ -81,13 +81,13 @@ export func slugify(text as string) {
 # wanted depth. Trailing hashes are the closed ATX form and are not part of the
 # text.
 func headingAt(line as string, depth as int) {
-    def marker as string init strings.repeat("#", $depth) + " ";
+    def marker as string init strings.replicate("#", $depth) + " ";
     if (not strings.startsWith($line, $marker)) {
         return "";
     }
-    def text as string init strings.trim(strings.substring($line, len($marker), len($line)));
+    def text as string init strings.trim($line[len($marker)..len($line)]);
     while (strings.endsWith($text, "#")) {
-        $text = strings.trim(strings.substring($text, 0, len($text) - 1));
+        $text = strings.trim($text[..len($text) - 1]);
     }
     return $text;
 }
@@ -236,7 +236,7 @@ func wordAt(text as string, i as int) {
     if ($i < 0 or $i >= len($text)) {
         return false;
     }
-    return strings.contains(WORD, strings.substring($text, $i, $i + 1));
+    return strings.contains(WORD, $text[$i..$i + 1]);
 }
 
 /**
@@ -257,7 +257,7 @@ export func wordIndex(line as string, word as string) {
     }
     def from as int init 0;
     while ($from <= len($hay) - len($needle)) {
-        def rest as string init strings.substring($hay, $from, len($hay));
+        def rest as string init $hay[$from..len($hay)];
         def at as int init strings.indexOf($rest, $needle);
         if ($at < 0) {
             return -1;
@@ -348,9 +348,9 @@ export func link(content as string, terms as list of Term, target as string) {
                 continue;
             }
             def stop as int init $at + len($term.word);
-            $lines[$i] = strings.substring($line, 0, $at) + "[" +
-                strings.substring($line, $at, $stop) + "](" + $target + "#" + $term.anchor + ")" +
-                strings.substring($line, $stop, len($line));
+            $lines[$i] = $line[..$at] + "[" +
+                $line[$at..$stop] + "](" + $target + "#" + $term.anchor + ")" +
+                $line[$stop..len($line)];
             $linked[$term.anchor] = 1;
             break;
         }

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `mathml.j`, run by `jennifer test src/mathml_test.j`.
@@ -135,17 +135,17 @@ func testTexPrintsTheSource() {
     # (40 - 11) // 2 no-break spaces, then a space, then the source.
     testing.assertEqual(
         $block.children[0].text,
-        strings.repeat(convert.fromCodepoint(0xA0), 14) + ' \frac{a}{b}');
+        strings.replicate(convert.fromCodepoint(0xA0), 14) + ' \frac{a}{b}');
 }
 
 func testEachDisplayLineIsCentredOnItsOwn() {
     def lines as list of doctree.Node init centredTex("ab\nabcdef\n", 10);
     testing.assertEqual(len($lines), 3);
-    testing.assertEqual($lines[0].text, strings.repeat(convert.fromCodepoint(0xA0), 4) + " ab");
+    testing.assertEqual($lines[0].text, strings.replicate(convert.fromCodepoint(0xA0), 4) + " ab");
     testing.assertEqual($lines[1].kind, "line_break");
     testing.assertEqual(
         $lines[2].text,
-        strings.repeat(convert.fromCodepoint(0xA0), 2) + " abcdef");
+        strings.replicate(convert.fromCodepoint(0xA0), 2) + " abcdef");
     # Wider than the column: no padding, the layout wraps it.
     testing.assertEqual(centredTex("abcdefghijkl", 10)[0].text, "abcdefghijkl");
 }

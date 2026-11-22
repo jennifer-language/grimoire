@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The words Grimoire itself puts on a page, in English and ten other languages.
@@ -399,7 +399,7 @@ func base(lang as string) {
     if ($at < 0) {
         return strings.lower($lang);
     }
-    return strings.lower(strings.substring($lang, 0, $at));
+    return strings.lower($lang[..$at]);
 }
 
 /**

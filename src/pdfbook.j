@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * The printable build: the whole book as one paginated PDF, laid out by the
@@ -354,7 +354,7 @@ func fenceAt(line as string) {
     def t as string init strings.trim($line);
     def prefix as string init quotePrefix($t);
     if ($prefix != "") {
-        $t = strings.trim(strings.substring($t, len($prefix), len($t)));
+        $t = strings.trim($t[len($prefix)..len($t)]);
     }
     return strings.startsWith($t, "```") or strings.startsWith($t, "~~~");
 }
@@ -373,7 +373,7 @@ func headingLevel(line as string) {
     if ($n == 0 or $n > 6) {
         return 0;
     }
-    def rest as string init strings.substring($line, $n, len($line));
+    def rest as string init $line[$n..len($line)];
     if ($rest == "" or strings.startsWith($rest, " ")) {
         return $n;
     }
@@ -432,11 +432,11 @@ func resolveImages(line as string, dir as string) {
     def out as list of string;
     def at as int init 0;
     for (def m in $spans) {
-        $out[] = strings.substring($line, $at, $m.start);
+        $out[] = $line[$at..$m.start];
         $out[] = "![" + $m.groups[0] + "](" + bookPath($dir, $m.groups[1]) + $m.groups[2] + ")";
         $at = $m.end;
     }
-    $out[] = strings.substring($line, $at, len($line));
+    $out[] = $line[$at..len($line)];
     return strings.join($out, "");
 }
 
@@ -465,11 +465,11 @@ func printLinks(line as string) {
     def out as list of string;
     def at as int init 0;
     for (def m in $spans) {
-        $out[] = linksIn(strings.substring($line, $at, $m.start));
+        $out[] = linksIn($line[$at..$m.start]);
         $out[] = $m.text;
         $at = $m.end;
     }
-    $out[] = linksIn(strings.substring($line, $at, len($line)));
+    $out[] = linksIn($line[$at..len($line)]);
     return strings.join($out, "");
 }
 
@@ -524,8 +524,8 @@ func prepare(md as string, by as int, dir as string) {
             if ($target > 6) {
                 $target = 6;
             }
-            $out[] = strings.repeat("#", $target) +
-                printLine(strings.substring($line, $level, len($line)), $dir);
+            $out[] = strings.replicate("#", $target) +
+                printLine($line[$level..len($line)], $dir);
             continue;
         }
         # Every other line keeps its own shape, indentation included: the layout
@@ -739,7 +739,7 @@ export func combine(c as config.Config, entries as list of summary.Entry) {
         }
         $opensPart = false;
         if (not hasTitle($source)) {
-            $lines[] = strings.repeat("#", 1 + $shift) + " " + $e.title;
+            $lines[] = strings.replicate("#", 1 + $shift) + " " + $e.title;
             $lines[] = "";
         }
         $lines[] = $body;
@@ -899,7 +899,7 @@ func footerText(c as config.Config) {
     def describe as list of string init ["describe", "--tags", "--exact-match"];
     def tag as string init stamp("GRIMOIRE_VERSION", $c.srcDir, $describe);
     if (strings.startsWith($tag, "v")) {
-        $tag = strings.substring($tag, 1, len($tag));
+        $tag = $tag[1..len($tag)];
     }
     def commit as string init "";
     if ($tag == "") {
@@ -979,7 +979,7 @@ func bookFile(c as config.Config, url as string) {
     def prefix as string init config.generatedName() + "/";
     def clean as string init path.clean($url);
     if ($generated != "" and strings.startsWith($clean, $prefix)) {
-        return path.join($generated, strings.substring($clean, len($prefix), len($clean)));
+        return path.join($generated, $clean[len($prefix)..len($clean)]);
     }
     return path.join($c.srcDir, $clean);
 }
@@ -996,9 +996,7 @@ func rasterFor(c as config.Config, url as string) {
     if (not strings.endsWith(strings.lower($url), ".svg")) {
         return "";
     }
-    def sibling as string init bookFile(
-        $c,
-        strings.substring($url, 0, len($url) - len(".svg")) + ".png");
+    def sibling as string init bookFile($c, $url[..len($url) - len(".svg")] + ".png");
     if (not fs.isFile($sibling)) {
         return "";
     }

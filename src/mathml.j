@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * MathML in a chapter: recognising it, checking it, and handing it to each
@@ -320,7 +320,7 @@ func centredTex(tex as string, chars as int) {
         }
         def pad as int init ($chars - len($text)) // 2;
         if ($pad > 0) {
-            $text = strings.repeat(convert.fromCodepoint(0xA0), $pad) + " " + $text;
+            $text = strings.replicate(convert.fromCodepoint(0xA0), $pad) + " " + $text;
         }
         $out[] = textNode("codespan", $text);
     }

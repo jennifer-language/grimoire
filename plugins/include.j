@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * `{{#include}}`: a file pulled into a chapter.
@@ -33,7 +33,6 @@ use path;
 use json;
 use regex;
 use strings;
-use lists;
 use convert;
 import "../src/pluginkit.j" as kit;
 
@@ -67,7 +66,7 @@ export func slice(file as string, text as string, lo as int, hi as int) {
     # A file ends with a newline, which splits into a trailing empty line that is
     # not a line of the file.
     if (len($all) > 0 and $all[len($all) - 1] == "") {
-        $all = lists.head($all, len($all) - 1);
+        $all = $all[..len($all) - 1];
     }
     if ($lo == 0) {
         return strings.join($all, "\n");

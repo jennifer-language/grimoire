@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Captions for the pictures a book already has.
@@ -68,8 +68,8 @@ export func pictureOf(alt as string, dest as string) {
         if ($at < 0) {
             continue;
         }
-        $title = strings.substring($rest, $at + 2, len($rest) - 1);
-        $rest = strings.trim(strings.substring($rest, 0, $at));
+        $title = $rest[$at + 2..len($rest) - 1];
+        $rest = strings.trim($rest[..$at]);
         break;
     }
     return Picture{alt: $alt, src: $rest, title: $title};

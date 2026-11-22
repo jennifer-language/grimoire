@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * White-box tests for `epub.j`, run by `jennifer test epub_test.j`.
@@ -26,7 +26,7 @@ func bookTree() {
     fs.writeString(
         path.join($root, "src/guide/syntax.md"),
         "# Syntax\n\n![logo](../img/logo.png)\n");
-    fs.writeBytes(path.join($root, "src/img/logo.png"), convert.bytesFromString("utf-8", "PNG"));
+    fs.writeBytes(path.join($root, "src/img/logo.png"), encoding.encode("utf-8", "PNG"));
     return $root;
 }
 
@@ -75,16 +75,14 @@ func testTheArchiveOpensWithAStoredMimetype() {
     # Bytes 8 and 9 are the compression method: 0 is stored, 8 is deflate.
     testing.assertEqual($z[8], 0);
     testing.assertEqual($z[9], 0);
-    testing.assertEqual(convert.stringFromBytes("utf-8", binary.slice($z, 30, 38)), "mimetype");
-    testing.assertEqual(
-        convert.stringFromBytes("utf-8", binary.slice($z, 38, 38 + len(MIMETYPE))),
-        MIMETYPE);
+    testing.assertEqual(encoding.decode("utf-8", $z[30..38]), "mimetype");
+    testing.assertEqual(encoding.decode("utf-8", $z[38..38 + len(MIMETYPE)]), MIMETYPE);
 }
 
 # Stored, not deflated, for every entry: a payload that would certainly compress
 # is in the archive verbatim.
 func testEntriesAreNotCompressed() {
-    def payload as string init strings.repeat("a", 400);
+    def payload as string init strings.replicate("a", 400);
     def z as bytes init zipOf([File{name: "long.txt", data: bytesOf($payload)}]);
     testing.assertTrue(binary.contains($z, bytesOf($payload)));
 }
@@ -96,7 +94,7 @@ func testTheDirectoryCountsEveryEntry() {
         File{name: "c", data: bytesOf("3")}
     ]);
     def end as int init len($z) - 22;
-    testing.assertTrue(binary.startsWith(binary.slice($z, $end, len($z)), le32(0x06054b50)));
+    testing.assertTrue(binary.startsWith($z[$end..len($z)], le32(0x06054b50)));
     testing.assertEqual($z[$end + 10], 3);
 }
 

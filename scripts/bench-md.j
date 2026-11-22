@@ -1,7 +1,7 @@
 #!/usr/bin/env -S jennifer run
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * Time the `markdown` and `pdf` modules over a directory of Markdown, with no
@@ -72,7 +72,7 @@ func pad(n as int) {
 # skipValues reads the comma-separated patterns out of a `skip=a,b` argument.
 func skipValues(arg as string) {
     def out as list of string;
-    for (def part in strings.split(strings.substring($arg, 5, len($arg)), ",")) {
+    for (def part in strings.split($arg[5..len($arg)], ",")) {
         def clean as string init strings.trim($part);
         if ($clean != "") {
             $out[] = $clean;
@@ -131,7 +131,7 @@ func slowest(best as map of string to int, sizes as map of string to int) {
     for (def i in 0..$shown) {
         def key as string init $sorted[len($sorted) - 1 - $i];
         def at as int init strings.indexOf($key, "\t");
-        def file as string init strings.substring($key, $at + 1, len($key));
+        def file as string init $key[$at + 1..len($key)];
         io.printf("mdslow\t%d\t%d\t%d\t%s\n", $i + 1, $best[$file], $sizes[$file], $file);
     }
 }

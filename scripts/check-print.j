@@ -1,7 +1,7 @@
 #!/usr/bin/env -S jennifer run
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 /**
  * What the printable book cannot draw.
@@ -62,7 +62,7 @@ func hex(n as int) {
     def rest as int init $n;
     while ($rest > 0) {
         def digit as int init $rest % 16;
-        $out = strings.substring(HEX, $digit, $digit + 1) + $out;
+        $out = HEX[$digit..$digit + 1] + $out;
         $rest = $rest // 16;
     }
     return $out;
