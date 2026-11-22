@@ -35,7 +35,7 @@ env:
   # a new one - patch or minor - is a change made here on purpose rather than
   # one that arrives with `latest`. `Dockerfile`, `pages.yml` and
   # `scripts/ci-git-image.sh` pin the same.
-  JENNIFER_TAG: "0.26.0"
+  JENNIFER_TAG: "0.27.0"
 
 jobs:
   # The version numbers, as their own callable workflow. It used to be a block
@@ -49,6 +49,9 @@ jobs:
     uses: ./.github/workflows/version.yml
 
   unit:
+    # The interpreter runs from its image; Forgejo's runner has no Docker, so
+    # there the `native` job below checks the same.
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
 
     steps:
@@ -214,6 +217,7 @@ jobs:
 
   book:
     needs: unit
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
 
     steps:
@@ -460,3 +464,48 @@ jobs:
               grep -q "data-nav=\"$nav\" data-toc=\"$toc\"" "out-$nav-$toc/index.html"
             done
           done
+
+  # Forgejo's runner puts the job in a container with no Docker socket, so the
+  # image-based jobs above run on GitHub only. This runs the interpreter from
+  # the release archive of the same version instead: formatting, lint, the
+  # repository checks and the unit tests. The book build stays on GitHub.
+  native:
+    if: github.server_url != 'https://github.com'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install the interpreter release
+        run: |
+          set -eu
+          stage="jennifer-${JENNIFER_TAG}-linux-amd64"
+          base="https://github.com/jennifer-language/jennifer/releases/download/${JENNIFER_TAG}"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "$base/$stage.tar.gz"
+          curl -fsSLO "$base/$stage.tar.gz.sha256"
+          sha256sum -c "$stage.tar.gz.sha256"
+          tar xzf "$stage.tar.gz"
+          install -Dm755 "$stage/jennifer" "$HOME/.local/bin/jennifer"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "JENNIFER_SYSMODDIR=$RUNNER_TEMP/$stage/share/jennifer/modules" >> "$GITHUB_ENV"
+
+      - name: Check formatting
+        run: |
+          jennifer fmt --check bin/grimoire src/*.j src/themes/*.j scripts/*.j \
+            plugins/*.j plugins/grimoire-*
+
+      - name: Lint
+        run: |
+          jennifer lint bin/grimoire src/*.j src/themes/*.j scripts/*.j \
+            plugins/*.j plugins/grimoire-*
+
+      - name: Repository checks
+        run: |
+          scripts/check-style.sh
+          scripts/check-plugins.sh
+          scripts/check-tracked.sh
+          jennifer run scripts/check-print.j
+
+      - name: Unit tests
+        run: scripts/test.sh
