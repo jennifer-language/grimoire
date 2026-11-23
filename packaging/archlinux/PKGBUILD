@@ -14,8 +14,8 @@
 # it, and a prerelease must sort below its release. The release pipeline
 # stamps both lines from the tag.
 pkgname=grimoire
-_tag=0.6.0
-pkgver=0.6.0
+_tag=0.6.1
+pkgver=0.6.1
 pkgrel=1
 pkgdesc='Build a documentation website, and a printable PDF, from a directory of Markdown files'
 arch=('any')
