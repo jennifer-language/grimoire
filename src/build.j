@@ -32,6 +32,7 @@ import "./summary.j" as summary;
 import "./content.j" as content;
 import "./layout.j" as layout;
 import "./theme.j" as theme;
+import "./themefile.j" as themefile;
 import "./agents.j" as agents;
 import "./plugin.j" as plugin;
 import "./assets.j" as assets;
@@ -186,6 +187,25 @@ func writeFile(target as string, text as string) {
     }
     fs.writeString($target, $text);
     return encoding.lenBytes($text);
+}
+
+# copyThemeFiles copies the files a theme file lists (its web fonts, say) into
+# assets/, at the same relative paths, so its stylesheet can reach them as
+# url("fonts/x.woff2"). A shipped theme lists none.
+func copyThemeFiles(c as config.Config) {
+    def t as themefile.Loaded init theme.resolve($c.theme);
+    def written as int init 0;
+    for (def one in $t.files) {
+        def target as string init path.join($c.outDir, "assets", $one);
+        def dir as string init path.dir($target);
+        if ($dir != "" and $dir != ".") {
+            fs.mkdirAll($dir);
+        }
+        def data as bytes init fs.readBytes(path.join($t.dir, $one));
+        fs.writeBytes($target, $data);
+        $written = $written + len($data);
+    }
+    return $written;
 }
 
 # searchNote names the search index in the asset line only when one is built.
@@ -998,6 +1018,7 @@ export func run(c as config.Config) {
     note($c, "  assets  stylesheet, runtime" + searchNote($c));
     $written = $written +
         writeFile(path.join($c.outDir, "assets/grimoire.css"), theme.stylesheet($c.theme));
+    $written = $written + copyThemeFiles($c);
     $written = $written + writeFile(path.join($c.outDir, "assets/grimoire.js"), assets.runtime());
     if ($c.search) {
         $written = $written +

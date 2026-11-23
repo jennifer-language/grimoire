@@ -18,6 +18,9 @@
 use testing;
 use strings;
 use lists;
+use fs;
+use os;
+use path;
 
 func testFallbackIsGrimoire() {
     testing.assertEqual(fallback(), "grimoire");
@@ -139,4 +142,50 @@ func testCatalogIsAlphabeticalButAllIsNot() {
         $previous = $line;
     }
     testing.assertEqual(names()[0], fallback());
+}
+
+# writeTheme puts a theme file, and its stylesheet, into a fresh directory.
+func writeTheme(toml as string, css as string) {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-resolve-");
+    fs.writeString(path.join($dir, "t.toml"), $toml);
+    if ($css != "") {
+        fs.writeString(path.join($dir, "t.css"), $css);
+    }
+    return path.join($dir, "t.toml");
+}
+
+func testResolveANameIsTheShippedTheme() {
+    testing.assertEqual(resolve("nordic").theme, byName("nordic"));
+    testing.assertEqual(resolve("nordic").css, "");
+}
+
+func testResolveAFileExtendsTheNamedTheme() {
+    def file as string init writeTheme('extends = "carbon"' + "\n" + 'label = "Mine"', "");
+    def t as themefile.Loaded init resolve($file);
+    testing.assertEqual($t.theme.label, "Mine");
+    testing.assertEqual($t.theme.light, byName("carbon").light);
+    testing.assertEqual($t.theme.radius, byName("carbon").radius);
+}
+
+func testResolveAFileWithoutExtendsUsesTheDefault() {
+    def t as themefile.Loaded init resolve(writeTheme('label = "Mine"', ""));
+    testing.assertEqual($t.theme.dark, byName(fallback()).dark);
+}
+
+func testResolveRefusesAnUnknownBase() {
+    try {
+        resolve(writeTheme('extends = "nordik"', ""));
+        testing.assertTrue(false);
+    } catch (e) {
+        testing.assertEqual($e.kind, "grimoire");
+        testing.assertContains($e.message, "extends nordik, which is not a shipped theme");
+    }
+}
+
+# A theme file's own stylesheet follows the generated one, so it wins.
+func testAThemeStylesheetIsAppended() {
+    def file as string init writeTheme('stylesheet = "t.css"', '.marker { color: red; }');
+    def css as string init stylesheet($file);
+    testing.assertTrue(strings.indexOf($css, ":root") < strings.indexOf($css, ".marker"));
+    testing.assertEqual(stylesheet("nordic"), palette.stylesheet(byName("nordic")));
 }

@@ -14,6 +14,7 @@
 use lists;
 
 import "./palette.j" as palette;
+import "./themefile.j" as themefile;
 import "./themes/grimoire.j" as grimoire;
 import "./themes/obsidian.j" as obsidian;
 import "./themes/ivy.j" as ivy;
@@ -93,12 +94,53 @@ export func byName(name as string) {
 }
 
 /**
- * The stylesheet for a named theme, ready to write to `assets/grimoire.css`.
- * @param name {string} the theme name
+ * The stylesheet for a theme, ready to write to `assets/grimoire.css`.
+ *
+ * A theme file's own stylesheet follows the generated one, so its rules and
+ * its `--gr-*` overrides win over the shipped values.
+ * @param spec {string} a shipped theme's name, or a theme file
  * @return {string} the stylesheet source
+ * @throws {Error} kind "grimoire" when a theme file is unusable
  */
-export func stylesheet(name as string) {
-    return palette.stylesheet(byName($name));
+export func stylesheet(spec as string) {
+    def t as themefile.Loaded init resolve($spec);
+    def out as string init palette.stylesheet($t.theme);
+    if ($t.css == "") {
+        return $out;
+    }
+    return $out + "\n/* the theme's own stylesheet */\n" + $t.css;
+}
+
+/**
+ * The theme an `html.theme` setting names, with a theme file's extras.
+ *
+ * A name is looked up among the shipped themes, falling back to the default
+ * as `byName` does. A setting ending in `.toml` is a theme file, read on top
+ * of the shipped theme it `extends` (the default when it names none).
+ * @param spec {string} a shipped theme's name, or a theme file's path
+ * @return {themefile.Loaded} the theme, its stylesheet and its files
+ * @throws {Error} kind "grimoire" when a theme file is unusable or extends an
+ *   unknown theme
+ */
+export func resolve(spec as string) {
+    if (not themefile.isFile($spec)) {
+        return themefile.Loaded{theme: byName($spec), css: "", files: [], dir: ""};
+    }
+    def base as string init themefile.extendsOf($spec);
+    if ($base == "") {
+        $base = fallback();
+    }
+    if (not has($base)) {
+        throw Error{
+            kind: "grimoire",
+            message: "theme " + $spec + ": extends " + $base + ", which is not a shipped theme" +
+                " (see: grimoire themes)",
+            file: $spec,
+            line: 0,
+            col: 0
+        };
+    }
+    return themefile.load($spec, byName($base));
 }
 
 /**

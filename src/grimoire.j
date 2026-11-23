@@ -35,6 +35,7 @@ import "./summary.j" as summary;
 import "./build.j" as build;
 import "./plugin.j" as plugin;
 import "./theme.j" as theme;
+import "./themefile.j" as themefile;
 import "./locale.j" as locale;
 import "./serve.j" as serve;
 import "./watch.j" as watch;
@@ -234,6 +235,12 @@ func configure(r as args.Result, appDir as string) {
     if (args.has($r, "out")) {
         $c.outDir = args.asString($r, "out");
     }
+    # A theme file named in grimoire.toml is relative to that file, so a book
+    # builds the same from any directory; one named on the command line is
+    # relative to where the command runs, as any path argument is.
+    if (themefile.isFile($c.theme) and not path.isAbs($c.theme) and $c.configFile != "") {
+        $c.theme = path.join(path.dir($c.configFile), $c.theme);
+    }
     if (args.has($r, "theme")) {
         $c.theme = args.asString($r, "theme");
     }
@@ -305,6 +312,12 @@ func configure(r as args.Result, appDir as string) {
 }
 
 func checkTheme(c as config.Config) {
+    # A theme file is read now, so a broken one stops the command before
+    # anything is rendered, with the file and the problem in the message.
+    if (themefile.isFile($c.theme)) {
+        theme.resolve($c.theme);
+        return;
+    }
     if (not theme.has($c.theme)) {
         warn("unknown theme " + $c.theme + "; using " + theme.fallback() +
             " (see: grimoire themes)");
@@ -481,6 +494,7 @@ func runThemes() {
     }
     io.printf("\nEvery theme ships both a light and a dark palette; readers pick with the\n");
     io.printf("selector in the top bar, which defaults to following the system setting.\n");
+    io.printf("\nA book can use its own theme instead: set html.theme to a .toml theme file.\n");
     return 0;
 }
 
@@ -508,7 +522,8 @@ out = "site"
 clean = false
 
 [html]
-# Any of the eleven built-in themes; run `grimoire themes` for the list.
+# Any of the eleven built-in themes (`grimoire themes` lists them), or a
+# theme file of your own: theme = "theme/house.toml".
 theme = "grimoire"
 # The colour mode a first-time reader gets: auto, light, or dark.
 mode = "auto"

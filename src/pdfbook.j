@@ -800,7 +800,7 @@ func options(c as config.Config) {
     $opts.margin = 48;
     $opts.bodySize = 10;
     $opts.tablePad = 3;
-    def light as palette.Palette init theme.byName($c.theme).light;
+    def light as palette.Palette init theme.resolve($c.theme).theme.light;
     $opts.tableHeaderFill = fillOf($light.surfaceAlt);
     $opts.headingStyles = [
         doctree.headingStyle(tintOf($light.accent, 22)),
@@ -937,7 +937,7 @@ func footer(c as config.Config, doc as pdf.Document) {
     $label.right = $right;
     $label.size = 8;
     $label.margin = FOOTER_MARGIN;
-    def muted as palette.Rgb init palette.parseHex(theme.byName($c.theme).light.muted);
+    def muted as palette.Rgb init palette.parseHex(theme.resolve($c.theme).theme.light.muted);
     $label.red = $muted.r;
     $label.green = $muted.g;
     $label.blue = $muted.b;

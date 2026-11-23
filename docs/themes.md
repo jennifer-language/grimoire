@@ -3,6 +3,7 @@
 Eleven themes ship with Grimoire. Every one defines a **light and a dark palette** -
 that is not optional in the theme model, so no theme can render a broken dark
 mode - plus a type stack, a corner radius, and the measure of the text column.
+A book can also bring its own as a TOML file: see [Custom themes](#custom-themes).
 
 ```sh
 grimoire themes                  # the list, with one line each
@@ -233,6 +234,68 @@ needs to hear about it.
 jennifer fmt --write src/themes/yours.j
 bin/grimoire build --theme yours
 ```
+
+## Custom themes
+
+A book does not need a theme compiled into Grimoire to have its own look. Point
+`html.theme` at a theme file instead of a name:
+
+```toml
+[html]
+theme = "theme/house.toml"   # relative to grimoire.toml
+```
+
+A theme file gives what a shipped theme gives, in TOML, and **extends** a
+shipped theme for everything it leaves out, so it states only what differs:
+
+```toml
+name = "house"                # defaults to the file's name
+label = "House"
+description = "Our colours"
+extends = "carbon"            # the shipped theme to start from; default "grimoire"
+radius = 4                    # corner radius, 0-64
+contentWidth = 800            # the measure, 480-1600
+stylesheet = "house.css"      # optional, appended after the generated stylesheet
+files = ["fonts/house-sans.woff2"]   # copied into the site's assets/
+
+[fonts]
+body = '"House Sans", Arial, sans-serif'
+heading = '"House Sans", Arial, sans-serif'
+mono = '"House Mono", Menlo, monospace'
+
+[light]
+accent = "#c2410c"
+accentHover = "#9a3412"
+
+[dark]
+bg = "#0c100e"
+accent = "#f4772f"
+```
+
+`[light]` and `[dark]` take any of the fourteen slots in the table above, by
+name. A colour is hex (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) or `rgb()` /
+`rgba()` / `hsl()` / `hsla()`. The six light slots the printed book draws with
+(`surface`, `surfaceAlt`, `border`, `muted`, `accent`, `codeBg`) must be
+`#rrggbb`, because that is the form the PDF writer reads.
+
+**`stylesheet`** is for what a palette does not cover: `@font-face` rules for
+self-hosted fonts, the code colours (`--gr-syn-*`) and the admonition colours
+(`--gr-adm-*`), or any rule of your own. It is appended to
+`assets/grimoire.css`, after the theme's own rules, so it wins; match the
+selectors the generated sheet uses for dark mode, as described above. The
+**`files`** it needs, web fonts typically, are copied into `assets/` at the same
+relative paths, so `url("fonts/house-sans.woff2")` in the stylesheet finds them.
+Both are paths inside the theme file's directory.
+
+Unlike `grimoire.toml`, a theme file is **strict**. A configuration typo falls
+back to a default, but a theme file is something the book asked for by name,
+so a missing file, an unknown key, a colour that does not parse or a path that
+leaves the theme's directory stops the build with a message that names the file
+and the problem. Every value ends up in a stylesheet, which is also why none of
+them may contain `{`, `}`, `;`, `<` or `>`.
+
+A theme given on the command line (`--theme house.toml`) is relative to where
+the command runs, as any path argument is.
 
 ## Regenerating the gallery
 

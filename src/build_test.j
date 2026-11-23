@@ -1011,3 +1011,21 @@ func testWriteFileReturnsBytesNotRunes() {
     testing.assertEqual(writeFile($target, $umlauts), 6);
     testing.assertEqual(len(fs.readBytes($target)), 6);
 }
+
+# --- theme files -------------------------------------------------------
+
+# A theme file's fonts land in assets/ at their own relative paths, so its
+# stylesheet's url(fonts/x.woff2) resolves; a shipped theme copies nothing.
+func testAThemesFilesAreCopiedIntoAssets() {
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-themefiles-");
+    fs.mkdirAll(path.join($dir, "fonts"));
+    fs.writeString(path.join($dir, "fonts/a.woff2"), "font-bytes");
+    fs.writeString(path.join($dir, "t.toml"), 'files = ["fonts/a.woff2"]');
+    def c as config.Config init config.defaults();
+    $c.outDir = path.join($dir, "site");
+    $c.theme = path.join($dir, "t.toml");
+    testing.assertEqual(copyThemeFiles($c), 10);
+    testing.assertEqual(fs.readString(path.join($dir, "site/assets/fonts/a.woff2")), "font-bytes");
+    $c.theme = "nordic";
+    testing.assertEqual(copyThemeFiles($c), 0);
+}
