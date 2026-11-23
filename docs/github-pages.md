@@ -63,12 +63,12 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.5.0
+    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.6.0
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.5.0
+      image: ghcr.io/jennifer-language/grimoire:0.6.0
 ```
 
-`0.5.0` is a Grimoire release: use the newest one, in both places. 0.4.0 is the
+`0.6.0` is a Grimoire release: use the newest one, in both places. 0.4.0 is the
 first release that carries `docs-pages.yml`, so it is the oldest that `uses`
 can name. [Pinning](#pinning) says why both lines name a version rather than
 `main` and `latest`.
@@ -183,7 +183,7 @@ the published address, custom or not.
 
 ```yaml
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.5.0
+      image: ghcr.io/jennifer-language/grimoire:0.6.0
       directory: manual
 ```
 
@@ -211,7 +211,7 @@ A plugin that needs a program the image does not have - `grimoire-feed` and
 registry, and name it:
 
 ```yaml
-      image: ghcr.io/you/grimoire-with-git:0.5.0
+      image: ghcr.io/you/grimoire-with-git:0.6.0
 ```
 
 **The image has to be public.** The workflow pulls it without logging in.
@@ -289,9 +289,9 @@ on:
 jobs:
   pages:
     # permissions as above
-    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.5.0
+    uses: jennifer-language/grimoire/.github/workflows/docs-pages.yml@0.6.0
     with:
-      image: ghcr.io/jennifer-language/grimoire:0.5.0
+      image: ghcr.io/jennifer-language/grimoire:0.6.0
       dev: true
 ```
 

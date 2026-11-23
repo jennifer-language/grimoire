@@ -34,7 +34,7 @@ jvc app install https://github.com/jennifer-language/grimoire
 ```
 
 ```
-installed grimoire 0.5.0
+installed grimoire 0.6.0
   from:    https://github.com/jennifer-language/grimoire
   app:     /home/you/.local/share/jvc/apps/grimoire (209 file(s))
   command: /home/you/.local/bin/grimoire
@@ -115,13 +115,13 @@ on.
 both together lets apt check the dependency between them:
 
 ```sh
-sudo apt install ./jennifer_0.27.0_amd64.deb ./grimoire_0.5.0_all.deb
+sudo apt install ./jennifer_0.27.0_amd64.deb ./grimoire_0.6.0_all.deb
 ```
 
 **Arch Linux.** The package, or the published `PKGBUILD` to build it yourself:
 
 ```sh
-sudo pacman -U grimoire-0.5.0-1-any.pkg.tar.zst
+sudo pacman -U grimoire-0.6.0-1-any.pkg.tar.zst
 ```
 
 The Arch package depends on `jennifer` without a version, because the
@@ -139,8 +139,8 @@ plugins that ship with Grimoire are installed beside it, in
 **Anywhere else.** The tarball is the same tree, without the packaging:
 
 ```sh
-tar xzf grimoire-0.5.0.tar.gz
-ln -s "$PWD/grimoire-0.5.0/bin/grimoire" ~/.local/bin/grimoire
+tar xzf grimoire-0.6.0.tar.gz
+ln -s "$PWD/grimoire-0.6.0/bin/grimoire" ~/.local/bin/grimoire
 ```
 
 It is reproducible - rebuilding a release tag yields the same bytes - so the
@@ -184,8 +184,8 @@ want a shell in there instead.
 | Tag | What it is |
 | --- | ---------- |
 | `latest` | the newest release - what the commands above pull |
-| `0.5.0` | one release, unchanging |
-| `0.4` | the newest release of that line |
+| `0.6.0` | one release, unchanging |
+| `0.6` | the newest release of that line |
 | `dev` | the tip of the default branch, unreleased; `main` is the same image |
 
 `latest` follows the highest release rather than the last one tagged, so a
