@@ -25,6 +25,7 @@ import "./summary.j" as summary;
 import "./content.j" as content;
 import "./assets.j" as assets;
 import "./util.j" as util;
+import "./theme.j" as theme;
 
 /**
  * Everything that varies from page to page, gathered so the shell takes one
@@ -392,6 +393,34 @@ func searchDialog(c as config.Config) {
         "</span></div></div></div>";
 }
 
+/**
+ * A web font a theme file ships, and its media type.
+ * @field path {string} the file, relative to `assets/`
+ * @field type {string} the font's media type
+ */
+def struct FontFile {
+    path as string,
+    type as string
+};
+
+/**
+ * The web fonts among a theme's files, to preload. A shipped theme has none.
+ * @param spec {string} the `html.theme` setting
+ * @return {list of FontFile} the fonts, in the order the theme lists them
+ */
+func fontFiles(spec as string) {
+    def out as list of FontFile;
+    for (def one in theme.resolve($spec).files) {
+        def lower as string init strings.lower($one);
+        if (strings.endsWith($lower, ".woff2")) {
+            $out[] = FontFile{path: $one, type: "font/woff2"};
+        } elseif (strings.endsWith($lower, ".woff")) {
+            $out[] = FontFile{path: $one, type: "font/woff"};
+        }
+    }
+    return $out;
+}
+
 func head(c as config.Config, v as View, b as Brand) {
     def title as string init $c.title;
     if ($v.title != "" and $v.title != $c.title) {
@@ -421,6 +450,13 @@ func head(c as config.Config, v as View, b as Brand) {
         $out[] = '<link rel="icon" href="' + attrEsc(siteRef($v.root, $b.favicon)) + '">';
     }
     $out[] = '<link rel="stylesheet" href="' + attrEsc($v.root + "assets/grimoire.css") + '">';
+    # A theme's web fonts are only found once the stylesheet is parsed, so a page
+    # would paint in the fallback face and then jump. Preloading starts them with
+    # the HTML instead.
+    for (def font in fontFiles($c.theme)) {
+        $out[] = '<link rel="preload" href="' + attrEsc($v.root + "assets/" + $font.path) +
+            '" as="font" type="' + $font.type + '" crossorigin>';
+    }
     # The mode is stamped on the root element before the first paint, so a reader
     # who chose dark never gets a white flash between pages.
     $out[] = "<script>" + assets.boot($c.defaultMode) + "</script>";

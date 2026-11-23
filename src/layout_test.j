@@ -21,6 +21,9 @@
  */
 use testing;
 use strings;
+use fs;
+use os;
+use path;
 
 func english() {
     locale.install("en");
@@ -402,6 +405,32 @@ func testHeadCarriesTheLanguageAndStylesheet() {
     testing.assertContains($html, '<html lang="en">');
     testing.assertContains($html, 'href="assets/grimoire.css"');
     testing.assertContains($html, '<meta name="generator" content="Grimoire">');
+}
+
+# A theme file's web fonts are preloaded from every page, so the first paint
+# can use them; other files it ships are not, and a shipped theme has none.
+func testHeadPreloadsAThemesWebFonts() {
+    english();
+    def dir as string init fs.makeTempDir(os.tempDir(), "grimoire-preload-");
+    fs.mkdirAll(path.join($dir, "fonts"));
+    for (def name in ["fonts/a.woff2", "fonts/b.woff", "fonts/c.ttf", "logo.svg"]) {
+        fs.writeString(path.join($dir, $name), "x");
+    }
+    fs.writeString(
+        path.join($dir, "t.toml"),
+        'files = ["fonts/a.woff2", "fonts/b.woff", "fonts/c.ttf", "logo.svg"]');
+    def c as config.Config init config.defaults();
+    $c.theme = path.join($dir, "t.toml");
+    def v as View init view();
+    $v.root = "../";
+    def html as string init head($c, $v, noBrand());
+    testing.assertContains(
+        $html,
+        '<link rel="preload" href="../assets/fonts/a.woff2" as="font" type="font/woff2" crossorigin>');
+    testing.assertContains($html, 'href="../assets/fonts/b.woff" as="font" type="font/woff"');
+    testing.assertFalse(strings.contains($html, "c.ttf"));
+    testing.assertFalse(strings.contains($html, "logo.svg"));
+    testing.assertFalse(strings.contains(head(config.defaults(), view(), noBrand()), "preload"));
 }
 
 func testHeadResolvesAssetPathsPerPage() {

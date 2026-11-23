@@ -285,7 +285,11 @@ self-hosted fonts, the code colours (`--gr-syn-*`) and the admonition colours
 selectors the generated sheet uses for dark mode, as described above. The
 **`files`** it needs, web fonts typically, are copied into `assets/` at the same
 relative paths, so `url("fonts/house-sans.woff2")` in the stylesheet finds them.
-Both are paths inside the theme file's directory.
+Both are paths inside the theme file's directory. Every page preloads the
+`.woff2` and `.woff` files among them, so the browser fetches the fonts with the
+HTML rather than after the stylesheet; pair that with `font-display: optional`
+in the `@font-face` rules and the text never jumps from a fallback face to the
+web font while a page is shown.
 
 Unlike `grimoire.toml`, a theme file is **strict**. A configuration typo falls
 back to a default, but a theme file is something the book asked for by name,
