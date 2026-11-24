@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 /**
  * White-box tests for `config.j`, run by `jennifer test src/config_test.j`.
@@ -321,11 +321,10 @@ func decodeBrokenToml() {
     return apply(defaults(), "[unclosed\nkey = ");
 }
 
-# The `toml` module raises a plain runtime error rather than a kinded one - its
-# message carries the `toml:` prefix instead. Worth pinning: the docblocks on
-# `apply` and `load` said "kind toml" until this test disagreed with them.
+# A document that does not parse is the `toml` library's own kind, as the
+# docblock on `apply` says.
 func testApplyThrowsOnADocumentThatDoesNotParse() {
-    testing.assertThrows("decodeBrokenToml", "runtime");
+    testing.assertThrows("decodeBrokenToml", "toml");
 }
 
 # --- load ------------------------------------------------------------
@@ -379,6 +378,15 @@ title = "Moved"
 func testAPluginDatetimeSettingCrossesAsText() {
     def doc as toml.Value init toml.decode("at = 1979-05-27T07:32:00Z\n");
     testing.assertEqual(jsonOf($doc, "/at"), '"1979-05-27T07:32:00Z"');
+}
+
+# A local date, time or date-time has no offset, so it crosses as its TOML text.
+func testAPluginLocalDateSettingCrossesAsText() {
+    def doc as toml.Value init toml.decode(
+        "d = 0979-05-07\nt = 07:32:00.25\ndt = 1979-05-27T07:32:00\n");
+    testing.assertEqual(jsonOf($doc, "/d"), '"0979-05-07"');
+    testing.assertEqual(jsonOf($doc, "/t"), '"07:32:00.25"');
+    testing.assertEqual(jsonOf($doc, "/dt"), '"1979-05-27T07:32:00"');
 }
 
 func testAPointerKeyEscapesInTheOrderTheStandardSays() {

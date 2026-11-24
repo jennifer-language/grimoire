@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 /**
  * The Grimoire build configuration: a `Config` value with a working default for
@@ -12,6 +12,7 @@
  * @license LGPL-3.0-only
  */
 use toml;
+use io;
 use json;
 use fs;
 use strings;
@@ -333,7 +334,8 @@ func pointerKey(key as string) {
 # A plugin receives its own table, and the wire format is JSON, so the two have
 # to meet somewhere. The text is assembled rather than built as a `json.Value`
 # because every branch then returns a string, and `json.encode` of a scalar does
-# the escaping. A date-time goes over as its RFC 3339 text: JSON has no date.
+# the escaping. An offset date-time goes over as its RFC 3339 text, a local one
+# as its TOML text: JSON has no date.
 #
 # The braces are raw strings; a cooked one reads them as an interpolation.
 func jsonOf(doc as toml.Value, ptr as string) {
@@ -361,7 +363,39 @@ func jsonOf(doc as toml.Value, ptr as string) {
         }
         return "false"; }
         when "datetime" { return json.encode(time.iso(toml.asDatetime($doc, $ptr))); }
+        when "local-date", "local-time", "local-datetime" {
+            return json.encode(localText($doc, $ptr, toml.typeOf($doc, $ptr)));
+        }
         else { return "null"; }
+    }
+}
+
+# localText renders a TOML local date, time or date-time as its TOML text, which
+# is also its ISO 8601 form: a local value has no offset, so it has no RFC 3339
+# text and no instant to convert.
+func localText(doc as toml.Value, ptr as string, form as string) {
+    def l as toml.Local init toml.asLocal($doc, $ptr);
+    def date as string init io.sprintf(
+        "%d|pad=4|fill=0-%d|pad=2|fill=0-%d|pad=2|fill=0",
+        $l.year,
+        $l.month,
+        $l.day);
+    def clock as string init io.sprintf(
+        "%d|pad=2|fill=0:%d|pad=2|fill=0:%d|pad=2|fill=0",
+        $l.hour,
+        $l.minute,
+        $l.second);
+    if ($l.nanosecond > 0) {
+        def frac as string init io.sprintf("%d|pad=9|fill=0", $l.nanosecond);
+        while (strings.endsWith($frac, "0")) {
+            $frac = $frac[..len($frac) - 1];
+        }
+        $clock = $clock + "." + $frac;
+    }
+    match ($form) {
+        when "local-date" { return $date; }
+        when "local-time" { return $clock; }
+        else { return $date + "T" + $clock; }
     }
 }
 
@@ -437,9 +471,8 @@ export func generatedDir(c as Config) {
  * @param base {Config} the configuration to layer onto
  * @param text {string} the TOML source
  * @return {Config} the merged configuration
- * @throws {Error} when the document does not parse. The `toml` module raises a
- *   plain runtime error rather than a kinded one; its message carries the
- *   `toml:` prefix and the line number
+ * @throws {Error} kind `toml` when the document does not parse; the message
+ *   carries the line number
  */
 export func apply(base as Config, text as string) {
     def doc as toml.Value init toml.decode($text);
