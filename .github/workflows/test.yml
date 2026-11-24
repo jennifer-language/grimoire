@@ -34,8 +34,9 @@ env:
   # The interpreter every job runs in: an exact Jennifer release, the newest, so
   # a new one - patch or minor - is a change made here on purpose rather than
   # one that arrives with `latest`. `Dockerfile`, `pages.yml` and
-  # `scripts/ci-git-image.sh` pin the same.
-  JENNIFER_TAG: "0.27.0"
+  # `scripts/ci-git-image.sh` pin the same. `dev` (Jennifer's main) until 0.28.0,
+  # the floor in deck.toml, is released; then that tag.
+  JENNIFER_TAG: "dev"
 
 jobs:
   # The version numbers, as their own callable workflow. It used to be a block
@@ -476,7 +477,24 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Install the interpreter release
+      # `dev` has no release to download: build Jennifer's main instead.
+      - if: ${{ !contains(env.JENNIFER_TAG, '.') }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - if: ${{ !contains(env.JENNIFER_TAG, '.') }}
+        name: Build the interpreter from main
+        run: |
+          set -eu
+          git clone --quiet --depth 1 https://github.com/jennifer-language/jennifer "$RUNNER_TEMP/jennifer"
+          make -C "$RUNNER_TEMP/jennifer" build-go
+          install -Dm755 "$RUNNER_TEMP/jennifer/jennifer" "$HOME/.local/bin/jennifer"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "JENNIFER_SYSMODDIR=$RUNNER_TEMP/jennifer/modules" >> "$GITHUB_ENV"
+
+      - if: ${{ contains(env.JENNIFER_TAG, '.') }}
+        name: Install the interpreter release
         run: |
           set -eu
           stage="jennifer-${JENNIFER_TAG}-linux-amd64"

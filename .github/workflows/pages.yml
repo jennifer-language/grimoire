@@ -46,8 +46,10 @@ jobs:
       # well as a new one, and an interpreter that moved underneath it - the
       # 0.25 development builds changed how quotes are escaped and how strictly
       # XML namespaces are read - would fail a build that passed when the
-      # release was tagged. Raise it deliberately, when a release needs it.
-      image: ghcr.io/jennifer-language/jennifer:0.27.0
+      # release was tagged. Raise it deliberately, when a release needs it:
+      # `dev` (Jennifer's main) until 0.28.0, the floor, is released; then that
+      # tag.
+      image: ghcr.io/jennifer-language/jennifer:dev
       launcher: bin/grimoire
       args: --pdf
       # The pieces a reader needs, so a silently empty publish fails here

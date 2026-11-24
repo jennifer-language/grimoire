@@ -44,8 +44,9 @@ manual = "https://grimoire.jennifer-lang.dev/"
 # pragma. Grimoire uses the read-only parameter borrow that arrived during the
 # 0.24 series, the module surface as it settled for 0.25, and the doctree
 # module (the document tree and PDF renderer split out of markdown) of 0.26,
-# and `encoding.encode` / `encoding.decode` and `strings.replicate` of 0.27.
-jennifer = ">=0.27.0"
+# `encoding.encode` / `encoding.decode` and `strings.replicate` of 0.27, and
+# `toml.asLocal` of 0.28.
+jennifer = ">=0.28.0"
 
 # No [decks] table: Grimoire depends on no other deck. Everything it imports -
 # args, html, markdown, pdf - is a system library that ships with the
