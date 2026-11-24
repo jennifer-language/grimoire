@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 /**
  * The words Grimoire itself puts on a page, in English and ten other languages.
@@ -424,9 +424,10 @@ export func has(lang as string) {
  * Load every catalog and select one. Called once, while the configuration is
  * being resolved, before anything renders.
  *
- * An unknown tag is not rejected here - `intl` falls back to English on a key it
- * cannot find, which is the right outcome for a book in an untranslated
- * language. `has` is what the command line uses to say so out loud.
+ * An unknown tag is not rejected here: a book in an untranslated language gets
+ * the English interface. `intl.setLocale` refuses a tag with no catalog, so that
+ * fallback is chosen here. `has` is what the command line uses to say so out
+ * loud.
  * @param lang {string} the language tag to render the interface in
  * @return {null}
  */
@@ -442,7 +443,11 @@ export func install(lang as string) {
     intl.load("pt", PT);
     intl.load("ru", RU);
     intl.load("zh", ZH);
-    intl.setLocale($lang);
+    if (has($lang)) {
+        intl.setLocale($lang);
+    } else {
+        intl.setLocale("en");
+    }
 }
 
 # The admonition kinds `markdown.j` parses, and the catalog key that labels each.
