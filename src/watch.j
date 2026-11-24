@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 /**
  * The rebuild-on-change loop behind `grimoire serve --watch`.
@@ -134,7 +134,7 @@ func also(count as int) {
 # included; rebuilding on a changed `grimoire.toml` would quietly use the old
 # theme and the old title and look like it had worked.
 func watchConfig(configPath as string) {
-    def w as fs.Watcher init fs.watch($configPath, POLL_MS);
+    def w as fs.Watcher init fs.watchWith($configPath, fs.WatchOptions{intervalMs: POLL_MS});
     def watching as bool init true;
     while ($watching) {
         try {
@@ -158,7 +158,7 @@ func watchConfig(configPath as string) {
  * @return {int} the process exit status; the loop does not return on its own
  */
 export func run(c as config.Config, configPath as string) {
-    def sources as fs.Watcher init fs.watch($c.srcDir, POLL_MS);
+    def sources as fs.Watcher init fs.watchWith($c.srcDir, fs.WatchOptions{intervalMs: POLL_MS});
     if ($configPath != "" and fs.isFile($configPath)) {
         spawn {
             return watchConfig($configPath);

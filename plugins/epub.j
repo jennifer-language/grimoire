@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <jennifer@mplx.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 /**
  * An EPUB of the book, built from the same outline as the site.
@@ -214,7 +214,9 @@ func xhtmlDocument(root as xml.Value) {
 # every chapter fails EPUBCheck (RSC-005).
 func bodyOf(body as string) {
     try {
-        return xml.decode("<body>" + $body + "</body>", {"": XHTML_NS, "epub": OPS_NS});
+        return xml.decodeWith(
+            "<body>" + $body + "</body>",
+            xml.DecodeOptions{namespaces: {"": XHTML_NS, "epub": OPS_NS}});
     } catch (e) {
         kit.fail("a chapter did not render as XML: " + $e.message);
     }
